@@ -1,0 +1,8 @@
+.direnv/
+result
+result-*
+__pycache__/
+*.py[cod]
+registry.json
+*.local
+secrets/
