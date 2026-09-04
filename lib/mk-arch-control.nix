@@ -7,6 +7,10 @@ let
   packages = host.systemPackages;
   files = ../platforms/arch/files;
   lizardbytePackages = map (package: "lizardbyte/${package}") packages.lizardbyte;
+  deploymentUser = host.users.${host.deployment.username};
+  requiredGroups = lib.unique (
+    (deploymentUser.groups or [ ]) ++ lib.optional deploymentUser.admin "wheel"
+  );
 in
 pkgs.writeShellApplication {
   name = "arch-switch";
@@ -73,6 +77,11 @@ pkgs.writeShellApplication {
     expected_user=${lib.escapeShellArg host.deployment.username}
     if [[ $login_user != "$expected_user" ]]; then
       printf 'arch-switch must run as %s, not %s\n' "$expected_user" "$login_user" >&2
+      exit 1
+    fi
+    if ! /usr/bin/id -nG "$login_user" | tr ' ' '\n' | grep -Fxq wheel; then
+      printf 'deployment user is not in required administrator group: wheel\n' >&2
+      printf 'grant wheel membership through the Arch bootstrap path, then retry\n' >&2
       exit 1
     fi
 
@@ -223,7 +232,8 @@ pkgs.writeShellApplication {
       /usr/bin/sudo /usr/bin/mkinitcpio -P
     fi
 
-    for group in openrazer realtime; do
+    required_groups=(${lib.escapeShellArgs requiredGroups})
+    for group in "''${required_groups[@]}"; do
       if ! /usr/bin/id -nG "$login_user" | tr ' ' '\n' | grep -Fxq "$group"; then
         /usr/bin/sudo /usr/bin/gpasswd --add "$login_user" "$group"
       fi

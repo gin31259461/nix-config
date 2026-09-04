@@ -1,5 +1,5 @@
 {
-  description = "Personal Arch and NixOS configuration";
+  description = "Personal Arch Linux configuration";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-26.05";
@@ -46,13 +46,23 @@
       homeConfigurationName = "${deployment.username}@${archHost.name}";
       system = archHost.system;
       pkgs = nixpkgs.legacyPackages.${system};
-      runnerctl = import ./lib/mk-runner-control.nix {
+      runnerInstances = import ./modules/gitlab-runner/interface.nix {
+        inherit lib;
+        rawInstances = archHost.gitlabRunners;
+      };
+      runnerInterfaceTests = import ./modules/gitlab-runner/interface_test.nix {
+        inherit lib;
+        rawInstances = archHost.gitlabRunners;
+      };
+      runnerArch = import ./modules/gitlab-runner/arch.nix {
+        inherit lib;
+        packageInventory = archHost.systemPackages.pacman;
+      };
+      runnerPlatform = runnerArch.platform;
+      runnerctl = import ./modules/gitlab-runner/package.nix {
         inherit pkgs;
-        instances = archHost.gitlabRunners;
-        platform = {
-          podman = "/usr/bin/podman";
-          ip = "/usr/bin/ip";
-        };
+        instances = runnerInstances;
+        platform = runnerPlatform;
       };
       arch-switch = import ./lib/mk-arch-control.nix {
         inherit lib pkgs;
@@ -86,19 +96,6 @@
           exec ${home-switch}/bin/home-switch "$@"
         '';
       };
-      nixosRunnerFixture = lib.nixosSystem {
-        inherit system;
-        modules = [
-          ./modules/nixos/gitlab-runner.nix
-          {
-            system.stateVersion = "26.05";
-            orbit.gitlabRunner = {
-              enable = true;
-              instances = archHost.gitlabRunners;
-            };
-          }
-        ];
-      };
     in
     assert lib.assertMsg (builtins.elem deployment.profile deploymentUser.profiles)
       "deployment profile ${deployment.profile} is not selected by ${deployment.username}";
@@ -107,13 +104,17 @@
     {
       homeConfigurations = archHomes;
 
-      nixosModules.gitlab-runner = import ./modules/nixos/gitlab-runner.nix;
-
       checks.${system} = {
         arch-home = archHomes.${homeConfigurationName}.activationPackage;
         arch-switch-interface = pkgs.runCommand "arch-switch-interface-check" { } ''
           ${arch-switch}/bin/arch-switch --help \
             | ${pkgs.gnugrep}/bin/grep -Fxq 'usage: arch-switch [--check | --update]'
+          ${pkgs.gnugrep}/bin/grep -Fq \
+            'deployment user is not in required administrator group: wheel' \
+            ${arch-switch}/bin/arch-switch
+          ${pkgs.gnugrep}/bin/grep -Fq \
+            'required_groups=(i2c openrazer realtime wheel)' \
+            ${arch-switch}/bin/arch-switch
           if ${arch-switch}/bin/arch-switch --check --update > /dev/null 2>&1; then
             printf 'arch-switch accepted incompatible modes\n' >&2
             exit 1
@@ -201,6 +202,9 @@
         gitlab-runner-config = pkgs.runCommand "gitlab-runner-config-check" { } ''
           ${runnerctl}/bin/runnerctl validate > "$out"
         '';
+        gitlab-runner-interface =
+          assert runnerInterfaceTests;
+          pkgs.writeText "gitlab-runner-interface-check" "GitLab Runner Interface checks passed\n";
         gitlab-runner-tests =
           pkgs.runCommand "gitlab-runner-tests"
             {
@@ -211,20 +215,14 @@
                 ${
                   pkgs.writeText "gitlab-runner-test-instances.json" (
                     builtins.toJSON {
-                      instances = archHost.gitlabRunners;
-                      platform = {
-                        podman = "/usr/bin/podman";
-                        ip = "/usr/bin/ip";
-                      };
+                      instances = runnerInstances;
+                      platform = runnerPlatform;
                     }
                   )
                 } \
                 ${./modules/gitlab-runner/runnerctl.py}
               touch "$out"
             '';
-        nixos-gitlab-runner-module = pkgs.writeText "nixos-gitlab-runner-module-check" (
-          builtins.toJSON (builtins.attrNames nixosRunnerFixture.config.users.users)
-        );
         justfile =
           pkgs.runCommand "justfile-check"
             {

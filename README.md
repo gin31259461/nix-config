@@ -4,15 +4,14 @@
 [![Nix Flakes](https://img.shields.io/badge/Nix-Flakes-5277C3?logo=nixos&logoColor=white)](https://nix.dev/concepts/flakes.html)
 [![Home Manager](https://img.shields.io/badge/Home_Manager-26.05-7EBAE4?logo=nixos&logoColor=white)](https://github.com/nix-community/home-manager/tree/release-26.05)
 
-Declarative configuration for Abner's Arch workstation and future NixOS hosts.
-The flake combines machine identity, reusable profiles, optional modules, Home
-Manager policy, and small platform adapters while keeping every package, file,
-account, and service under one owner.
+Declarative configuration for Abner's Arch workstation. The flake combines
+machine identity, reusable profiles, optional modules, Home Manager policy, and
+small Arch adapters while keeping every package, file, account, and service
+under one owner.
 
 The active deployment is `arch-workstation`: host `arch`, profile
 `workstation`, login user `abnertu`, and Home Manager configuration
-`abnertu@arch`. No NixOS host is fabricated; a real host must supply its own
-hardware and filesystem configuration.
+`abnertu@arch`.
 
 ## Deploy the Arch workstation
 
@@ -99,7 +98,6 @@ operations. Builds and checks are the safe review path.
 | `profiles/` | Reusable general-purpose Home Manager bundles |
 | `homes/<user>/` | Personal Home Manager differences |
 | `modules/home/` | Shared user capabilities and graphical-session policy |
-| `modules/nixos/` | Reusable NixOS capabilities |
 | `modules/gitlab-runner/` | Runner policy, controller, and invariant checks |
 
 The vocabulary is defined in [CONTEXT.md](CONTEXT.md). Host `arch` selects the
@@ -137,7 +135,7 @@ just build arch-workstation
 
 Neovim is linked as one directory. Hyprland is projected recursively into a
 clean, writable, non-VCS directory so generated state and selected profiles can
-change without exposing migration backups or repository metadata.
+change without exposing adjacent backups or repository metadata.
 
 ## GitLab Runner
 
@@ -152,15 +150,19 @@ Build the controller and address one exact instance at a time:
 ```bash
 runnerctl_path="$(nix build --no-link --print-out-paths .#runnerctl)"
 sudo "$runnerctl_path/bin/runnerctl" status frontend
+sudo "$runnerctl_path/bin/runnerctl" check frontend
 sudo "$runnerctl_path/bin/runnerctl" reconcile frontend
-sudo "$runnerctl_path/bin/runnerctl" verify frontend
 ```
 
 Repeat for `dotnet`. `network.requiredInterface` is a readiness check only; it
 does not force routing through that interface. Reconciliation preserves an
-existing single-runner registration without printing its metadata.
+existing single-runner registration without printing its metadata. It creates
+or converges only the selected account, subordinate-ID allocation, rootless
+Podman socket, manager image, configuration, and user service.
 
-Register a new instance by passing its authentication token only through the
+If `status` reports `registration=absent`, create the Runner in GitLab first and
+set tags, protection, locking, and similar scheduling policy there. Register
+the host instance by passing its authentication token only through the
 environment:
 
 ```bash
@@ -171,10 +173,18 @@ sudo --preserve-env=GITLAB_RUNNER_TOKEN \
 unset GITLAB_RUNNER_TOKEN
 ```
 
-There is intentionally no purge command. A NixOS host can import the same
-interface through `nixosModules.gitlab-runner`.
+Finish by checking the live manager, registration, isolation, and disposable
+job network:
 
-## Validation and migration
+```bash
+sudo "$runnerctl_path/bin/runnerctl" verify frontend
+```
+
+There is intentionally no purge command. Registration and verification are
+explicit operations; normal Arch or Home Manager deployment never invokes
+them.
+
+## Validation
 
 Use `nix flake check` for normal repository changes. Build the affected Home
 Manager activation package when its closure or generated units change:
@@ -183,7 +193,6 @@ Manager activation package when its closure or generated units change:
 nix build '.#homeConfigurations."abnertu@arch".activationPackage'
 ```
 
-Runner `status` and `verify` inspect external state and connectivity, so they
-are not part of source-only validation. The remaining Runner adoption and
-legacy repository retirement gates live in
-[the migration guide](docs/migrations/from-dotfiles-homebase.md).
+Runner `status`, `check`, and `verify` inspect external state and connectivity,
+so they are not part of source-only validation. Run the workflow above when an
+instance is first deployed or its live state must be inspected.

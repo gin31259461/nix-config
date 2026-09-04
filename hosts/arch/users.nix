@@ -4,6 +4,11 @@
     homeDirectory = "/home/abnertu";
     stateVersion = "26.05";
     admin = true;
+    groups = [
+      "i2c"
+      "openrazer"
+      "realtime"
+    ];
 
     profiles = [
       "base"

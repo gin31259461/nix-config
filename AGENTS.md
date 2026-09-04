@@ -2,17 +2,15 @@
 
 ## Scope and sources of truth
 
-This repository is the declarative source of truth for the owner's Arch and
-future NixOS machines. Read `CONTEXT.md` before changing composition vocabulary.
-Read `docs/migrations/from-dotfiles-homebase.md` while Runner adoption or legacy
-repository retirement remains incomplete.
+This repository is the declarative source of truth for the owner's Arch
+machine. Read `CONTEXT.md` before changing composition vocabulary.
 
 Use these ownership boundaries:
 
 - `hosts/<name>/` owns machine identity, login users, profile/module selection,
   hardware, and host-specific values.
-- `platforms/` owns generic Arch or NixOS realization and native package
-  ownership. It must not know host identity or application instances.
+- `platforms/` owns generic Arch realization and native package ownership. It
+  must not know host identity or application instances.
 - `profiles/` owns reusable general-purpose bundles. Keep hostnames, hardware,
   secrets, service accounts, and GitLab Runner instances out of profiles.
 - `homes/<user>/` owns personal Home Manager differences; shared behavior
@@ -36,8 +34,6 @@ implementation details to callers.
   Home Manager. User units must call the Arch-owned stable system path.
 - Home Manager owns platform-independent CLI/development packages, static home
   configuration, and user-unit policy whose activation is safe.
-- NixOS owns system accounts, services, hardware, and system packages through
-  NixOS modules.
 - Login users belong in `hosts/<name>/users.nix`. A service account belongs to
   its module and receives no Home Manager profile, password, wheel membership,
   desktop policy, or unrelated host role.
@@ -60,7 +56,7 @@ partial-upgrade path or make routine activation update the system implicitly.
 
 Manage the locked Neovim input as one directory link. Project Hyprland
 recursively into a clean, writable, non-VCS directory. Never project either
-input into an existing Git worktree, where VCS metadata or migration backups
+input into an existing Git worktree, where VCS metadata or adjacent backups
 could enter runtime discovery.
 
 ## GitLab Runner invariants
@@ -80,7 +76,7 @@ could enter runtime discovery.
 - Work in the normal `~/.config/nix` worktree. `nix.conf` is tracked directly;
   Home Manager must not generate it.
 - Link each `~/.agents/skills/<name>` directory as a unit. Leaf-file projection
-  and migration backups can prevent Codex skill discovery.
+  and adjacent backups can prevent Codex skill discovery.
 - `files/home/AGENTS.md` is the concise source for the Home Manager-managed
   instruction file at the home root; detailed ownership stays here.
 - Preserve unrelated dirty files and stage exact paths only. Flakes see only
@@ -90,7 +86,7 @@ could enter runtime discovery.
   private keys, application databases, or mutable host state.
 
 Builds, evaluation, formatting, shell linting, and fake harnesses are safe.
-Never run Arch bootstrap/apply, Home Manager or NixOS switch, package managers,
+Never run Arch bootstrap/apply, Home Manager switch, package managers,
 service enablement, Runner registration, or repository retirement merely to
 validate source. Inspect the exact target before any authorized live operation.
 Do not read or print KeePassXC databases/INI files, systemd credentials, Runner
@@ -109,14 +105,11 @@ nix build '.#homeConfigurations."abnertu@arch".activationPackage'
 nix build .#arch-switch .#runnerctl
 ```
 
-For a NixOS host, build its affected system closure. Run Runner `status` or
-`verify` only when external host state or connectivity is explicitly in scope.
+Run Runner `status` or `verify` only when external host state or connectivity is
+explicitly in scope.
 Keep permanent tests for stable interfaces, security invariants, and
-non-trivial orchestration; remove migration-only comparisons when their old
-owner is retired.
+non-trivial orchestration.
 
 `README.md` owns current operator workflows, `CONTEXT.md` owns vocabulary,
-`AGENTS.md` owns coding-agent decisions, and migration documents own temporary
-transition steps. Update source first, then only documents whose public
-contract or ownership changed. Do not retain completed migration instructions
-as a parallel architecture.
+and `AGENTS.md` owns coding-agent decisions. Update source first, then only
+documents whose public contract or ownership changed.

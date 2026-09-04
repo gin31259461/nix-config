@@ -1,7 +1,7 @@
 # Nix Configuration
 
 This context describes how machine identity, reusable policy, and optional
-capabilities compose into deployable Arch and NixOS configurations.
+capabilities compose into the deployable Arch configuration.
 
 ## Language
 
@@ -10,7 +10,7 @@ A real machine and its final deployable configuration.
 _Avoid_: Platform configuration, environment
 
 **Platform**:
-The operating-system mechanism that realizes a host, currently Arch or NixOS.
+The operating-system mechanism that realizes a host, currently Arch.
 _Avoid_: Host, distribution profile
 
 **Profile**:

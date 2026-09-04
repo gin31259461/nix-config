@@ -13,16 +13,11 @@ let
   };
   profileRegistry = import ../profiles;
   moduleRegistry = import ../modules/home;
-  supportedPlatforms = [
-    "arch"
-    "nixos"
-  ];
   resolve =
     registry: kind: name:
     if builtins.hasAttr name registry then registry.${name} else throw "unknown ${kind}: ${name}";
 in
-assert inputs.nixpkgs.lib.assertMsg (builtins.elem platform supportedPlatforms)
-  "unsupported platform: ${platform}";
+assert inputs.nixpkgs.lib.assertMsg (platform == "arch") "unsupported platform: ${platform}";
 inputs.home-manager.lib.homeManagerConfiguration {
   inherit pkgs;
 
