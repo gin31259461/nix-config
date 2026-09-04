@@ -1,0 +1,83 @@
+{
+  "nodes": {
+    "home-manager": {
+      "inputs": {
+        "nixpkgs": [
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1787377438,
+        "narHash": "sha256-Sxu1NLTD/Ern6hFGLlZmtKCSct3YQXZI/lls8RE1XeM=",
+        "owner": "nix-community",
+        "repo": "home-manager",
+        "rev": "65258d5c65a250189fde2e35f490d15e064c4c62",
+        "type": "github"
+      },
+      "original": {
+        "owner": "nix-community",
+        "ref": "release-26.05",
+        "repo": "home-manager",
+        "type": "github"
+      }
+    },
+    "hypr-config": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1787035734,
+        "narHash": "sha256-wCoDqTxGqHOffU0buoOT6JLnE1VVzrikijzWjmYCTCo=",
+        "owner": "Orbit-Lua",
+        "repo": "hypr",
+        "rev": "09402e2cf53f62683ac0726b770e22c3c7fedd96",
+        "type": "github"
+      },
+      "original": {
+        "owner": "Orbit-Lua",
+        "repo": "hypr",
+        "type": "github"
+      }
+    },
+    "neovim-config": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1787037298,
+        "narHash": "sha256-vd0DhVWPUa7kbxsgVUOObKP+t7PgVmW8xTt21zfJZsw=",
+        "owner": "Orbit-Lua",
+        "repo": "orbitvim",
+        "rev": "3fc751c1bad2bddd8e27784dd5ed245ed542bec2",
+        "type": "github"
+      },
+      "original": {
+        "owner": "Orbit-Lua",
+        "repo": "orbitvim",
+        "type": "github"
+      }
+    },
+    "nixpkgs": {
+      "locked": {
+        "lastModified": 1788405554,
+        "narHash": "sha256-r2f1oUwixlgq9zOdYLqJLfS/lWBT60/IITjhTKI59JU=",
+        "owner": "NixOS",
+        "repo": "nixpkgs",
+        "rev": "a5cc6f2c37bf518436dc8d1c288ccd0c43c2f4c4",
+        "type": "github"
+      },
+      "original": {
+        "owner": "NixOS",
+        "ref": "nixos-26.05",
+        "repo": "nixpkgs",
+        "type": "github"
+      }
+    },
+    "root": {
+      "inputs": {
+        "home-manager": "home-manager",
+        "hypr-config": "hypr-config",
+        "neovim-config": "neovim-config",
+        "nixpkgs": "nixpkgs"
+      }
+    }
+  },
+  "root": "root",
+  "version": 7
+}
