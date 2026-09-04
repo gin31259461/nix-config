@@ -1,0 +1,4 @@
+interface:
+  display_name: "Create README"
+  short_description: "Write concise evidence-backed project READMEs"
+  default_prompt: "Use $create-readme to create or rewrite this repository's README.md from verified project evidence."

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Create AGENTS.md"
+  short_description: "Write scoped coding-agent repository instructions"
+  default_prompt: "Use $create-agentsmd to create or rewrite scoped AGENTS.md instructions for this repository."
