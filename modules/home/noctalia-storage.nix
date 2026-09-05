@@ -5,7 +5,8 @@
   ...
 }:
 let
-  keyFile = "${config.xdg.dataHome}/noctalia/storage-key/master-key";
+  # A dedicated directory must not collide with a pre-existing storage-key file.
+  keyFile = "${config.xdg.dataHome}/noctalia/file-key-v1/master-key";
   prepare =
     "${pkgs.python3}/bin/python ${./prepare-noctalia-storage.py}"
     + " --config ${lib.escapeShellArg "${config.xdg.configHome}/noctalia"}"

@@ -66,7 +66,7 @@ class StorageTests(unittest.TestCase):
         self.assertTrue(fresh.exists())
 
     def test_running_shell_blocks_first_migration_without_writes(self):
-        with self.assertRaisesRegex(RuntimeError, "Exit Noctalia"):
+        with self.assertRaisesRegex(RuntimeError, "Stop noctalia.service"):
             self.prepare(running=True)
         self.assertFalse(self.key.parent.exists())
 
@@ -152,6 +152,14 @@ class StorageTests(unittest.TestCase):
         marker = self.key.parent / "pending"
         marker.mkdir(mode=0o600)
         with self.assertRaisesRegex(RuntimeError, "file type"):
+            self.prepare()
+
+    def test_key_directory_collision_has_actionable_error(self):
+        self.key.parent.parent.mkdir(parents=True)
+        self.key.parent.write_bytes(b"fixture existing key file")
+        with self.assertRaisesRegex(
+            RuntimeError, "Expected a key directory, found a file; preserve it"
+        ):
             self.prepare()
 
 

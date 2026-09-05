@@ -64,6 +64,11 @@ def validate(config, state, cache, key):
         safe_path(path)
         if path.exists():
             info = path.stat()
+            if path == key.parent:
+                require(
+                    stat.S_ISDIR(info.st_mode),
+                    "Expected a key directory, found a file; preserve it and choose a separate managed directory",
+                )
             require(
                 stat.S_ISDIR(info.st_mode)
                 if path == key.parent
@@ -109,7 +114,7 @@ def preflight(config, state, cache, key, running):
         return
     require(
         not running(),
-        "Exit Noctalia before first migration; deploy from a text console",
+        "Stop noctalia.service before first migration; Hyprland may remain running",
     )
     pending = (key.parent / "pending").exists()
     for source, archive in archives(state, cache):

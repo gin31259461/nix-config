@@ -22,7 +22,7 @@ and disables calendar synchronization. The guard rejects configured calendar
 accounts, conflicting storage overrides and config includes pending review.
 It does not silently rewrite GUI settings or account credentials.
 
-The key lives at `~/.local/share/noctalia/storage-key/master-key`, with directory
+The key lives at `~/.local/share/noctalia/file-key-v1/master-key`, with directory
 mode `0700` and file mode `0600`. Activation generates 32 random bytes encoded
 as 64 lowercase hexadecimal characters. Only the filename enters Nix artifacts.
 Neither key contents nor encrypted data are imported into Git or the Nix store.
@@ -33,17 +33,21 @@ the encrypted files can decrypt it. KeePassXC's locked state no longer protects
 Noctalia history. Back up the new key securely alongside any data you need to
 recover; losing it cannot be repaired by generating another key.
 
-## First activation: exit the graphical session
+## First activation: pause Noctalia, not Hyprland
 
-Save work and log out of Hyprland. Use a text console to run the normal
-deployment command from the repository:
+Keep a terminal open in Hyprland. Pause only Noctalia, then run deployment from
+the repository. The bar and launcher will temporarily disappear; existing
+application windows remain open. A text console is an alternative, not a requirement.
 
 ```bash
-nix run .#arch-workstation
+systemctl --user stop noctalia.service
+nix run .#arch-workstation && systemctl --user start noctalia.service
 ```
 
 First activation refuses to proceed if Noctalia is running. It does not stop
-services itself. Do not launch Noctalia concurrently with this transition.
+services itself. Do not launch Noctalia or tray consumers that pull it in
+concurrently with this transition. If activation fails after migration starts,
+finish recovery before restarting Noctalia.
 The transition uses the Home Manager XDG paths; the following are this Host's
 defaults:
 
@@ -66,7 +70,10 @@ Home Manager dry-run validation never generates a key or moves data.
 
 ## Recovery and configuration conflicts
 
-- If Noctalia is running during first activation, exit the session and retry.
+- If Noctalia is running during first activation, stop its user service and retry.
+- An existing `~/.local/share/noctalia/storage-key` may be a key file, not a
+  directory. It remains untouched; the new transition uses `file-key-v1/` to
+  avoid that collision. Never delete or overwrite an unknown existing key.
 - If a conflicting `[storage]` override or calendar account is reported, review
   the relevant `~/.config/noctalia/*.toml` and GUI-managed
   `~/.local/state/noctalia/settings.toml` locally. Remove only the conflicting

@@ -53,13 +53,13 @@ class SessionTests(unittest.TestCase):
             policy["storage"],
             {
                 "key_source": "file",
-                "key_file": "/home/abnertu/.local/share/noctalia/storage-key/master-key",
+                "key_file": "/home/abnertu/.local/share/noctalia/file-key-v1/master-key",
             },
         )
         self.assertFalse(policy["calendar"]["enabled"])
         self.assertFalse(
             (
-                UNITS / "../../.." / ".local/share/noctalia/storage-key/master-key"
+                UNITS / "../../.." / ".local/share/noctalia/file-key-v1/master-key"
             ).exists()
         )
 
