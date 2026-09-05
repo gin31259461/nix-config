@@ -61,6 +61,12 @@ host state. Use scoped Conventional Commit subjects: `type(scope): imperative su
   degraded startup. Do not restore Remmina applet autostart.
 - Never copy package-provided units or track generated `.wants/` links.
   Target drop-ins at the package's canonical unit name.
+- `modules/home/noctalia-config/` owns capture/deploy behavior and its tests;
+  `homes/<user>/noctalia/config.toml` owns reviewed preferences. Home Manager
+  alone deploys the config link. Do not copy GUI state wholesale into Git or
+  silently clear overrides. Override replacement requires a stopped Noctalia,
+  a private recovery receipt, and preservation of unowned sections. Dry-run
+  capture/deploy still inspect live settings and are not source-validation tests.
 - Link the locked Neovim input as one directory; recursively project Hyprland
   into a clean writable non-VCS directory. Keep projection preflight before
   Home Manager link changes. Reject worktrees and adjacent backups instead of

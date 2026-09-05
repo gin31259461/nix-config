@@ -97,6 +97,11 @@ file key; desktop startup does not wait for an unlocked vault.
 See [desktop and password-store operation](docs/desktop-session.md) for the
 first-activation requirements, key recovery and post-activation verification.
 
+Use `nix run .#noctalia-config -- capture --dry-run` to preview exporting reviewed
+Noctalia GUI preferences to this repository, or `deploy --dry-run` to check a
+deployment. See [Noctalia preference exchange](docs/noctalia-config.md) for scope,
+GUI override conflicts and recovery. Actual `deploy` activates the complete home.
+
 Arch owns graphical executables, drivers and system services. Home Manager owns
 CLI/development tools, static home files and user-unit policy; graphical units
 call stable Arch paths. Do not install a second desktop executable through Home

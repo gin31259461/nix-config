@@ -3,4 +3,5 @@
   hyprland = ./hyprland.nix;
   keepassxc = ./keepassxc.nix;
   noctalia-storage = ./noctalia-storage.nix;
+  noctalia-config = ./noctalia-config;
 }

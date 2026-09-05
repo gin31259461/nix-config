@@ -20,6 +20,7 @@
       "graphical-session"
       "keepassxc"
       "noctalia-storage"
+      "noctalia-config"
     ];
     homeModules = [ ../../homes/abnertu/home.nix ];
   };

@@ -1,5 +1,6 @@
 { pkgs, home }:
 {
+  noctalia-config = import ./noctalia-config/checks.nix { inherit pkgs; };
   noctalia-storage =
     pkgs.runCommand "noctalia-storage-check" { nativeBuildInputs = [ pkgs.python3 ]; }
       ''

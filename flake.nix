@@ -78,6 +78,11 @@
           exec home-manager switch --flake '${self}#${homeConfigurationName}' "$@"
         '';
       };
+      noctalia-config = import ./modules/home/noctalia-config/package.nix {
+        inherit pkgs;
+        username = deployment.username;
+        homeConfiguration = homeConfigurationName;
+      };
       archDeployment = pkgs.writeShellApplication {
         name = deploymentName;
         text = ''
@@ -119,13 +124,18 @@
       // runners.checks;
 
       packages.${system} = {
-        inherit arch-switch home-switch;
+        inherit arch-switch home-switch noctalia-config;
         ${deploymentName} = archDeployment;
         default = arch-switch;
       }
       // runners.packages;
 
       apps.${system} = {
+        noctalia-config = {
+          type = "app";
+          program = "${noctalia-config}/bin/noctalia-config";
+          meta.description = "Capture or deploy reviewed Noctalia preferences";
+        };
         arch-switch = {
           type = "app";
           program = "${arch-switch}/bin/arch-switch";

@@ -1,0 +1,467 @@
+"""Explicit, reviewed preference exchange with Noctalia v5 (not secret sync)."""
+
+import argparse
+from contextlib import contextmanager
+import fcntl
+import hashlib
+import json
+import os
+from pathlib import Path
+import re
+import stat
+import subprocess
+import sys
+import tempfile
+import tomllib
+
+import tomli_w
+
+
+# Whole sections are owned together. Unknown/new sections require code review.
+SECTIONS = frozenset(
+    {
+        "theme",
+        "bar",
+        "widget",
+        "dock",
+        "desktop",
+        "shell",
+        "osd",
+        "notification",
+        "audio",
+        "brightness",
+        "battery",
+        "control_center",
+        "accessibility",
+        "night_light",
+    }
+)
+REVIEW = re.compile(
+    r"password|secret|token|credential|account|command|exec|script|hook|action|keybind|url",
+    re.IGNORECASE,
+)
+
+
+def require(ok, message):
+    if not ok:
+        raise RuntimeError(message)
+
+
+def safe_path(path):
+    require(path.is_absolute(), "Expected an absolute path")
+    for item in (path, *path.parents):
+        require(not item.is_symlink(), "Refusing a symlinked write/state path")
+
+
+def encode(data):
+    return tomli_w.dumps(data).encode()
+
+
+def parse(raw):
+    return tomllib.loads(raw.decode())
+
+
+def read(path):
+    return path.read_bytes() if path.exists() else b""
+
+
+def needs_review(value):
+    if isinstance(value, dict):
+        return any(
+            (REVIEW.search(key) and bool(item)) or needs_review(item)
+            for key, item in value.items()
+        )
+    if isinstance(value, list):
+        return any(needs_review(item) for item in value)
+    return False
+
+
+def select(data):
+    selected = {
+        key: value
+        for key, value in data.items()
+        if key in SECTIONS and not needs_review(value)
+    }
+    return selected, sorted(set(data) - set(selected))
+
+
+def merge(base, override):
+    result = dict(base)
+    for key, value in override.items():
+        if isinstance(value, dict) and isinstance(result.get(key), dict):
+            result[key] = merge(result[key], value)
+        else:
+            result[key] = value
+    return result
+
+
+def atomic_write(path, raw, mode=0o600):
+    safe_path(path)
+    if (
+        path.exists()
+        and read(path) == raw
+        and stat.S_IMODE(path.stat().st_mode) == mode
+    ):
+        return
+    fd, name = tempfile.mkstemp(prefix=".noctalia-", dir=path.parent)
+    try:
+        with os.fdopen(fd, "wb") as stream:
+            stream.write(raw)
+            stream.flush()
+            os.fchmod(stream.fileno(), mode)
+            os.fsync(stream.fileno())
+        os.replace(name, path)
+        directory = os.open(path.parent, os.O_RDONLY | os.O_DIRECTORY)
+        try:
+            os.fsync(directory)
+        finally:
+            os.close(directory)
+    finally:
+        if os.path.exists(name):
+            os.unlink(name)
+
+
+def execute(argv):
+    result = subprocess.run(argv, capture_output=True, check=False)
+    require(
+        result.returncode == 0,
+        "External command failed; output withheld to protect settings",
+    )
+    return (
+        result.stdout + result.stderr
+        if argv[1:3] == ["config", "validate"]
+        else result.stdout
+    )
+
+
+class Sync:
+    def __init__(
+        self, repo, user, home_configuration, config, state, control, run=execute
+    ):
+        require(bool(re.fullmatch(r"[a-z_][a-z0-9_-]*", user)), "Invalid login user")
+        self.repo, self.run = repo, run
+        self.target = repo / "homes" / user / "noctalia/config.toml"
+        self.config, self.settings = config, state / "settings.toml"
+        self.control = control
+        self.home_configuration = home_configuration
+        self.pending = control / "pending.json"
+
+    def validate(self, data):
+        with tempfile.TemporaryDirectory(prefix="noctalia-validate-") as directory:
+            candidate = Path(directory) / "config.toml"
+            candidate.write_bytes(encode(data))
+            result = self.run(
+                ["/usr/bin/noctalia", "config", "validate", str(candidate)]
+            )
+            require(
+                b"warn" not in result.lower(),
+                "Noctalia validation warnings require review",
+            )
+
+    def export(self):
+        return parse(self.run(["/usr/bin/noctalia", "config", "export"]))
+
+    def stopped(self):
+        # pgrep's exit 1 is an expected negative result, not a command failure.
+        result = subprocess.run(
+            ["/usr/bin/pgrep", "-u", str(os.getuid()), "-x", "noctalia"],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            check=False,
+        )
+        require(
+            result.returncode == 1,
+            "Exit Noctalia before changing GUI overrides or recovering",
+        )
+
+    @contextmanager
+    def locked(self):
+        safe_path(self.control)
+        self.control.mkdir(mode=0o700, parents=True, exist_ok=True)
+        require(
+            self.control.stat().st_uid == os.getuid()
+            and stat.S_IMODE(self.control.stat().st_mode) == 0o700,
+            "Command state requires login-user ownership and mode 0700",
+        )
+        lock_path = self.control / "lock"
+        safe_path(lock_path)
+        fd = os.open(lock_path, os.O_CREAT | os.O_RDWR | os.O_NOFOLLOW, 0o600)
+        with os.fdopen(fd, "r+") as lock:
+            fcntl.flock(lock, fcntl.LOCK_EX)
+            yield
+
+    def preflight(self):
+        safe_path(self.target)
+        safe_path(self.settings)
+        safe_path(self.control)
+        safe_path(self.pending)
+        root = (
+            self.run(["git", "-C", str(self.repo), "rev-parse", "--show-toplevel"])
+            .decode()
+            .strip()
+        )
+        require(Path(root) == self.repo, "--repo must identify the repository root")
+        self.run(
+            [
+                "git",
+                "-C",
+                str(self.repo),
+                "ls-files",
+                "--error-unmatch",
+                str(self.target.relative_to(self.repo)),
+            ]
+        )
+        require(
+            not self.pending.exists(),
+            "An interrupted deployment exists; use deploy --recover",
+        )
+
+    def capture(self, dry_run=False):
+        self.preflight()
+        original = read(self.target)
+        data, skipped = select(self.export())
+        require(bool(data), "No eligible preferences; repository file left unchanged")
+        self.validate(data)
+        print("Capture sections: " + ", ".join(sorted(data)))
+        print(
+            "Excluded sections (policy, unsupported or review required): "
+            + ", ".join(skipped)
+        )
+        if dry_run:
+            return
+        with self.locked():
+            self.preflight()
+            require(
+                read(self.target) == original,
+                "Repository preferences changed during capture; retry",
+            )
+            atomic_write(self.target, encode(data), 0o644)
+        print(
+            "Preferences captured. Review locally before committing; no Git index changes made."
+        )
+
+    def plan(self, replace):
+        self.preflight()
+        wanted = parse(read(self.target))
+        eligible, excluded = select(wanted)
+        require(
+            not excluded and eligible == wanted,
+            "Repository contains policy or unreviewed sections",
+        )
+        self.validate(wanted)
+        # Other handwritten files remain unowned. Never overwrite their policy.
+        for path in self.config.glob("*.toml"):
+            if path.name == "config.toml":
+                continue
+            data = parse(read(path))
+            require(
+                not data.get("include"),
+                "Included configuration needs manual ownership review",
+            )
+            require(
+                not (set(data) & set(wanted)),
+                "Another TOML owns the same preference sections",
+            )
+        current = self.config / "config.toml"
+        require(
+            not current.exists()
+            or (
+                current.is_symlink()
+                and str(current.resolve()).startswith("/nix/store/")
+            ),
+            "Existing config.toml is not a Home Manager link; resolve ownership first",
+        )
+        original = read(self.settings)
+        overrides = parse(original)
+        conflicts = [
+            key
+            for key in wanted
+            if key in overrides
+            and merge({key: wanted[key]}, {key: overrides[key]})[key] != wanted[key]
+        ]
+        require(
+            not conflicts or replace,
+            "GUI override conflicts in sections: " + ", ".join(sorted(conflicts)),
+        )
+        # Clear only the sections explicitly owned by this repository snapshot.
+        replacement = (
+            encode(
+                {key: value for key, value in overrides.items() if key not in wanted}
+            )
+            if replace
+            else original
+        )
+        return wanted, original, replacement
+
+    def recover(self):
+        self.stopped()
+        safe_path(self.pending)
+        require(self.pending.is_file(), "No interrupted deployment to recover")
+        journal = json.loads(read(self.pending))
+        require(
+            journal["settings"] == str(self.settings),
+            "Recovery root differs from interrupted deployment",
+        )
+        backup = self.control / journal["backup"]
+        require(
+            backup.parent == self.control and backup.name.startswith("settings-"),
+            "Invalid recovery receipt",
+        )
+        safe_path(backup)
+        current_hash = hashlib.sha256(read(self.settings)).hexdigest()
+        require(
+            current_hash in (journal["before"], journal["after"]),
+            "GUI settings changed after interruption; preserve receipt and resolve manually",
+        )
+        raw = read(backup)
+        require(
+            hashlib.sha256(raw).hexdigest() == journal["before"],
+            "Recovery backup does not match receipt",
+        )
+        atomic_write(self.settings, raw, journal["mode"])
+        self.pending.unlink()
+        print(
+            "GUI overrides restored; Home Manager generation was not rolled back. Backup retained."
+        )
+
+    def deploy(self, dry_run=False, replace=False, recover=False):
+        if recover:
+            require(not dry_run, "Recovery cannot be combined with dry-run")
+            with self.locked():
+                self.recover()
+            return
+        wanted, original, replacement = self.plan(replace)
+        print("Deploy sections: " + ", ".join(sorted(wanted)))
+        if dry_run:
+            print("Dry run: no Home Manager build, activation or override changes.")
+            return
+        with self.locked():
+            wanted, original, replacement = self.plan(replace)
+            source = read(self.target)
+            # Build the full home before touching mutable overrides.
+            self.run(
+                [
+                    "/usr/bin/nix",
+                    "build",
+                    "--no-link",
+                    "--no-update-lock-file",
+                    str(self.repo)
+                    + '#homeConfigurations."'
+                    + self.home_configuration
+                    + '".activationPackage',
+                ]
+            )
+            require(
+                read(self.settings) == original,
+                "GUI settings changed during build; retry",
+            )
+            require(
+                read(self.target) == source,
+                "Repository preferences changed during build; retry",
+            )
+            changed = original != replacement
+            if changed:
+                self.stopped()
+                self.settings.parent.mkdir(parents=True, exist_ok=True)
+                fd, backup = tempfile.mkstemp(
+                    prefix="settings-", suffix=".toml", dir=self.control
+                )
+                os.close(fd)
+                atomic_write(Path(backup), original)
+                journal = {
+                    "settings": str(self.settings),
+                    "backup": Path(backup).name,
+                    "before": hashlib.sha256(original).hexdigest(),
+                    "after": hashlib.sha256(replacement).hexdigest(),
+                    "mode": stat.S_IMODE(self.settings.stat().st_mode),
+                }
+                atomic_write(self.pending, json.dumps(journal).encode())
+                atomic_write(self.settings, replacement, journal["mode"])
+            try:
+                self.run(
+                    [
+                        "/usr/bin/nix",
+                        "run",
+                        "--no-update-lock-file",
+                        str(self.repo) + "#home-switch",
+                    ]
+                )
+                effective = self.export()
+                require(
+                    all(effective.get(key) == value for key, value in wanted.items()),
+                    "Effective preferences differ from repository after activation",
+                )
+            except Exception:
+                if changed:
+                    self.recover()
+                raise
+            if changed:
+                self.pending.unlink()
+            print(
+                "Home Manager deployment and effective preference verification completed."
+            )
+
+
+def main():
+    parser = argparse.ArgumentParser(prog="noctalia-config", description=__doc__)
+    parser.add_argument("operation", choices=("capture", "deploy"))
+    parser.add_argument("--user", required=True, help=argparse.SUPPRESS)
+    parser.add_argument("--home-configuration", required=True, help=argparse.SUPPRESS)
+    parser.add_argument("--repo", type=Path, default=Path.cwd())
+    parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument("--replace-overrides", action="store_true")
+    parser.add_argument("--recover", action="store_true")
+    args = parser.parse_args()
+    home = Path.home()
+    config_root = Path(
+        os.environ.get("NOCTALIA_CONFIG_HOME")
+        or os.environ.get("XDG_CONFIG_HOME")
+        or home / ".config"
+    )
+    state_root = Path(
+        os.environ.get("NOCTALIA_STATE_HOME")
+        or os.environ.get("XDG_STATE_HOME")
+        or home / ".local/state"
+    )
+    control = (
+        Path(os.environ.get("XDG_STATE_HOME") or home / ".local/state")
+        / "nix-config/noctalia-config"
+    )
+    sync = Sync(
+        args.repo.absolute(),
+        args.user,
+        args.home_configuration,
+        config_root / "noctalia",
+        state_root / "noctalia",
+        control,
+    )
+    try:
+        require(
+            args.operation == "deploy" or not (args.replace_overrides or args.recover),
+            "Override replacement/recovery are deploy-only operations",
+        )
+        if args.operation == "capture":
+            sync.capture(args.dry_run)
+        else:
+            require(
+                not os.environ.get("NOCTALIA_CONFIG_HOME")
+                and not os.environ.get("NOCTALIA_STATE_HOME")
+                and config_root == home / ".config"
+                and state_root == home / ".local/state",
+                "Custom Noctalia roots are capture-only until Home Manager ownership is configured",
+            )
+            sync.deploy(args.dry_run, args.replace_overrides, args.recover)
+    except RuntimeError as error:
+        print(str(error), file=sys.stderr)
+        return 1
+    except (OSError, ValueError, KeyError, TypeError):
+        print(
+            "Operation failed; details withheld to protect configuration values",
+            file=sys.stderr,
+        )
+        return 1
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
