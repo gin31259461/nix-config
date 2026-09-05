@@ -2,6 +2,7 @@
 
 from pathlib import Path
 import sys
+import tomllib
 import unittest
 
 UNITS = Path(sys.argv.pop())
@@ -21,24 +22,49 @@ def unit(name):
 
 
 class SessionTests(unittest.TestCase):
-    def test_secret_service_shell_and_repair_order(self):
+    def test_keepassxc_loads_at_login_without_password_delivery(self):
         keepass = unit("keepassxc")
-        shell = unit("noctalia")
-        repair = unit("keepassxc-tray-refresh")
-        self.assertIn("noctalia.service", keepass["Before"])
-        self.assertIn("org.freedesktop.secrets", keepass["ExecStartPost"][0])
-        self.assertIn("exit 1", keepass["ExecStartPost"][0])
-        self.assertIn("keepassxc.service", shell["After"])
-        self.assertIn("keepassxc-tray-refresh.service", shell["Wants"])
-        self.assertTrue(
-            {"keepassxc.service", "noctalia.service"}.issubset(repair["After"])
+        self.assertEqual(keepass["WantedBy"], ["graphical-session.target"])
+        self.assertNotIn("ExecStartPost", keepass)
+        self.assertNotIn("LoadCredentialEncrypted", keepass)
+        self.assertNotIn("LoadCredential", keepass)
+        self.assertEqual(keepass["Restart"], ["no"])
+        self.assertEqual(
+            keepass["ExecStart"],
+            [
+                '/usr/bin/keepassxc --minimized "/home/abnertu/.local/share/keepassxc/credentials.kdbx"'
+            ],
         )
-        self.assertIn("StatusNotifierWatcher", repair["ExecStartPre"][0])
-        self.assertIn("--no-block restart keepassxc.service", repair["ExecStart"][0])
+        self.assertFalse((UNITS / "keepassxc-tray-refresh.service").exists())
+        self.assertFalse((UNITS / "remmina-applet.service").exists())
+        for path in UNITS.glob("*.service"):
+            config = unit(path.stem)
+            for key in ("After", "Before", "Wants", "Requires", "BindsTo"):
+                self.assertNotIn("keepassxc.service", config.get(key, []), path.name)
+            self.assertNotIn("--pw-stdin", path.read_text())
+            self.assertNotIn(".cred", path.read_text().replace("credentials.kdbx", ""))
+        self.assertTrue(
+            (UNITS / "graphical-session.target.wants/keepassxc.service").exists()
+        )
+
+    def test_noctalia_uses_a_runtime_file_key(self):
+        policy = tomllib.loads((UNITS / "../../noctalia/storage.toml").read_text())
+        self.assertEqual(
+            policy["storage"],
+            {
+                "key_source": "file",
+                "key_file": "/home/abnertu/.local/share/noctalia/storage-key/master-key",
+            },
+        )
+        self.assertFalse(policy["calendar"]["enabled"])
+        self.assertFalse(
+            (
+                UNITS / "../../.." / ".local/share/noctalia/storage-key/master-key"
+            ).exists()
+        )
 
     def test_tray_consumers_and_degraded_launcher(self):
         for name in (
-            "remmina-applet",
             "tailscale-systray",
             "vesktop",
             "vicinae",

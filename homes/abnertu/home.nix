@@ -1,5 +1,7 @@
-{ pkgs, ... }:
+{ config, pkgs, ... }:
 {
+  workstation.keepassxc.databaseFile = "${config.home.homeDirectory}/.local/share/keepassxc/credentials.kdbx";
+
   programs.git.settings = {
     user = {
       email = "qw0207060413@gmail.com";

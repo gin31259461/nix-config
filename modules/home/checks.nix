@@ -1,5 +1,11 @@
 { pkgs, home }:
 {
+  noctalia-storage =
+    pkgs.runCommand "noctalia-storage-check" { nativeBuildInputs = [ pkgs.python3 ]; }
+      ''
+        python ${./tests/test_noctalia_storage.py} ${./prepare-noctalia-storage.py}
+        touch "$out"
+      '';
   graphical-session-ordering =
     pkgs.runCommand "graphical-session-ordering" { nativeBuildInputs = [ pkgs.python3 ]; }
       ''
@@ -37,7 +43,6 @@
       noctalia.service \
       polychromatic-tray.service \
       quickshell-overview.service \
-      remmina-applet.service \
       tailscale-systray.service \
       vesktop.service \
       vicinae.service; do
@@ -48,7 +53,6 @@
     done
     for unit in \
       polychromatic-tray.service \
-      remmina-applet.service \
       tailscale-systray.service \
       vesktop.service \
       vicinae.service; do

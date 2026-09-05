@@ -60,67 +60,9 @@ in
         Install.WantedBy = [ "graphical-session.target" ];
       };
 
-      keepassxc = {
-        Unit = graphicalUnit // {
-          Description = "KeePassXC tray and Secret Service provider";
-          Before = [
-            "noctalia.service"
-            "remmina-applet.service"
-          ];
-          ConditionPathExists = [
-            "%h/.local/share/keepassxc/credentials.kdbx"
-            "%h/.local/share/keepassxc/keepassxc-password.cred"
-          ];
-        };
-        Service = {
-          LoadCredentialEncrypted = "keepassxc-password:%h/.local/share/keepassxc/keepassxc-password.cred";
-          ExecStart = ''
-            ${bin "bash"} -c 'exec ${bin "keepassxc"} --minimized --pw-stdin "%h/.local/share/keepassxc/credentials.kdbx" < "%d/keepassxc-password"'
-          '';
-          ExecStartPost = ''
-            ${bin "bash"} -c 'for _ in {1..150}; do ${bin "busctl"} --user get-property org.freedesktop.secrets /org/freedesktop/secrets/collection/credentials org.freedesktop.Secret.Collection Locked 2>/dev/null | ${bin "grep"} -qx "b false" && exit 0; ${bin "sleep"} 0.1; done; exit 1'
-          '';
-          Restart = "on-failure";
-          RestartSec = "2s";
-          Slice = "app-graphical.slice";
-          TimeoutStartSec = "30s";
-          TimeoutStopSec = "10s";
-        };
-        Install.WantedBy = [ "graphical-session.target" ];
-      };
-
-      keepassxc-tray-refresh = {
-        Unit = graphicalUnit // {
-          Description = "Refresh KeePassXC tray registration after Noctalia starts";
-          After = [
-            "keepassxc.service"
-            "noctalia.service"
-          ];
-          ConditionPathExists = [ "%h/.local/share/keepassxc/credentials.kdbx" ];
-        };
-        Service = {
-          Type = "oneshot";
-          ExecStartPre = ''
-            ${bin "bash"} -c 'for _ in {1..100}; do ${bin "busctl"} --user get-property org.kde.StatusNotifierWatcher /StatusNotifierWatcher org.kde.StatusNotifierWatcher RegisteredStatusNotifierItems >/dev/null 2>&1 && ${bin "sleep"} 5 && exit 0; ${bin "sleep"} 0.1; done; exit 1'
-          '';
-          ExecStart = "${bin "systemctl"} --user --no-block restart keepassxc.service";
-          RemainAfterExit = true;
-          Slice = "session-graphical.slice";
-          TimeoutStartSec = "20s";
-        };
-      };
-
       noctalia = {
         Unit = graphicalUnit // {
           Description = "Noctalia desktop shell";
-          After = [
-            "graphical-session.target"
-            "keepassxc.service"
-          ];
-          Wants = [
-            "keepassxc.service"
-            "keepassxc-tray-refresh.service"
-          ];
         };
         Service = restartableService // {
           ExecStart = bin "noctalia";
@@ -148,17 +90,6 @@ in
         };
         Service = restartableService // {
           ExecStart = bin "polychromatic-tray-applet";
-          Slice = "app-graphical.slice";
-        };
-        Install.WantedBy = [ "graphical-session.target" ];
-      };
-
-      remmina-applet = {
-        Unit = trayConsumerUnit // {
-          Description = "Remmina tray applet";
-        };
-        Service = restartableService // {
-          ExecStart = "${bin "remmina"} -i";
           Slice = "app-graphical.slice";
         };
         Install.WantedBy = [ "graphical-session.target" ];

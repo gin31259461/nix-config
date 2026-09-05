@@ -18,6 +18,8 @@
     modules = [
       "hyprland"
       "graphical-session"
+      "keepassxc"
+      "noctalia-storage"
     ];
     homeModules = [ ../../homes/abnertu/home.nix ];
   };

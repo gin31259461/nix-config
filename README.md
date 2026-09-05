@@ -92,6 +92,11 @@ Before `just` is installed, use `nix run .#just -- <recipe>`.
 | Runner instances and resource limits | [hosts/arch/gitlab-runners.nix](hosts/arch/gitlab-runners.nix) |
 | Arch convergence behavior | [platforms/arch/arch-switch.sh](platforms/arch/arch-switch.sh) |
 
+KeePassXC loads at login and unlocks manually. Noctalia uses its own runtime
+file key; desktop startup does not wait for an unlocked vault.
+See [desktop and password-store operation](docs/desktop-session.md) for the
+first-activation requirements, key recovery and post-activation verification.
+
 Arch owns graphical executables, drivers and system services. Home Manager owns
 CLI/development tools, static home files and user-unit policy; graphical units
 call stable Arch paths. Do not install a second desktop executable through Home

@@ -81,6 +81,7 @@
       "pipewire-pulse"
       "playerctl"
       "power-profiles-daemon"
+      "procps-ng"
       "qalculate-gtk"
       "qt5ct"
       "qt6-5compat"

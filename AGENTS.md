@@ -53,8 +53,12 @@ host state. Use scoped Conventional Commit subjects: `type(scope): imperative su
 ## Protect home and Runner state
 
 - Keep UWSM as the Hyprland entrypoint and one startup owner per application.
-  Preserve KeePassXC, Secret Service readiness, Noctalia, tray consumers and
-  tray-repair ordering. Vicinae's tray timeout permits degraded startup.
+  KeePassXC loads minimized at login but unlocks manually: no credential
+  delivery, unlocked collection probe or tray-repair restart. Noctalia uses a
+  runtime file key and starts independently of KeePassXC; tray consumers follow
+  Noctalia. Keep its one-time storage transition offline, preserve archived
+  data, and never regenerate a missing established key. Vicinae's tray timeout permits
+  degraded startup. Do not restore Remmina applet autostart.
 - Never copy package-provided units or track generated `.wants/` links.
   Target drop-ins at the package's canonical unit name.
 - Link the locked Neovim input as one directory; recursively project Hyprland
