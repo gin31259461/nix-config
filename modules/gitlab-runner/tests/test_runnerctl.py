@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import copy
+from contextlib import ExitStack
 import importlib.util
 import json
 import os
@@ -19,6 +20,7 @@ CONFIG_PATH = Path(sys.argv.pop())
 
 
 def load_runnerctl(path: Path):
+    sys.path.insert(0, str(path.parent))
     spec = importlib.util.spec_from_file_location("runnerctl", path)
     if spec is None or spec.loader is None:
         raise RuntimeError("unable to load runnerctl")
@@ -38,15 +40,183 @@ class RunnerControlTests(unittest.TestCase):
     def test_host_configuration_is_valid(self) -> None:
         self.runnerctl.validate_instances(self.instances)
 
-    def test_cli_exposes_the_arch_runner_lifecycle_without_token_arguments(self) -> None:
+    def test_empty_configuration_is_valid(self) -> None:
+        self.runnerctl.validate_instances({})
+
+    def test_shared_declaration_cases(self) -> None:
+        cases = json.loads(
+            Path(__file__).with_name("validation-cases.json").read_text()
+        )
+        for case in cases:
+            with self.subTest(case=case):
+                instance = copy.deepcopy(self.instances["frontend"])
+                value = instance
+                for key in case["path"][:-1]:
+                    value = value[key]
+                value[case["path"][-1]] = case["value"]
+                if case["valid"]:
+                    self.runnerctl.validate_instances({"frontend": instance})
+                else:
+                    with self.assertRaises(self.runnerctl.RunnerError):
+                        self.runnerctl.validate_instances({"frontend": instance})
+
+    def test_operation_lock_serializes_instances(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "runner.lock"
+            with self.runnerctl.operation_lock(path):
+                with self.assertRaisesRegex(
+                    self.runnerctl.RunnerError, "another Runner"
+                ):
+                    with self.runnerctl.operation_lock(path):
+                        self.fail("acquired twice")
+            with self.runnerctl.operation_lock(path):
+                pass
+
+    def test_timeout_does_not_echo_arguments_or_output(self) -> None:
+        with mock.patch.object(
+            self.runnerctl.subprocess,
+            "run",
+            side_effect=subprocess.TimeoutExpired(
+                ["fake", "private"], 1, output="private"
+            ),
+        ):
+            with self.assertRaises(self.runnerctl.RunnerError) as raised:
+                self.runnerctl.run(["fake", "private"], timeout=1)
+        self.assertNotIn("private", str(raised.exception))
+
+    def test_reconcile_twice_change_and_failed_restart_retry(self) -> None:
+        instance = copy.deepcopy(self.instances["frontend"])
+        with tempfile.TemporaryDirectory() as directory, ExitStack() as stack:
+            root = Path(directory)
+            entry = self.runnerctl.pwd.struct_passwd(
+                (
+                    instance["account"]["user"],
+                    "x",
+                    os.getuid(),
+                    os.getgid(),
+                    "",
+                    str(root),
+                    "/bin/bash",
+                )
+            )
+            paths = self.runnerctl.HostPaths(
+                root / "subuid", root / "subgid", root / "run"
+            )
+            bus = paths.runtime / str(entry.pw_uid) / "bus"
+            bus.parent.mkdir(parents=True)
+            bus.touch()
+            platform = {
+                **self.document["platform"],
+                "caAnchorDirectory": str(root / "anchors"),
+                "containerCertsDirectory": str(root / "certs"),
+            }
+            calls = []
+            active = False
+            image_present = False
+            fail_restart = False
+
+            def run_as(entry, command, **kwargs):
+                nonlocal active, image_present
+                calls.append(command)
+                if command[1:3] == ["image", "exists"]:
+                    return subprocess.CompletedProcess(
+                        command, 0 if image_present else 1
+                    )
+                if command[1:2] == ["pull"]:
+                    image_present = True
+                if "is-active" in command:
+                    return subprocess.CompletedProcess(command, 0 if active else 3)
+                if "restart" in command and fail_restart:
+                    raise self.runnerctl.RunnerError("restart failed")
+                if "start" in command or "restart" in command:
+                    active = True
+                return subprocess.CompletedProcess(command, 0)
+
+            for name in (
+                "require_root",
+                "check_prerequisites",
+                "verify_rootless_podman",
+            ):
+                stack.enter_context(mock.patch.object(self.runnerctl, name))
+            stack.enter_context(
+                mock.patch.object(self.runnerctl, "ensure_account", return_value=entry)
+            )
+
+            # Native allocation ownership is tested separately; here the private
+            # adapter keeps its simulated allocations inside this instance HOME.
+            def allocation(path, user, desired):
+                self.assertTrue(path.is_relative_to(root))
+                self.runnerctl.atomic_write(
+                    path,
+                    f"{user}:{desired['start']}:{desired['count']}\n",
+                    mode=0o644,
+                    uid=os.getuid(),
+                    gid=os.getgid(),
+                )
+
+            stack.enter_context(
+                mock.patch.object(
+                    self.runnerctl, "ensure_subordinate_range", side_effect=allocation
+                )
+            )
+            stack.enter_context(
+                mock.patch.object(
+                    self.runnerctl,
+                    "run",
+                    return_value=subprocess.CompletedProcess([], 0),
+                )
+            )
+            stack.enter_context(
+                mock.patch.object(self.runnerctl, "run_as", side_effect=run_as)
+            )
+            self.assertTrue(self.runnerctl.reconcile(instance, platform, paths=paths))
+            files = [path for path in root.rglob("*") if path.is_file()]
+            before = {path: path.stat().st_ino for path in files}
+            calls.clear()
+            self.assertFalse(self.runnerctl.reconcile(instance, platform, paths=paths))
+            self.assertEqual(before, {path: path.stat().st_ino for path in files})
+            self.assertFalse(
+                any(
+                    "restart" in call or "pull" in call or "daemon-reload" in call
+                    for call in calls
+                )
+            )
+            instance["runner"]["memory"] = "8g"
+            fail_restart = True
+            with self.assertRaisesRegex(self.runnerctl.RunnerError, "restart failed"):
+                self.runnerctl.reconcile(instance, platform, paths=paths)
+            self.assertTrue((root / "gitlab-runner/config/.reconcile.pending").exists())
+            fail_restart = False
+            self.assertTrue(self.runnerctl.reconcile(instance, platform, paths=paths))
+            self.assertFalse(
+                (root / "gitlab-runner/config/.reconcile.pending").exists()
+            )
+            self.assertFalse(self.runnerctl.reconcile(instance, platform, paths=paths))
+
+    def test_cli_exposes_the_arch_runner_lifecycle_without_token_arguments(
+        self,
+    ) -> None:
         result = subprocess.run(
-            [sys.executable, str(RUNNERCTL_PATH), "--config", str(CONFIG_PATH), "--help"],
+            [
+                sys.executable,
+                str(RUNNERCTL_PATH),
+                "--config",
+                str(CONFIG_PATH),
+                "--help",
+            ],
             check=True,
             text=True,
             stdout=subprocess.PIPE,
         )
 
-        for command in ("check", "reconcile", "register", "status", "validate", "verify"):
+        for command in (
+            "check",
+            "reconcile",
+            "register",
+            "status",
+            "validate",
+            "verify",
+        ):
             self.assertIn(command, result.stdout)
         self.assertNotIn("--token", result.stdout)
 
@@ -105,15 +275,19 @@ class RunnerControlTests(unittest.TestCase):
         rendered = self.runnerctl.render_config(instance, {"token": "test-only-value"})
 
         self.assertIn(
-            'tls-ca-file = "/etc/gitlab-runner/certs/gitlab.wke.csie.ncnu.edu.tw.crt"',
+            'tls-ca-file = "/etc/gitlab-runner/certs/gitlab.example.crt"',
             rendered,
         )
 
     def test_registration_metadata_rejects_multiple_runners(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             config = Path(directory) / "config.toml"
-            config.write_text('[[runners]]\ntoken = "one"\n[[runners]]\ntoken = "two"\n')
-            with self.assertRaisesRegex(self.runnerctl.RunnerError, "multiple registrations"):
+            config.write_text(
+                '[[runners]]\ntoken = "one"\n[[runners]]\ntoken = "two"\n'
+            )
+            with self.assertRaisesRegex(
+                self.runnerctl.RunnerError, "multiple registrations"
+            ):
                 self.runnerctl.registration_metadata(config)
 
     def test_registration_metadata_rejects_incomplete_runner(self) -> None:
@@ -158,8 +332,7 @@ class RunnerControlTests(unittest.TestCase):
         self.assertNotIn("podman.sock:/run/podman/podman.sock:rw", job)
         self.assertIn("--network host", manager)
         self.assertIn(
-            "  --dns 100.100.100.100 \\\n"
-            "  docker.io/gitlab/gitlab-runner:v18.10.1 \\",
+            "  --dns 100.100.100.100 \\\n  docker.io/gitlab/gitlab-runner:v18.10.1 \\",
             manager,
         )
         self.assertNotIn("\n+", manager)
@@ -183,8 +356,12 @@ class RunnerControlTests(unittest.TestCase):
         )
         with (
             mock.patch.object(self.runnerctl.pwd, "getpwnam", return_value=entry),
-            mock.patch.object(self.runnerctl.grp, "getgrgid", return_value=primary_group),
-            mock.patch.object(self.runnerctl.os, "getgrouplist", return_value=[1001, 998]),
+            mock.patch.object(
+                self.runnerctl.grp, "getgrgid", return_value=primary_group
+            ),
+            mock.patch.object(
+                self.runnerctl.os, "getgrouplist", return_value=[1001, 998]
+            ),
         ):
             with self.assertRaisesRegex(self.runnerctl.RunnerError, "supplementary"):
                 self.runnerctl.ensure_account(instance, self.document["platform"])
@@ -203,7 +380,9 @@ class RunnerControlTests(unittest.TestCase):
             )
         )
         completed = subprocess.CompletedProcess([], 0)
-        with mock.patch.object(self.runnerctl, "run", return_value=completed) as invoked:
+        with mock.patch.object(
+            self.runnerctl, "run", return_value=completed
+        ) as invoked:
             self.runnerctl.run_as(
                 entry,
                 [self.document["platform"]["podman"], "info"],
@@ -231,6 +410,51 @@ class RunnerControlTests(unittest.TestCase):
 
             self.assertFalse(changed)
             self.assertEqual(before.st_ino, path.stat().st_ino)
+
+    def test_ca_trust_refresh_is_retried_after_files_already_match(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            config = root / "config"
+            config.mkdir()
+            certificate = root / "public.crt"
+            certificate.write_text("public certificate fixture\n")
+            instance = copy.deepcopy(self.instances["frontend"])
+            instance["gitlab"]["caCertificate"] = str(certificate)
+            entry = self.runnerctl.pwd.struct_passwd(
+                ("fixture", "x", os.getuid(), os.getgid(), "", str(root), "/bin/bash")
+            )
+            platform = {
+                **self.document["platform"],
+                "caAnchorDirectory": str(root / "anchors"),
+                "containerCertsDirectory": str(root / "registry"),
+            }
+            write = self.runnerctl.atomic_write
+
+            def write_as_test_user(path, content, **kwargs):
+                return write(
+                    path, content, **{**kwargs, "uid": os.getuid(), "gid": os.getgid()}
+                )
+
+            with (
+                mock.patch.object(self.runnerctl.os, "chown"),
+                mock.patch.object(
+                    self.runnerctl, "atomic_write", side_effect=write_as_test_user
+                ),
+                mock.patch.object(
+                    self.runnerctl,
+                    "run",
+                    side_effect=[
+                        self.runnerctl.RunnerError("trust failed"),
+                        subprocess.CompletedProcess([], 0),
+                    ],
+                ) as invoked,
+            ):
+                with self.assertRaisesRegex(self.runnerctl.RunnerError, "trust failed"):
+                    self.runnerctl.reconcile_ca(instance, entry, config, platform)
+                self.assertTrue((config / ".trust.pending").exists())
+                self.runnerctl.reconcile_ca(instance, entry, config, platform)
+                self.assertFalse((config / ".trust.pending").exists())
+                self.assertEqual(invoked.call_count, 2)
 
     def test_atomic_write_removes_a_temporary_file_after_failure(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -282,7 +506,9 @@ class RunnerControlTests(unittest.TestCase):
                 ),
                 mock.patch.object(self.runnerctl, "require_root"),
                 mock.patch.object(self.runnerctl.pwd, "getpwnam", return_value=entry),
-                mock.patch.object(self.runnerctl.subprocess, "run", return_value=completed) as invoked,
+                mock.patch.object(
+                    self.runnerctl.subprocess, "run", return_value=completed
+                ) as invoked,
                 mock.patch.object(self.runnerctl, "reconcile"),
                 mock.patch.object(self.runnerctl, "verify"),
             ):
@@ -311,7 +537,11 @@ class RunnerControlTests(unittest.TestCase):
         with mock.patch.object(
             self.runnerctl,
             "run_as",
-            side_effect=[completed, self.runnerctl.RunnerError("job failed"), completed],
+            side_effect=[
+                completed,
+                self.runnerctl.RunnerError("job failed"),
+                completed,
+            ],
         ) as invoked:
             with self.assertRaisesRegex(self.runnerctl.RunnerError, "job failed"):
                 self.runnerctl.validate_job_network(
@@ -321,7 +551,9 @@ class RunnerControlTests(unittest.TestCase):
                 )
 
         cleanup_arguments = invoked.call_args_list[-1].args[1]
-        self.assertEqual(cleanup_arguments[1:5], ["network", "rm", "--force", cleanup_arguments[-1]])
+        self.assertEqual(
+            cleanup_arguments[1:5], ["network", "rm", "--force", cleanup_arguments[-1]]
+        )
 
 
 if __name__ == "__main__":

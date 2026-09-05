@@ -3,6 +3,7 @@
   system,
   hostName,
   platform,
+  hardware,
   username,
   user,
 }:
@@ -22,7 +23,12 @@ inputs.home-manager.lib.homeManagerConfiguration {
   inherit pkgs;
 
   extraSpecialArgs = {
-    inherit inputs hostName platform;
+    inherit
+      inputs
+      hostName
+      platform
+      hardware
+      ;
   };
 
   modules = [

@@ -1,49 +1,56 @@
-# Nix Configuration
+# Composition model
 
-This context describes how machine identity, reusable policy, and optional
-capabilities compose into the deployable Arch configuration.
+The flake connects machine choices to Arch realization and Home Manager
+configuration. These terms describe the current implementation.
 
-## Language
+| Term | Meaning |
+| --- | --- |
+| Host | A machine's identity, login users, hardware and selected capabilities |
+| Platform | The operating-system realization mechanism; currently x86_64 Arch |
+| Profile | A reusable general-purpose Home Manager bundle |
+| Module | A capability with one interface and its implementation, including internal platform adapters when needed |
+| Adapter | The implementation that realizes declared policy on a particular platform |
+| Login user | A human account declared by a Host and provisioned before deployment |
+| Service account | A non-human identity created and owned by its Module |
+| Instance | One configured occurrence of a Module on a Host |
+| Deployment target | A named Arch-then-home workflow for one Host and login user |
+| Required interface | A network readiness prerequisite, not a routing or egress policy |
 
-**Host**:
-A real machine and its final deployable configuration.
-_Avoid_: Platform configuration, environment
+## Selection and realization
 
-**Platform**:
-The operating-system mechanism that realizes a host, currently Arch.
-_Avoid_: Host, distribution profile
+`flake.nix` explicitly imports a Host, validates it, constructs its users' Home
+Manager configurations, and builds the selected deployment target. Registries
+in `profiles/default.nix` and `modules/home/default.nix` resolve named selections.
+Nothing discovers Hosts or loads overlays by scanning directories.
 
-**Profile**:
-A reusable bundle of general-purpose configuration selected by hosts.
-_Avoid_: Platform, feature
+A deployment is named `<host>-<profile>`. Its profile is a descriptive label
+that must occur in the selected user's profile list. The target activates that
+user's entire composed Home Manager configuration, including all selected
+profiles and modules. Profiles are not mutually exclusive deployment modes.
 
-**Module**:
-An optional capability with one interface and platform-specific adapters when
-required.
-_Avoid_: Profile, service bundle
+The Host supplies hardware intent. The Arch adapter selects native packages
+from that intent and combines them with optional Module dependencies.
+Application instances remain private to their Module and Host declaration.
 
-**Adapter**:
-The implementation of a module or host policy for one platform.
-_Avoid_: Platform profile
+The Runner Module accepts zero or more instances. With zero instances, it
+exports no controller app/package or native requirements; its independent
+interface and fake-runtime tests remain available.
 
-**Login user**:
-A human account selected and owned by a host.
-_Avoid_: Service account
+## State and ownership
 
-**Service account**:
-A non-human identity owned by the module that requires it.
-_Avoid_: Login user
+Nix builds desired artifacts. Arch deployment compares those artifacts with
+managed system files and runtime state; Home Manager performs home activation.
+The two stages are ordered but do not share a rollback transaction.
 
-**Instance**:
-One configured occurrence of a module on a host.
-_Avoid_: Profile
+A successful repeat deployment with unchanged declarations and healthy runtime
+state leaves managed file contents and service processes unchanged. Runtime
+drift can still require repair. Pending-action markers preserve unfinished
+work across failures; they are mutable host state, not repository inputs.
 
-**Deployment target**:
-A buildable and activatable host/profile pairing, named `<host>-<profile>` and
-associated with one login user.
-_Avoid_: Host, profile
+Removing a declaration is not authorization to retire an account, remove
+packages or erase application state. Those operations are intentionally outside
+the deployment interface.
 
-**Required interface**:
-A network interface that must be usable for an operation to proceed; it does
-not imply that traffic is bound or forcibly routed through that interface.
-_Avoid_: VPN interface, egress interface
+Use these distinctions consistently: a Host is not a Platform, a Module is not
+a Profile, and a service account is not a login user. Operator workflows live in
+[README.md](README.md); agent decisions live in [AGENTS.md](AGENTS.md).

@@ -1,198 +1,155 @@
-# nix-config
+# Arch workstation
 
-[![Arch Linux](https://img.shields.io/badge/Arch_Linux-native-1793D1?logo=archlinux&logoColor=white)](https://archlinux.org/)
-[![Nix Flakes](https://img.shields.io/badge/Nix-Flakes-5277C3?logo=nixos&logoColor=white)](https://nix.dev/concepts/flakes.html)
-[![Home Manager](https://img.shields.io/badge/Home_Manager-26.05-7EBAE4?logo=nixos&logoColor=white)](https://github.com/nix-community/home-manager/tree/release-26.05)
+[![Platform: Arch Linux](https://img.shields.io/badge/platform-Arch_Linux-1793D1?logo=archlinux)](https://archlinux.org/)
+[![Check](https://github.com/gin31259461/nix-config/actions/workflows/check.yml/badge.svg)](https://github.com/gin31259461/nix-config/actions/workflows/check.yml)
+[![Home Manager](https://img.shields.io/badge/Home_Manager-26.05-5277C3)](https://github.com/nix-community/home-manager/tree/release-26.05)
 
-Declarative configuration for Abner's Arch workstation. The flake combines
-machine identity, reusable profiles, optional modules, Home Manager policy, and
-small Arch adapters while keeping every package, file, account, and service
-under one owner.
+Build and deploy an Arch workstation with native desktop applications, Home
+Manager CLI tools and configuration, a UWSM-managed Hyprland session, and optional
+rootless GitLab Runner instances.
 
-The active deployment is `arch-workstation`: host `arch`, profile
-`workstation`, login user `abnertu`, and Home Manager configuration
-`abnertu@arch`.
+The supported target is `arch-workstation` on `x86_64-linux`. It deploys host
+`arch` and Home Manager configuration `abnertu@arch`. Host and user selections
+are explicit in [flake.nix](flake.nix) and [hosts/arch](hosts/arch/default.nix).
 
-## Deploy the Arch workstation
+## Start with a build
 
-Arch owns Nix itself, graphical/session executables, drivers, PAM, polkit, and
-system services. Install Nix through pacman, start the daemon, and make `yay`
-available before the first deployment:
+Use an existing Arch installation with Nix flakes enabled. This repository's
+tracked `nix.conf` supplies the user configuration when the checkout is at
+`~/.config/nix`; Home Manager does not generate that file.
+
+From the checkout:
 
 ```bash
-sudo pacman -S --needed nix
-sudo systemctl enable --now nix-daemon.service
-exec "$SHELL" -l
-nix --version
-yay --version
+nix flake check
+nix build --no-link .#arch-workstation
 ```
 
-The tracked `nix.conf` enables flakes through
-`$XDG_CONFIG_HOME/nix/nix.conf`. From this repository, validate and perform the
-first deployment with a full Arch update:
+These commands evaluate configuration and build artifacts. They do not activate
+Home Manager, change packages or services, or contact configured GitLab servers.
+Nix may download locked inputs and build dependencies.
+
+Before deployment, provision the declared login user with `wheel` access, the
+Arch-owned Nix daemon, `yay`, and the native prerequisites checked by
+[arch-switch.sh](platforms/arch/arch-switch.sh). Boot a kernel whose module
+directory is installed. The project does not bootstrap login accounts.
+
+## Deploy and update
+
+Run deployments as the selected login user, not root. The controller uses sudo
+for system changes.
 
 ```bash
-nix run .#just -- check
-nix run .#just -- arch-workstation update
-```
-
-Home Manager installs `just`, so routine deployments are shorter:
-
-```bash
-just arch-workstation
-```
-
-Routine deployment does not install or update packages. It verifies the
-declared Arch, LizardByte, and AUR inventories, then refuses to continue if a
-declared package is missing. Install missing packages and update the system
-safely with an explicit full upgrade:
-
-```bash
-just arch-workstation update
-
-# Equivalent flake app invocation:
+# First deployment, or after adding native packages:
 nix run .#arch-workstation -- --update
+
+# Subsequent deployments:
+nix run .#arch-workstation
 ```
 
-The update path installs the managed LizardByte repository include, runs a
-complete `pacman -Syu` with the declared official and LizardByte packages, then
-converges the declared AUR packages. Its signature exception applies only to
-`[lizardbyte]`, beta repositories are not enabled, and Sunshine is addressed as
-`lizardbyte/sunshine`.
+The target builds its Home Manager activation package first, converges Arch, and
+activates the home only after Arch succeeds. These stages are not one atomic
+transaction: if home activation fails, completed Arch changes remain.
 
-If an update replaces the running kernel, deployment stops before
-module-dependent configuration and requests a reboot. Boot the new kernel and
-rerun the same command; DKMS owns rebuilding OpenRazer for the installed kernel.
+Routine deployment checks locally installed packages without querying remote
+repositories. Missing packages stop it with exit code 3. It updates changed
+configuration, repairs managed runtime settings, and starts required inactive
+services. An already-converged run does not rebuild initramfs or restart healthy
+services.
 
-After the Arch plane succeeds, Home Manager activates CLI/development packages,
-static home configuration, locked Hyprland and Neovim inputs, and custom user
-unit policy. The deployment performs no cleanup, garbage collection, directory
-backup, Runner registration, or repository retirement.
+Only `--update` resolves remote inventories, installs the managed LizardByte
+repository include, performs a complete `pacman -Syu`, and then converges AUR
+packages. The signature exception is confined to the LizardByte repository.
+Native packages are not version-locked by `flake.lock`.
 
-> [!IMPORTANT]
-> Home Manager intentionally activates without a backup-file extension. When a
-> path collides, reconcile that path with its owner; do not add `-b` or
-> `--backup-file-extension`, because adjacent backups can enter runtime
-> discovery.
+If an update replaces the running kernel, deployment exits with code 75 before
+AUR convergence and subsequent system configuration. Reboot and rerun the
+update. Group changes require a new login session.
 
-## Project commands
+Home Manager installs `just` for shorter commands:
 
-| Command | Result |
+| Command | Purpose |
 | --- | --- |
-| `just check` | Evaluate and build every flake check |
-| `just check-arch` | Resolve native package inventories |
-| `just build arch-workstation` | Build the deployment without activation |
-| `just arch-workstation` | Converge the host without updating system packages |
-| `just arch-workstation update` | Update packages, then converge the host |
-| `nix build .#runnerctl` | Build the GitLab Runner controller |
+| `just check-fast` | Check source formatting, Python static errors, and declaration interfaces |
+| `just check` | Run all source checks and build the managed home |
+| `just build` | Build the deployment without activating it |
+| `just arch-workstation` | Deploy using installed native packages |
+| `just arch-workstation update` | Fully update native packages, then deploy |
+| `just check-arch` | Query remote package inventories; requires connectivity |
 
-`arch-switch`, Home Manager activation, and Runner reconciliation are live
-operations. Builds and checks are the safe review path.
+Before `just` is installed, use `nix run .#just -- <recipe>`.
 
-## Composition
+## Change the configuration
 
-| Layer | Responsibility |
+| Change | Edit |
 | --- | --- |
-| `hosts/<name>/` | Machine identity, selections, users, and instance values |
-| `platforms/` | OS realization and native package ownership |
-| `profiles/` | Reusable general-purpose Home Manager bundles |
-| `homes/<user>/` | Personal Home Manager differences |
-| `modules/home/` | Shared user capabilities and graphical-session policy |
-| `modules/gitlab-runner/` | Runner policy, controller, and invariant checks |
+| Login identity, groups, selected profiles and modules | [hosts/arch/users.nix](hosts/arch/users.nix) |
+| Graphics, OpenRazer and initramfs requirements | [hosts/arch/hardware.nix](hosts/arch/hardware.nix) |
+| Arch-native package inventory | [platforms/arch/packages.nix](platforms/arch/packages.nix) |
+| Reusable CLI/development bundles | [profiles](profiles/default.nix) |
+| User-specific Home Manager preferences | [homes/abnertu/home.nix](homes/abnertu/home.nix) |
+| Shared home files and graphical unit policy | [modules/home](modules/home/default.nix) |
+| Runner instances and resource limits | [hosts/arch/gitlab-runners.nix](hosts/arch/gitlab-runners.nix) |
+| Arch convergence behavior | [platforms/arch/arch-switch.sh](platforms/arch/arch-switch.sh) |
 
-The vocabulary is defined in [CONTEXT.md](CONTEXT.md). Host `arch` selects the
-`base`, `dev`, and `workstation` profiles plus the `hyprland` and
-`graphical-session` modules. Registries in `profiles/default.nix` and
-`modules/home/default.nix` keep those imports explicit.
+Arch owns graphical executables, drivers and system services. Home Manager owns
+CLI/development tools, static home files and user-unit policy; graphical units
+call stable Arch paths. Do not install a second desktop executable through Home
+Manager to change its configuration.
 
-Graphical applications are Arch packages. Home Manager owns their configuration
-and user-unit policy but invokes executables through stable system paths, so
-desktop files, systemd units, GPU integration, and singleton behavior refer to
-the same installation. UWSM remains the only Hyprland session entrypoint.
+A deployment's profile is a label selected from its user's profiles. Deployment
+activates **all** profiles and modules selected by that user; it does not switch
+to an isolated profile. See [CONTEXT.md](CONTEXT.md) for composition terminology.
 
-## Locked external configuration
+## Maintain the locked editor and desktop inputs
 
-Hyprland and Neovim are locked non-flake inputs named `hypr-config` and
-`neovim-config`. Develop them in their own worktrees at `~/codebase/hypr` and
-`~/codebase/orbitvim`, not in active runtime paths.
-
-Test a local revision without changing `flake.lock`:
+Neovim and Hyprland configuration are separate repositories locked by this flake.
+Develop them outside their runtime paths, for example under `~/codebase`.
 
 ```bash
-nix build --override-input hypr-config path:$HOME/codebase/hypr \
+nix build --no-link --override-input hypr-config path:$HOME/codebase/hypr \
   '.#homeConfigurations."abnertu@arch".activationPackage'
-nix build --override-input neovim-config path:$HOME/codebase/orbitvim \
-  '.#homeConfigurations."abnertu@arch".activationPackage'
-```
 
-After publishing an upstream revision, adopt it explicitly:
-
-```bash
+# Adopt a published revision:
 nix flake update hypr-config
-nix flake update neovim-config
-just build arch-workstation
+nix flake check
 ```
 
-Neovim is linked as one directory. Hyprland is projected recursively into a
-clean, writable, non-VCS directory so generated state and selected profiles can
-change without exposing adjacent backups or repository metadata.
+Use `neovim-config` for the Neovim input. Neovim is linked as one directory;
+Hyprland uses a writable directory containing recursive links. Activation rejects
+Git worktrees at these targets and known adjacent backup paths. Resolve collisions
+at their source; backup-extension flags are rejected by deployment wrappers.
+Each managed skill is also linked as one directory.
 
-## GitLab Runner
+## Optional Runner operations
 
-The Arch host declares `frontend` and `dotnet` instances in
-`hosts/arch/gitlab-runners.nix`. Each owns a dedicated account, home,
-subordinate-ID range, rootless Podman socket, manager container, and
-registration. Job containers remain unprivileged, have concurrency one, and do
-not receive the host Podman socket.
+Removing or emptying `gitlabRunners` in the Host omits the Runner controller and
+its module dependencies from composition. It does not delete existing accounts,
+registrations or containers. Normal workstation deployment never reconciles or
+registers a Runner.
 
-Build the controller and address one exact instance at a time:
+For instance setup, registration and live verification, follow
+[the Runner operations guide](docs/runners.md). Each instance has one service
+account, subordinate-ID allocation, rootless Podman socket and manager. Jobs
+remain unprivileged, use concurrency one and receive no host socket.
 
-```bash
-runnerctl_path="$(nix build --no-link --print-out-paths .#runnerctl)"
-sudo "$runnerctl_path/bin/runnerctl" status frontend
-sudo "$runnerctl_path/bin/runnerctl" check frontend
-sudo "$runnerctl_path/bin/runnerctl" reconcile frontend
-```
+## Develop and troubleshoot
 
-Repeat for `dotnet`. `network.requiredInterface` is a readiness check only; it
-does not force routing through that interface. Reconciliation preserves an
-existing single-runner registration without printing its metadata. It creates
-or converges only the selected account, subordinate-ID allocation, rootless
-Podman socket, manager image, configuration, and user service.
+Start with `just check-fast`, then run `nix flake check`. The checks include
+GitHub workflow linting alongside
+isolated Arch command tests, Runner validation and reconciliation tests, and
+generated Home Manager units. Test data belongs beside its owner and must not
+depend on real host registrations or credentials.
 
-If `status` reports `registration=absent`, create the Runner in GitLab first and
-set tags, protection, locking, and similar scheduling policy there. Register
-the host instance by passing its authentication token only through the
-environment:
+[GitHub Actions](.github/workflows/check.yml) runs these checks and builds the
+deployment artifacts on pushes to `main`, pull requests and manual dispatch.
+It uses an Ubuntu runner for Nix builds; it never activates the workstation or
+runs live Runner operations. Action revisions are pinned to commit hashes.
 
-```bash
-read -rsp 'GitLab Runner token: ' GITLAB_RUNNER_TOKEN
-export GITLAB_RUNNER_TOKEN
-sudo --preserve-env=GITLAB_RUNNER_TOKEN \
-  "$runnerctl_path/bin/runnerctl" register frontend
-unset GITLAB_RUNNER_TOKEN
-```
+New Nix inputs must be tracked before flake evaluation; stage only intended
+paths. Use the locked formatter with `nix fmt -- path/to/file.nix`.
+[AGENTS.md](AGENTS.md) contains the coding-agent contract.
 
-Finish by checking the live manager, registration, isolation, and disposable
-job network:
-
-```bash
-sudo "$runnerctl_path/bin/runnerctl" verify frontend
-```
-
-There is intentionally no purge command. Registration and verification are
-explicit operations; normal Arch or Home Manager deployment never invokes
-them.
-
-## Validation
-
-Use `nix flake check` for normal repository changes. Build the affected Home
-Manager activation package when its closure or generated units change:
-
-```bash
-nix build '.#homeConfigurations."abnertu@arch".activationPackage'
-```
-
-Runner `status`, `check`, and `verify` inspect external state and connectivity,
-so they are not part of source-only validation. Run the workflow above when an
-instance is first deployed or its live state must be inspected.
+For exit codes, pending actions, deployment locks and recovery behavior, see
+[the deployment guide](docs/deployment.md). There is no automatic cleanup,
+package removal, garbage collection, directory backup service or Runner purge.

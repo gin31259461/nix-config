@@ -1,5 +1,6 @@
 { inputs, pkgs, ... }:
 {
+  imports = [ ./projection-safety.nix ];
   xdg.configFile."nvim" = {
     source = inputs.neovim-config;
   };

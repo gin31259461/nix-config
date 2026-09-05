@@ -8,5 +8,5 @@
   };
   users = import ./users.nix;
   gitlabRunners = import ./gitlab-runners.nix;
-  systemPackages = import ./system-packages.nix;
+  hardware = import ./hardware.nix;
 }

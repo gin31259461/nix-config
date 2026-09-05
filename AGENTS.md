@@ -1,115 +1,117 @@
 # AGENTS Instructions
 
-## Scope and sources of truth
+## Before editing
 
-This repository is the declarative source of truth for the owner's Arch
-machine. Read `CONTEXT.md` before changing composition vocabulary.
+Read `CONTEXT.md` when changing composition or terminology. Use the normal
+`~/.config/nix` worktree, preserve unrelated changes, and stage exact intended
+paths before flake evaluation. Do not commit result links, registries or mutable
+host state. Use scoped Conventional Commit subjects: `type(scope): imperative subject`.
 
-Use these ownership boundaries:
+## Put changes with their owner
 
-- `hosts/<name>/` owns machine identity, login users, profile/module selection,
-  hardware, and host-specific values.
-- `platforms/` owns generic Arch realization and native package ownership. It
-  must not know host identity or application instances.
-- `profiles/` owns reusable general-purpose bundles. Keep hostnames, hardware,
-  secrets, service accounts, and GitLab Runner instances out of profiles.
-- `homes/<user>/` owns personal Home Manager differences; shared behavior
-  belongs in `modules/home/`.
-- A module owns its interface, implementation, service accounts, and internal
-  platform adapters. GitLab Runner policy belongs only in
-  `modules/gitlab-runner/` and host instance configuration.
-- `flake.nix` is the explicit composition entrypoint. Do not add directory
-  auto-discovery or implicit overlay loading.
+- `flake.nix` explicitly selects Hosts and connects outputs. Keep checks in
+  `checks/` or the owning Module. Do not add directory auto-discovery or implicit
+  overlay loading.
+- `hosts/<name>/` owns identity, login users, hardware intent, selections and
+  instance values. Login accounts are provisioned outside deployment.
+- `platforms/arch/` owns Arch realization, native package inventory and pacman
+  repositories. Pass policy values to it; do not teach it Host identity or
+  application instances.
+- `profiles/` owns reusable general-purpose bundles. Exclude hardware, Host
+  names, secrets, service accounts and Runner instances.
+- `homes/<user>/` owns user differences; `modules/home/` owns shared home
+  behavior and graphical unit policy.
+- `modules/gitlab-runner/` owns Runner interfaces, derived identities, fixed
+  security policy, native requirements, runtime code and tests. Host declarations
+  own instance values; Profiles and Platform must not implement Runner policy.
+- Give each package, file, account and service one owner. Prefer a small
+  interface that hides fixed behavior. Keep test dependencies private.
+- Use names that identify responsibility: `package.nix` for executable
+  packaging, `packages.nix` for inventories, `tests/test_*.py` for Python tests.
+  Update imports, checks and documentation when moving an owner.
 
-Give every package, file, account, and service exactly one owner. Prefer a deep
-module that derives names and fixed security behavior over options that leak
-implementation details to callers.
+## Preserve deployment contracts
 
-## Platform and runtime policy
+- Arch owns Nix, graphical/session executables, core OS packages, drivers,
+  kernel integration, PAM, polkit and system services. Home Manager owns
+  platform-independent CLI/development packages, static files and safe
+  user-unit policy. Graphical units call Arch-owned `/usr/bin` or `/usr/lib`
+  paths; never add graphical executables or GPU wrappers to the home profile.
+- Routine `arch-switch` uses local package checks and never installs or updates
+  packages. Missing packages exit 3. Only explicit `--update` may run a complete
+  `pacman -Syu`, followed by AUR convergence. Preserve the kernel/reboot gate.
+- Compare content and metadata before writing. Record pending actions before
+  writes, clear them only after success, and repair runtime drift on repeat
+  invocation. Keep locking around mutations; do not remove active lock inodes.
+- Preserve unowned mkinitcpio settings. Hardware intent comes from the Host,
+  not loaded-module detection. Change only the managed module addition.
+- Deployment profile names label the user's complete composition; do not
+  silently turn them into profile-selection switches.
+- Do not implement generic cleanup, automatic garbage collection, package
+  removal, directory backup services or Runner purge.
 
-- Arch owns Nix, graphical/session executables, core OS packages, kernel and
-  driver integration, PAM, polkit, and system services. Keep its third-party
-  pacman repositories and package inventory in the Arch adapter.
-- On Arch, do not add graphical executables, GPU bridges, or driver wrappers to
-  Home Manager. User units must call the Arch-owned stable system path.
-- Home Manager owns platform-independent CLI/development packages, static home
-  configuration, and user-unit policy whose activation is safe.
-- Login users belong in `hosts/<name>/users.nix`. A service account belongs to
-  its module and receives no Home Manager profile, password, wheel membership,
-  desktop policy, or unrelated host role.
+## Protect home and Runner state
 
-Routine `arch-switch` runs do not update or install packages. A missing declared
-package must stop deployment and require an explicit `--update`; that path uses
-a complete `pacman -Syu` before converging AUR packages. Do not introduce a
-partial-upgrade path or make routine activation update the system implicitly.
+- Keep UWSM as the Hyprland entrypoint and one startup owner per application.
+  Preserve KeePassXC, Secret Service readiness, Noctalia, tray consumers and
+  tray-repair ordering. Vicinae's tray timeout permits degraded startup.
+- Never copy package-provided units or track generated `.wants/` links.
+  Target drop-ins at the package's canonical unit name.
+- Link the locked Neovim input as one directory; recursively project Hyprland
+  into a clean writable non-VCS directory. Keep projection preflight before
+  Home Manager link changes. Reject worktrees and adjacent backups instead of
+  deleting or migrating them automatically.
+- Link each managed `~/.agents/skills/<name>` directory as a unit. Leaf-file
+  projection and adjacent backups can break skill discovery.
+- Keep `nix.conf` tracked directly; Home Manager must not generate it.
+- Runner remains optional. Each instance owns one account, home, subordinate
+  range, Podman socket, manager and registration. Reject overlapping ranges
+  and supplementary host roles. A service account gets no password, wheel
+  membership, Home Manager profile or desktop policy.
+- A manager can access only its instance's rootless Podman socket. Jobs get
+  no host socket, remain unprivileged and use concurrency one. Do not expose
+  these invariants as options. Required network interfaces indicate readiness,
+  never enforced routing.
+- Keep real tokens and registration metadata out of expressions, derivations,
+  arguments, logs, fixtures and the Nix store. Do not read or print KeePassXC
+  databases/INI files, systemd credentials, Runner tokens/config, private keys
+  or ignored secrets.
 
-## Graphical session invariants
+## Validate source without deploying
 
-- Keep UWSM as the Hyprland entrypoint and give every application one startup
-  owner.
-- Treat the Arch package inventory and `/usr/bin` or `/usr/lib` paths as
-  authoritative for graphical-session executables. Home Manager may own only
-  unit policy and application configuration.
-- Do not copy package-provided units or track generated `.wants/` symlinks.
-- Preserve KeePassXC, Secret Service, Noctalia, tray-consumer, and tray-repair
-  ordering. Keep credentials and mutable security state outside the Nix store.
-
-Manage the locked Neovim input as one directory link. Project Hyprland
-recursively into a clean, writable, non-VCS directory. Never project either
-input into an existing Git worktree, where VCS metadata or adjacent backups
-could enter runtime discovery.
-
-## GitLab Runner invariants
-
-- Keep Runner optional, never a profile or platform concern. Configure
-  instances under their host.
-- Preserve one account, home, subordinate-ID range, Podman socket, manager, and
-  registration per instance; reject overlapping subordinate ranges.
-- A manager may access only its instance's rootless Podman socket. Job
-  containers receive no host socket, stay unprivileged, and use concurrency one.
-- Treat `network.requiredInterface` as readiness only, not routing policy.
-- Keep registration tokens and persisted metadata out of Nix expressions,
-  derivations, command arguments, logs, fixtures, and the Nix store.
-
-## Repository and safety rules
-
-- Work in the normal `~/.config/nix` worktree. `nix.conf` is tracked directly;
-  Home Manager must not generate it.
-- Link each `~/.agents/skills/<name>` directory as a unit. Leaf-file projection
-  and adjacent backups can prevent Codex skill discovery.
-- `files/home/AGENTS.md` is the concise source for the Home Manager-managed
-  instruction file at the home root; detailed ownership stays here.
-- Preserve unrelated dirty files and stage exact paths only. Flakes see only
-  tracked files, so add intended inputs before evaluating them.
-- Use scoped Conventional Commit subjects: `type(scope): imperative subject`.
-- Never commit result links, local registries, secrets, credentials, tokens,
-  private keys, application databases, or mutable host state.
-
-Builds, evaluation, formatting, shell linting, and fake harnesses are safe.
-Never run Arch bootstrap/apply, Home Manager switch, package managers,
-service enablement, Runner registration, or repository retirement merely to
-validate source. Inspect the exact target before any authorized live operation.
-Do not read or print KeePassXC databases/INI files, systemd credentials, Runner
-tokens/config, private keys, or ignored secrets.
-
-The project intentionally provides no generic cleanup, automatic garbage
-collection, directory backup service, or Runner purge command.
-
-## Validation and documentation
-
-Use the narrowest safe check that covers the changed interface:
+Safe checks:
 
 ```bash
+nix build --no-link .#checks.x86_64-linux.source-format
 nix flake check
-nix build '.#homeConfigurations."abnertu@arch".activationPackage'
-nix build .#arch-switch .#runnerctl
+nix build --no-link '.#homeConfigurations."abnertu@arch".activationPackage'
+nix build --no-link .#arch-switch .#runnerctl
+git diff --check
 ```
 
-Run Runner `status` or `verify` only when external host state or connectivity is
-explicitly in scope.
-Keep permanent tests for stable interfaces, security invariants, and
-non-trivial orchestration.
+Use focused checks while editing, then the complete flake checks for composition
+or orchestration changes. Keep `.github/workflows/check.yml` limited to source
+validation and builds, pin actions to commit hashes, and use read-only repository
+permissions. Workflow linting is part of `nix flake check`.
+Keep permanent tests for stable interfaces, security,
+repeat execution, failure recovery and generated unit relationships. Use fake
+native commands and temporary paths; never execute a source-validation harness
+against the real machine.
 
-`README.md` owns current operator workflows, `CONTEXT.md` owns vocabulary,
-and `AGENTS.md` owns coding-agent decisions. Update source first, then only
-documents whose public contract or ownership changed.
+Arch deployment/bootstrap, Home Manager switch, package managers, service
+enablement and Runner reconcile/register/verify are live operations, not
+validation. Runner status/check and Arch inventory queries also inspect
+external state. Run them only when that state is explicitly in scope; inspect
+the exact target before an authorized live mutation. Do not retire repositories
+as a validation step.
+
+## Keep documentation useful
+
+Write implementation first. `README.md` is the human/developer entry point,
+`docs/` explains operator recovery and Runner workflows, `CONTEXT.md` defines
+composition, and this file governs AI changes. Update only the documents whose
+contract changed; avoid duplicated inventories or historical migration prose.
+
+`files/home/AGENTS.md` is the concise source for the home-root instructions.
+Keep repository-specific details here rather than copying them to every project
+under the home directory.

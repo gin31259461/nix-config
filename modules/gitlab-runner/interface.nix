@@ -99,6 +99,40 @@ let
     isString value
     && (match "[1-9][0-9]*(\\.[0-9]+)?" value != null || match "0\\.[0-9]*[1-9][0-9]*" value != null);
   positiveMemory = value: isString value && match "[1-9][0-9]*([kKmMgGtT][bB]?)?" value != null;
+  ipv4 =
+    value:
+    let
+      parts = lib.splitString "." value;
+    in
+    length parts == 4
+    && all (part: match "(0|[1-9][0-9]{0,2})" part != null && builtins.fromJSON part <= 255) parts;
+  ipAddress =
+    value:
+    let
+      halves = lib.splitString "::" value;
+      parts = lib.splitString ":" value;
+      groups = builtins.filter (part: part != "") parts;
+      tail = if groups == [ ] then "" else lib.last groups;
+      hasIPv4 = lib.hasInfix "." tail;
+      hexGroups = if hasIPv4 then lib.init groups else groups;
+      count = length hexGroups + (if hasIPv4 then 2 else 0);
+    in
+    isString value
+    && (
+      ipv4 value
+      || (
+        all (part: match "[0-9A-Fa-f]{1,4}" part != null) hexGroups
+        && (!hasIPv4 || ipv4 tail)
+        && (
+          (
+            length halves == 2
+            && count < 8
+            && all (half: half == "" || (!lib.hasPrefix ":" half && !lib.hasSuffix ":" half)) halves
+          )
+          || (length halves == 1 && count == 8 && all (part: part != "") parts)
+        )
+      )
+    );
   rangesOverlap =
     left: right:
     left.start <= right.start + right.count - 1 && right.start <= left.start + left.count - 1;
@@ -187,7 +221,7 @@ let
       || (isString requiredInterface && match "[A-Za-z0-9_.:-]+" requiredInterface != null)
     ) "GitLab Runner instance ${instanceName}.network.requiredInterface is invalid";
     assert assertMsg (
-      dns == null || (isString dns && match "[0-9A-Fa-f:.]+" dns != null)
+      dns == null || (isString dns && ipAddress dns)
     ) "GitLab Runner instance ${instanceName}.network.dns must be an IP address";
     {
       account = {
@@ -239,7 +273,6 @@ let
     ) values
   ) values;
 in
-assert assertMsg (instances != { }) "at least one GitLab Runner instance is required";
 assert assertMsg (length uids == length (unique uids)) "GitLab Runner account UIDs must be unique";
 assert assertMsg rangesDoNotOverlap "GitLab Runner subordinate ID ranges overlap";
 instances

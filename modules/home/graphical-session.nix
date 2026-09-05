@@ -1,12 +1,8 @@
-{ platform, ... }:
+{ lib, hardware, ... }:
 let
-  systemBin = if platform == "arch" then "/usr/bin" else "/run/current-system/sw/bin";
+  systemBin = "/usr/bin";
   bin = name: "${systemBin}/${name}";
-  hyprpolkitagentExecutable =
-    if platform == "arch" then
-      "/usr/lib/hyprpolkitagent/hyprpolkitagent"
-    else
-      "${systemBin}/hyprpolkitagent";
+  hyprpolkitagentExecutable = "/usr/lib/hyprpolkitagent/hyprpolkitagent";
   graphicalUnit = {
     After = [ "graphical-session.target" ];
     PartOf = [ "graphical-session.target" ];
@@ -22,6 +18,7 @@ let
   waitForStatusNotifierWatcher = ''
     ${bin "bash"} -c 'for _ in {1..100}; do ${bin "busctl"} --user get-property org.kde.StatusNotifierWatcher /StatusNotifierWatcher org.kde.StatusNotifierWatcher RegisteredStatusNotifierItems >/dev/null 2>&1 && exit 0; ${bin "sleep"} 0.1; done; exit 0'
   '';
+  # Vicinae can run without a tray; timeout deliberately permits degraded startup.
   restartableService = {
     Restart = "on-failure";
     RestartSec = "2s";
@@ -143,7 +140,7 @@ in
         Install.WantedBy = [ "graphical-session.target" ];
       };
 
-      polychromatic-tray = {
+      polychromatic-tray = lib.mkIf hardware.openrazer {
         Unit = trayConsumerUnit // {
           Description = "Polychromatic tray applet";
           After = trayConsumerUnit.After ++ [ "openrazer-daemon.service" ];
@@ -202,11 +199,13 @@ in
         vesktop.preferences.defaultAction = "launch";
       };
     };
-    "systemd/user/openrazer-daemon.service.d/delay.conf".text = ''
-      [Service]
-      ExecStartPre=${bin "sleep"} 20
-    '';
-    "systemd/user/sunshine.service.d/override.conf".text = ''
+    "systemd/user/openrazer-daemon.service.d/delay.conf" = lib.mkIf hardware.openrazer {
+      text = ''
+        [Service]
+        ExecStartPre=${bin "sleep"} 20
+      '';
+    };
+    "systemd/user/app-dev.lizardbyte.app.Sunshine.service.d/override.conf".text = ''
       [Service]
       Restart=on-failure
       RestartSec=5s

@@ -1,0 +1,17 @@
+[
+  "aardvark-dns"
+  "ca-certificates"
+  "ca-certificates-utils"
+  "coreutils"
+  "curl"
+  "fuse-overlayfs"
+  "iproute2"
+  "netavark"
+  "p11-kit"
+  "passt"
+  "podman"
+  "slirp4netns"
+  "shadow"
+  "systemd"
+  "util-linux"
+]

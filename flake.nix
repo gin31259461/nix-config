@@ -1,6 +1,5 @@
 {
-  description = "Personal Arch Linux configuration";
-
+  description = "Arch workstation deployment and Home Manager configuration";
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-26.05";
 
@@ -29,13 +28,17 @@
     let
       inherit (nixpkgs) lib;
       mkHomeConfiguration = import ./lib/mk-home-configuration.nix { inherit inputs; };
-      archHost = import ./hosts/arch;
+      archHost = import ./lib/validate-host.nix {
+        inherit lib;
+        raw = import ./hosts/arch;
+      };
       archHomes = lib.mapAttrs' (
         username: user:
         lib.nameValuePair "${username}@${archHost.name}" (mkHomeConfiguration {
           inherit username user;
           hostName = archHost.name;
           platform = archHost.platform;
+          hardware = archHost.hardware;
           system = archHost.system;
         })
       ) archHost.users;
@@ -46,55 +49,44 @@
       homeConfigurationName = "${deployment.username}@${archHost.name}";
       system = archHost.system;
       pkgs = nixpkgs.legacyPackages.${system};
-      runnerInstances = import ./modules/gitlab-runner/interface.nix {
-        inherit lib;
-        rawInstances = archHost.gitlabRunners;
-      };
-      runnerInterfaceTests = import ./modules/gitlab-runner/interface_test.nix {
-        inherit lib;
-        rawInstances = archHost.gitlabRunners;
-      };
-      runnerArch = import ./modules/gitlab-runner/arch.nix {
-        inherit lib;
-        packageInventory = archHost.systemPackages.pacman;
-      };
-      runnerPlatform = runnerArch.platform;
-      runnerctl = import ./modules/gitlab-runner/package.nix {
-        inherit pkgs;
-        instances = runnerInstances;
-        platform = runnerPlatform;
-      };
-      arch-switch = import ./lib/mk-arch-control.nix {
+      runners = import ./modules/gitlab-runner {
         inherit lib pkgs;
-        host = archHost;
+        rawInstances = archHost.gitlabRunners;
+      };
+      nativePackages = import ./platforms/arch/packages.nix {
+        inherit lib;
+        hardware = archHost.hardware;
+        modulePackages = runners.requiredPackages;
+      };
+      arch-switch = import ./platforms/arch/package.nix {
+        inherit lib pkgs deploymentUser;
+        username = deployment.username;
+        packages = nativePackages;
+        hardware = archHost.hardware;
       };
       home-switch = pkgs.writeShellApplication {
         name = "home-switch";
         runtimeInputs = [ inputs.home-manager.packages.${system}.home-manager ];
         text = ''
+          for argument in "$@"; do
+            case "$argument" in
+              -b*|--backup-file-extension*)
+                printf 'Adjacent Home Manager backups are not supported; resolve the conflicting path first.\n' >&2
+                exit 2 ;;
+            esac
+          done
           exec home-manager switch --flake '${self}#${homeConfigurationName}' "$@"
         '';
       };
       archDeployment = pkgs.writeShellApplication {
         name = deploymentName;
         text = ''
-          arch_switch_args=()
-          if [[ ''${1-} == --update ]]; then
-            arch_switch_args+=(--update)
-            shift
-          elif [[ ''${1-} == --help ]]; then
-            printf 'usage: ${deploymentName} [--update] [HOME_MANAGER_ARGUMENTS...]\n'
-            exit 0
-          fi
-
-          if [[ ! -x ${archHomes.${homeConfigurationName}.activationPackage}/activate ]]; then
-            printf 'Home Manager activation package is unavailable\n' >&2
-            exit 1
-          fi
-
-          ${arch-switch}/bin/arch-switch "''${arch_switch_args[@]}"
-          exec ${home-switch}/bin/home-switch "$@"
-        '';
+          readonly deployment_name=${lib.escapeShellArg deploymentName}
+          readonly activation_package=${archHomes.${homeConfigurationName}.activationPackage}
+          readonly arch_switch=${arch-switch}/bin/arch-switch
+          readonly home_switch=${home-switch}/bin/home-switch
+        ''
+        + builtins.readFile ./lib/deploy-home.sh;
       };
     in
     assert lib.assertMsg (builtins.elem deployment.profile deploymentUser.profiles)
@@ -105,142 +97,33 @@
       homeConfigurations = archHomes;
 
       checks.${system} = {
+        optional-modules = import ./checks/optional-modules.nix { inherit lib pkgs inputs; };
+        source-format = import ./checks/format.nix { inherit lib pkgs; };
         arch-home = archHomes.${homeConfigurationName}.activationPackage;
-        arch-switch-interface = pkgs.runCommand "arch-switch-interface-check" { } ''
-          ${arch-switch}/bin/arch-switch --help \
-            | ${pkgs.gnugrep}/bin/grep -Fxq 'usage: arch-switch [--check | --update]'
-          ${pkgs.gnugrep}/bin/grep -Fq \
-            'deployment user is not in required administrator group: wheel' \
-            ${arch-switch}/bin/arch-switch
-          ${pkgs.gnugrep}/bin/grep -Fq \
-            'required_groups=(i2c openrazer realtime wheel)' \
-            ${arch-switch}/bin/arch-switch
-          if ${arch-switch}/bin/arch-switch --check --update > /dev/null 2>&1; then
-            printf 'arch-switch accepted incompatible modes\n' >&2
-            exit 1
-          fi
-          ${archDeployment}/bin/${deploymentName} --help \
-            | ${pkgs.gnugrep}/bin/grep -Fxq \
-              'usage: ${deploymentName} [--update] [HOME_MANAGER_ARGUMENTS...]'
-          touch "$out"
-        '';
-        arch-graphical-session = pkgs.runCommand "arch-graphical-session-check" { } ''
-          units=${archHomes.${homeConfigurationName}.activationPackage}/home-files/.config/systemd/user
-          profile=${archHomes.${homeConfigurationName}.config.home.path}
-          for unit in \
-            hyprpolkitagent.service \
-            keepassxc.service \
-            noctalia.service \
-            polychromatic-tray.service \
-            quickshell-overview.service \
-            remmina-applet.service \
-            tailscale-systray.service \
-            vesktop.service \
-            vicinae.service; do
-            if ${pkgs.gnugrep}/bin/grep -Eq '^Exec(Start|StartPre|StartPost|Reload)=.*/nix/store/' "$units/$unit"; then
-              printf 'Arch graphical unit references a Nix package: %s\n' "$unit" >&2
-              exit 1
-            fi
-          done
-          for unit in \
-            polychromatic-tray.service \
-            remmina-applet.service \
-            tailscale-systray.service \
-            vesktop.service \
-            vicinae.service; do
-            if ! ${pkgs.gnugrep}/bin/grep -qx 'After=noctalia.service' "$units/$unit"; then
-              printf 'Tray consumer does not start after Noctalia: %s\n' "$unit" >&2
-              exit 1
-            fi
-          done
-          if ! ${pkgs.gnugrep}/bin/grep -q '^ExecStartPre=.*StatusNotifierWatcher' "$units/vicinae.service"; then
-            printf 'Vicinae does not wait for Noctalia tray readiness\n' >&2
-            exit 1
-          fi
-          if ! ${pkgs.gnugrep}/bin/grep -qx \
-            'Environment=VICINAE_OVERRIDES=%h/.config/vicinae/nix-managed.json' \
-            "$units/vicinae.service"; then
-            printf 'Vicinae does not load the managed launcher policy\n' >&2
-            exit 1
-          fi
-          for application in kitty vesktop; do
-            if ! ${pkgs.gnugrep}/bin/grep -q \
-              "\"$application\":{\"preferences\":{\"defaultAction\":\"launch\"}}" \
-              "$units/../../vicinae/nix-managed.json"; then
-              printf 'Vicinae does not launch a new %s instance by default\n' "$application" >&2
-              exit 1
-            fi
-          done
-          for executable in \
-            ghostty \
-            gimp \
-            hypridle \
-            hyprlock \
-            hyprpolkitagent \
-            hyprsunset \
-            keepassxc \
-            kitty \
-            mpv \
-            mpvpaper \
-            noctalia \
-            noctalia-shell \
-            obs \
-            quickshell \
-            remmina \
-            swappy \
-            uwsm \
-            vesktop \
-            vicinae \
-            vlc; do
-            if [[ -e "$profile/bin/$executable" ]]; then
-              printf 'Arch Home profile provides a native graphical executable: %s\n' "$executable" >&2
-              exit 1
-            fi
-          done
-          touch "$out"
-        '';
-        gitlab-runner-config = pkgs.runCommand "gitlab-runner-config-check" { } ''
-          ${runnerctl}/bin/runnerctl validate > "$out"
-        '';
-        gitlab-runner-interface =
-          assert runnerInterfaceTests;
-          pkgs.writeText "gitlab-runner-interface-check" "GitLab Runner Interface checks passed\n";
-        gitlab-runner-tests =
-          pkgs.runCommand "gitlab-runner-tests"
-            {
-              nativeBuildInputs = [ pkgs.python3 ];
-            }
-            ''
-              python ${./modules/gitlab-runner/runnerctl_test.py} \
-                ${
-                  pkgs.writeText "gitlab-runner-test-instances.json" (
-                    builtins.toJSON {
-                      instances = runnerInstances;
-                      platform = runnerPlatform;
-                    }
-                  )
-                } \
-                ${./modules/gitlab-runner/runnerctl.py}
-              touch "$out"
-            '';
-        justfile =
-          pkgs.runCommand "justfile-check"
-            {
-              nativeBuildInputs = [ pkgs.just ];
-            }
-            ''
-              just --justfile ${./Justfile} --summary > "$out"
-              grep -Fxq 'arch-workstation build check check-arch default' "$out"
-              just --justfile ${./Justfile} --dry-run arch-workstation update >> "$out" 2>&1
-              grep -Fq 'nix run .#arch-workstation -- --update' "$out"
-            '';
-      };
+        host-interface =
+          assert import ./checks/host-interface.nix { inherit lib pkgs; };
+          pkgs.writeText "host-interface" "passed";
+      }
+      // (import ./checks {
+        inherit
+          pkgs
+          arch-switch
+          archDeployment
+          deploymentName
+          ;
+      })
+      // (import ./modules/home/checks.nix {
+        inherit pkgs;
+        home = archHomes.${homeConfigurationName};
+      })
+      // runners.checks;
 
       packages.${system} = {
-        inherit arch-switch home-switch runnerctl;
+        inherit arch-switch home-switch;
         ${deploymentName} = archDeployment;
         default = arch-switch;
-      };
+      }
+      // runners.packages;
 
       apps.${system} = {
         arch-switch = {
@@ -263,12 +146,8 @@
           program = "${pkgs.just}/bin/just";
           meta.description = "Run project commands before Home Manager is active";
         };
-        runnerctl = {
-          type = "app";
-          program = "${runnerctl}/bin/runnerctl";
-          meta.description = "Manage dedicated rootless GitLab Runner instances";
-        };
-      };
+      }
+      // runners.apps;
 
       formatter.${system} = pkgs.nixfmt;
     };

@@ -1,17 +1,18 @@
 {
   lib,
-  rawInstances,
 }:
 let
+  rawInstances = import ./instances.nix;
+  cases = builtins.fromJSON (builtins.readFile ./validation-cases.json);
   evaluate =
     instances:
     builtins.tryEval (
-      builtins.deepSeq (import ./interface.nix {
+      builtins.deepSeq (import ../interface.nix {
         inherit lib;
         rawInstances = instances;
       }) true
     );
-  canonical = import ./interface.nix { inherit lib rawInstances; };
+  canonical = import ../interface.nix { inherit lib rawInstances; };
   badAllowlist = rawInstances // {
     frontend = rawInstances.frontend // {
       runner = rawInstances.frontend.runner // {
@@ -31,6 +32,42 @@ let
   };
 in
 assert (evaluate rawInstances).success;
+assert builtins.all (
+  case:
+  let
+    changed = lib.recursiveUpdate rawInstances.frontend (lib.setAttrByPath case.path case.value);
+  in
+  (evaluate { frontend = changed; }).success == case.valid
+) cases;
+assert
+  !(evaluate (
+    rawInstances
+    // {
+      dotnet = rawInstances.dotnet // {
+        uid = rawInstances.frontend.uid;
+      };
+    }
+  )).success;
+assert
+  !(evaluate (
+    rawInstances
+    // {
+      dotnet = rawInstances.dotnet // {
+        subordinateIdStart = rawInstances.frontend.subordinateIdStart + 65535;
+      };
+    }
+  )).success;
+assert
+  (evaluate (
+    rawInstances
+    // {
+      dotnet = rawInstances.dotnet // {
+        subordinateIdStart = rawInstances.frontend.subordinateIdStart + 65536;
+      };
+    }
+  )).success;
+assert (evaluate { }).success;
+assert (evaluate { inherit (rawInstances) frontend; }).success;
 assert !(evaluate badAllowlist).success;
 assert !(evaluate unknownField).success;
 assert !(evaluate overlappingRange).success;

@@ -1,12 +1,12 @@
 {
   inputs,
-  platform,
   ...
 }:
 let
-  uwsm = if platform == "arch" then "/usr/bin/uwsm" else "/run/current-system/sw/bin/uwsm";
+  uwsm = "/usr/bin/uwsm";
 in
 {
+  imports = [ ./projection-safety.nix ];
   xdg.configFile."hypr" = {
     source = inputs.hypr-config;
     recursive = true;

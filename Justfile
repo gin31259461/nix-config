@@ -8,7 +8,11 @@ default:
 check:
     nix flake check
 
-# Resolve the current Arch and AUR package inventories without changing them.
+# Check Nix/Python formatting and Python static errors without building the home.
+check-fast:
+    nix build --no-link .#checks.x86_64-linux.source-format .#checks.x86_64-linux.host-interface .#checks.x86_64-linux.gitlab-runner-interface
+
+# Query the remote Arch, LizardByte, and AUR inventories (requires connectivity).
 check-arch:
     nix run .#arch-switch -- --check
 

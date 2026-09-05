@@ -14,6 +14,6 @@ pkgs.writeShellApplication {
     python3
   ];
   text = ''
-    exec python3 ${./runnerctl.py} --config ${config} "$@"
+    exec python3 ${./.}/runnerctl.py --config ${config} "$@"
   '';
 }

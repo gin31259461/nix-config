@@ -1,6 +1,6 @@
 { ... }:
 {
-  imports = [ ../../modules/home/static-config.nix ];
+  imports = [ ../../modules/home/config-files.nix ];
 
   home.sessionVariables = {
     QT_IM_MODULE = "fcitx";
