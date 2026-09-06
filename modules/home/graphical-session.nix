@@ -3,6 +3,9 @@ let
   systemBin = "/usr/bin";
   bin = name: "${systemBin}/${name}";
   hyprpolkitagentExecutable = "/usr/lib/hyprpolkitagent/hyprpolkitagent";
+  # Vesktop 1.6.7 on this Hyprland/Electron combination fails to remap a hidden
+  # native Wayland window. Keep the workaround app-local, including CLI launches.
+  vesktopPlatformFlag = "--ozone-platform=x11";
   graphicalUnit = {
     After = [ "graphical-session.target" ];
     PartOf = [ "graphical-session.target" ];
@@ -46,6 +49,10 @@ in
           Description = "Vicinae launcher daemon";
           Documentation = [ "https://docs.vicinae.com" ];
           Requires = [ "dbus.socket" ];
+          # Vicinae claims the watcher name when the shell disappears. Stop it
+          # first (inverse After order), and restart it after the shell returns.
+          BindsTo = [ "noctalia.service" ];
+          PartOf = graphicalUnit.PartOf ++ [ "noctalia.service" ];
         };
         Service = {
           Type = "simple";
@@ -63,6 +70,7 @@ in
       noctalia = {
         Unit = graphicalUnit // {
           Description = "Noctalia desktop shell";
+          Wants = [ "vicinae.service" ];
         };
         Service = restartableService // {
           ExecStart = bin "noctalia";
@@ -111,9 +119,8 @@ in
           Description = "Vesktop communication client";
         };
         Service = restartableService // {
-          Environment = [ "ELECTRON_OZONE_PLATFORM_HINT=auto" ];
           ExecStartPre = "${bin "sleep"} 3";
-          ExecStart = "${bin "vesktop"} --start-minimized --enable-features=UseOzonePlatform --ozone-platform-hint=wayland --enable-wayland-ime";
+          ExecStart = "${bin "vesktop"} --start-minimized ${vesktopPlatformFlag}";
           RestartSec = "5s";
           Slice = "app-graphical.slice";
           TimeoutStopSec = "10s";
@@ -124,6 +131,9 @@ in
   };
 
   xdg.configFile = {
+    # The Arch launcher reads this after electron-flags.conf. Do not force all
+    # Electron applications onto XWayland or replace the native executable.
+    "vesktop-flags.conf".text = "${vesktopPlatformFlag}\n";
     "vicinae/nix-managed.json".text = builtins.toJSON {
       providers.applications.entrypoints = {
         kitty.preferences.defaultAction = "launch";

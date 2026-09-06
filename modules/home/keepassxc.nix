@@ -28,11 +28,20 @@ in
     systemd.user.services.keepassxc = {
       Unit = {
         Description = "KeePassXC locked database and Secret Service provider";
-        After = [ "graphical-session.target" ];
+        After = [
+          "graphical-session.target"
+          "noctalia.service"
+        ];
         PartOf = [ "graphical-session.target" ];
         ConditionEnvironment = [ "WAYLAND_DISPLAY" ];
       };
       Service = {
+        # A simple shell unit is started before its D-Bus tray is ready. Wait
+        # for a host, but still allow manual vault access if the tray is absent.
+        ExecStartPre = ''
+          /usr/bin/bash -c 'deadline=$$((SECONDS + 10)); while (( SECONDS < deadline )); do ready=$$(/usr/bin/busctl --user --timeout=1s get-property org.kde.StatusNotifierWatcher /StatusNotifierWatcher org.kde.StatusNotifierWatcher IsStatusNotifierHostRegistered 2>/dev/null) && [[ "$$ready" == "b true" ]] && exit 0; /usr/bin/sleep 0.1; done; exit 0'
+        '';
+        TimeoutStartSec = "15s";
         ExecStart = ''/usr/bin/keepassxc --minimized "${quotedDatabase}"'';
         Restart = "no";
         Slice = "app-graphical.slice";

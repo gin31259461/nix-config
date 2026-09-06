@@ -8,7 +8,14 @@
         touch "$out"
       '';
   graphical-session-ordering =
-    pkgs.runCommand "graphical-session-ordering" { nativeBuildInputs = [ pkgs.python3 ]; }
+    pkgs.runCommand "graphical-session-ordering"
+      {
+        nativeBuildInputs = [
+          pkgs.python3
+          pkgs.bash
+          pkgs.coreutils
+        ];
+      }
       ''
         python ${./tests/test_session.py} ${home.activationPackage}/home-files/.config/systemd/user
         touch "$out"
