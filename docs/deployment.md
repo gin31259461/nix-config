@@ -1,73 +1,86 @@
-# Deployment behavior and recovery
+# Workstation deployment
 
-`arch-workstation` builds its Home Manager activation package, runs
-`arch-switch`, then runs `home-switch`. If Arch fails, home activation does not
-start. If home activation fails, the completed Arch work remains; fix the reported
-path or configuration and rerun the deployment.
+Run `arch-workstation` as the Host's selected login user on Arch Linux.
+The account must already exist with administrator membership, native Nix and
+`yay`, and the prerequisites checked by
+[arch-switch.sh](../platforms/arch/arch-switch.sh). Sudo performs system changes.
+Boot a kernel whose module directory exists before deployment.
 
-## What each mode does
+## Choose an operation
 
-| Mode | Inventory | System changes |
-| --- | --- | --- |
-| `arch-switch --check` | Remote Arch/LizardByte/AUR resolution | None |
-| `arch-switch` | Installed packages only | Converge files and runtime policy |
-| `arch-switch --update` | Remote resolution and installed packages | Full pacman upgrade, AUR convergence, then policy |
-
-All modes check the expected login identity and administrator membership.
-The deployment wrapper accepts `--update` as its first argument and forwards
-remaining arguments to Home Manager. Backup-extension arguments are rejected.
-
-The root of native package ownership is
-[packages.nix](../platforms/arch/packages.nix). Host hardware and optional Module
-requirements contribute to that inventory. Removing an entry does not uninstall
-it.
-
-## Convergence and interrupted work
-
-Managed file replacements compare contents, mode and owner. A changed file is
-installed through a temporary file in the destination directory and renamed
-into place. The controller refuses managed-file symlinks.
-
-NetworkManager restart, systemd reload and initramfs generation use pending
-markers under `/var/lib/nix-config/arch/`. Markers are written before related
-configuration changes and removed after successful actions. Leave them in place
-when diagnosing a failure; rerunning the deployment completes pending work.
-
-The controller preserves existing mkinitcpio settings and owns only its marked
-`MODULES+=` addition. The Host declares required early modules and expected
-initramfs image paths. Missing images trigger regeneration. Files and hooks
-outside this ownership are not a complete initramfs input-tracking system;
-changes made externally may still require the native rebuild workflow.
-
-Managed container-network modules are loaded when absent, before managed sysctl
-keys are compared with runtime values on every deployment. The modules-load
-destination retains its existing name, `nix-config-podman.conf`.
-Required system services are enabled or started only when needed. A private
-login-runtime lock serializes Arch deployments; an overlapping invocation
-returns 75. This lock does not coordinate unrelated manual administrative tools.
-
-## Respond to failures
-
-| Result | Next action |
+| Command | Behavior |
 | --- | --- |
-| Exit 2: invalid or incompatible arguments | Use `--help`; choose one mode |
-| Exit 3: missing declared packages | Rerun the deployment with `--update` |
-| Exit 75: running kernel modules unavailable | Reboot into the installed kernel, then rerun |
-| Exit 75: another deployment running | Let that invocation finish, then retry |
-| Unmanaged LizardByte repository detected | Reconcile ownership of the exact pacman entry before retrying |
-| Managed target is a symlink | Inspect the target and establish ownership; deployment will not replace it |
-| Command or initramfs generation failure | Correct the reported prerequisite and rerun; pending work remains recorded |
-| Home projection or file collision | Resolve the exact worktree/backup/conflicting file, then retry without backup flags |
+| `nix build --no-link .#arch-workstation` | Build artifacts without activation |
+| `nix run .#arch-switch -- --check` | Resolve Arch, LizardByte and AUR inventories without system convergence |
+| `nix run .#arch-workstation` | Check installed packages, converge Arch, activate the home |
+| `nix run .#arch-workstation -- --update` | Resolve inventories, fully upgrade pacman packages, converge AUR and deploy |
 
-Updating the kernel intentionally stops before AUR and subsequent policy
-convergence if its running module directory disappeared. After reboot, rerun
+Inventory checks inspect external state and need connectivity. Routine package
+checks are local, though Nix may still download build dependencies. Native
+packages are not version-locked by the flake. Removing an inventory entry does
+not uninstall the package.
+
+Both deployment modes maintain the managed LizardByte pacman include; only
+`--update` installs or upgrades packages. Its signature exception is confined
+to that repository. Existing unmanaged repository declarations require explicit
+ownership reconciliation.
+
+The wrapper accepts `--update` first and forwards remaining arguments to Home
+Manager. Adjacent-backup arguments are rejected. A deployment profile labels
+the complete user composition, not a subset of selected profiles.
+
+## Understand the boundary between stages
+
+The deployment artifact includes the built Home Manager activation package.
+At runtime, Arch convergence must succeed before Home Manager activation begins.
+A home failure leaves completed Arch work in place: fix the reported problem
+and rerun. These stages do not share a rollback transaction.
+
+First-time Noctalia storage preparation requires its service stopped; follow
+[desktop preparation](desktop-session.md#prepare-storage-on-a-new-home).
+Group membership changes require a new login session.
+
+## Repeat execution and interrupted work
+
+File updates compare contents, owner and mode, then replace through a temporary
+file in the destination directory. Managed-file symlinks are rejected. Healthy,
+unchanged system services are not restarted merely because deployment repeats.
+Runtime module and sysctl drift is repaired even when files already match.
+
+Network restart, systemd reload and initramfs work use pending markers under
+`/var/lib/nix-config/arch/`. Each marker precedes its related write and is cleared
+only after successful action. Preserve markers on failure; rerunning completes
+unfinished work. A private login-runtime lock serializes Arch mutations;
+unrelated manual administrative commands do not participate in that lock.
+
+The Host supplies early-module intent and expected initramfs images. Deployment
+preserves unowned mkinitcpio settings and manages only its marked `MODULES+=`
+addition. Missing images trigger regeneration. Changes to external hooks or
+other unowned inputs may still require the native initramfs rebuild workflow.
+
+## Resolve a failed run
+
+| Symptom | Next step |
+| --- | --- |
+| Exit 2 | Check arguments with `--help`; choose one mode |
+| Exit 3, missing native packages | Run the deployment with `--update` |
+| Exit 75, running kernel modules unavailable | Reboot into the installed kernel and rerun |
+| Exit 75, another deployment running | Wait for that invocation, then retry |
+| Unmanaged LizardByte repository | Reconcile the exact pacman declaration before retrying |
+| Managed file is a symlink | Inspect ownership; do not replace it blindly |
+| Initramfs or native-command failure | Fix the prerequisite and rerun with pending markers intact |
+| Home projection collision | Resolve the exact worktree, backup or conflicting file |
+
+After a pacman upgrade, a missing running-kernel module directory stops the
+workflow before AUR convergence and subsequent policy changes. Reboot and repeat
 the same update command.
 
-Home preflight rejects `.git` at the Neovim/Hyprland targets or their ancestors
-along both logical and resolved paths, and adjacent `.bak`, `.backup` and `~` paths. It does not delete
-anything. Keep development repositories elsewhere and avoid adding backup
-extensions to runtime configuration.
+Neovim/Hyprland preflight rejects `.git` at managed targets or their ancestors
+along logical and resolved paths, plus adjacent `.bak`, `.backup` and `~` paths.
+It runs before Home Manager link changes and does not remove collisions. Keep
+input development repositories outside runtime paths.
 
-Routine convergence requires neither GitLab connectivity nor a Runner
-registration. Nix downloads can still be needed to build a new deployment;
-remote inventory checks and updates require their own network connectivity.
+Workstation deployment does not require GitLab registration or perform Runner
+reconciliation. Use the separate [Runner workflow](runners.md) when that state
+is in scope. There is no automatic package removal, garbage collection,
+directory backup service or Runner purge.

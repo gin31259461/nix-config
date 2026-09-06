@@ -1,120 +1,100 @@
 # Arch workstation
 
-[![Platform: Arch Linux](https://img.shields.io/badge/platform-Arch_Linux-1793D1?logo=archlinux)](https://archlinux.org/)
 [![Check](https://github.com/gin31259461/nix-config/actions/workflows/check.yml/badge.svg)](https://github.com/gin31259461/nix-config/actions/workflows/check.yml)
+[![Arch Linux](https://img.shields.io/badge/platform-Arch_Linux-1793D1?logo=archlinux)](https://archlinux.org/)
 [![Home Manager](https://img.shields.io/badge/Home_Manager-26.05-5277C3)](https://github.com/nix-community/home-manager/tree/release-26.05)
 
-Build and deploy an Arch workstation with native desktop applications, Home
-Manager CLI tools and configuration, a UWSM-managed Hyprland session, and optional
-rootless GitLab Runner instances.
+Personal Arch Linux configuration combining a UWSM-managed Hyprland desktop,
+Noctalia, Home Manager development tools, and optional rootless GitLab Runners.
+The declared target is `arch-workstation` on `x86_64-linux`, with home
+configuration `abnertu@arch`.
 
-The supported target is `arch-workstation` on `x86_64-linux`. It deploys host
-`arch` and Home Manager configuration `abnertu@arch`. Host and user selections
-are explicit in [flake.nix](flake.nix) and [hosts/arch](hosts/arch/default.nix).
+![Current Noctalia wallpaper: a blue night city with an Arch-shaped tower](docs/assets/noctalia-wallpaper.png)
 
-## Start with a build
+*Wallpaper preview used by Noctalia. The image is a documentation asset; wallpaper
+selection remains local to Noctalia.*
 
-Use an existing Arch installation with Nix flakes enabled. This repository's
-tracked `nix.conf` supplies the user configuration when the checkout is at
-`~/.config/nix`; Home Manager does not generate that file.
+## Build, then deploy
 
-From the checkout:
+Use the checkout at `~/.config/nix` on an existing Arch installation with flakes
+enabled. The tracked [nix.conf](nix.conf) supplies Nix's user configuration.
+Provision the declared login user, `wheel` access, the Arch-owned Nix daemon,
+`yay`, and the [native prerequisites](platforms/arch/arch-switch.sh) first.
+This repository does not create login accounts or install the base OS.
 
 ```bash
 nix flake check
 nix build --no-link .#arch-workstation
-```
 
-These commands evaluate configuration and build artifacts. They do not activate
-Home Manager, change packages or services, or contact configured GitLab servers.
-Nix may download locked inputs and build dependencies.
-
-Before deployment, provision the declared login user with `wheel` access, the
-Arch-owned Nix daemon, `yay`, and the native prerequisites checked by
-[arch-switch.sh](platforms/arch/arch-switch.sh). Boot a kernel whose module
-directory is installed. The project does not bootstrap login accounts.
-
-## Deploy and update
-
-Run deployments as the selected login user, not root. The controller uses sudo
-for system changes.
-
-```bash
-# First deployment, or after adding native packages:
+# First deployment or newly declared native packages:
 nix run .#arch-workstation -- --update
 
-# Subsequent deployments:
+# Routine deployment:
 nix run .#arch-workstation
 ```
 
-The target builds its Home Manager activation package first, converges Arch, and
-activates the home only after Arch succeeds. These stages are not one atomic
-transaction: if home activation fails, completed Arch changes remain.
+Run as the selected login user; the controller uses sudo for system changes.
+For first-time Noctalia storage setup, follow the
+[offline preparation steps](docs/desktop-session.md#prepare-storage-on-a-new-home)
+before activation.
 
-Routine deployment checks locally installed packages without querying remote
-repositories. Missing packages stop it with exit code 3. It updates changed
-configuration, repairs managed runtime settings, and starts required inactive
-services. An already-converged run does not rebuild initramfs or restart healthy
-services.
+Deployment builds the home, converges Arch, then activates Home Manager.
+Routine runs check installed packages and repair managed files/runtime policy;
+missing packages exit 3. Only `--update` performs a full `pacman -Syu` followed
+by AUR convergence. A kernel mismatch exits 75: reboot and rerun the update.
+Arch packages are not locked by `flake.lock`, and home activation failure does
+not roll back completed Arch changes.
 
-Only `--update` resolves remote inventories, installs the managed LizardByte
-repository include, performs a complete `pacman -Syu`, and then converges AUR
-packages. The signature exception is confined to the LizardByte repository.
-Native packages are not version-locked by `flake.lock`.
+Once `just` is installed, use these shortcuts. Before then, use
+`nix run .#just -- <recipe>`.
 
-If an update replaces the running kernel, deployment exits with code 75 before
-AUR convergence and subsequent system configuration. Reboot and rerun the
-update. Group changes require a new login session.
-
-Home Manager installs `just` for shorter commands:
-
-| Command | Purpose |
+| Command | Action |
 | --- | --- |
-| `just check-fast` | Check source formatting, Python static errors, and declaration interfaces |
-| `just check` | Run all source checks and build the managed home |
-| `just build` | Build the deployment without activating it |
+| `just check-fast` | Formatting, Python static checks and declaration interfaces |
+| `just check` | All flake checks, including the home build |
+| `just build` | Build the deployment without activation |
 | `just arch-workstation` | Deploy using installed native packages |
-| `just arch-workstation update` | Fully update native packages, then deploy |
-| `just check-arch` | Query remote package inventories; requires connectivity |
+| `just arch-workstation update` | Fully update native packages and deploy |
+| `just check-arch` | Resolve external package inventories without deployment |
 
-Before `just` is installed, use `nix run .#just -- <recipe>`.
+## Configure your workstation
 
-## Change the configuration
+Arch owns desktop executables, drivers and system services. Home Manager owns
+platform-independent CLI packages, static home files and user-unit policy.
+Graphical units invoke Arch-owned paths.
 
-| Change | Edit |
+| Responsibility | Source |
 | --- | --- |
-| Login identity, groups, selected profiles and modules | [hosts/arch/users.nix](hosts/arch/users.nix) |
-| Graphics, OpenRazer and initramfs requirements | [hosts/arch/hardware.nix](hosts/arch/hardware.nix) |
-| Arch-native package inventory | [platforms/arch/packages.nix](platforms/arch/packages.nix) |
-| Reusable CLI/development bundles | [profiles](profiles/default.nix) |
-| User-specific Home Manager preferences | [homes/abnertu/home.nix](homes/abnertu/home.nix) |
-| Shared home files and graphical unit policy | [modules/home](modules/home/default.nix) |
-| Runner instances and resource limits | [hosts/arch/gitlab-runners.nix](hosts/arch/gitlab-runners.nix) |
-| Arch convergence behavior | [platforms/arch/arch-switch.sh](platforms/arch/arch-switch.sh) |
+| Host identity and deployment selection | [hosts/arch/default.nix](hosts/arch/default.nix) |
+| Login users, profiles and modules | [hosts/arch/users.nix](hosts/arch/users.nix) |
+| Hardware intent | [hosts/arch/hardware.nix](hosts/arch/hardware.nix) |
+| Native packages | [platforms/arch/packages.nix](platforms/arch/packages.nix) |
+| Reusable CLI/development bundles | [profiles/default.nix](profiles/default.nix) |
+| User preferences | [homes/abnertu/home.nix](homes/abnertu/home.nix) |
+| Shared home behavior | [modules/home/default.nix](modules/home/default.nix) |
+| Runner instances | [hosts/arch/gitlab-runners.nix](hosts/arch/gitlab-runners.nix) |
 
-KeePassXC loads at login and unlocks manually. Noctalia uses its own runtime
-file key; desktop startup does not wait for an unlocked vault.
-See [desktop and password-store operation](docs/desktop-session.md) for the
-first-activation requirements, key recovery and post-activation verification.
+The deployment name labels the user's entire selected composition; it does not
+switch to an isolated profile. [CONTEXT.md](CONTEXT.md) defines the composition
+model and ownership vocabulary.
 
-Use `nix run .#noctalia-config -- capture --dry-run` to preview exporting reviewed
-Noctalia GUI preferences to this repository, or `deploy --dry-run` to check a
-deployment. See [Noctalia preference exchange](docs/noctalia-config.md) for scope,
-GUI override conflicts and recovery. Actual `deploy` activates the complete home.
+### Noctalia preferences
 
-Arch owns graphical executables, drivers and system services. Home Manager owns
-CLI/development tools, static home files and user-unit policy; graphical units
-call stable Arch paths. Do not install a second desktop executable through Home
-Manager to change its configuration.
+```bash
+nix run .#noctalia-config -- capture --dry-run
+nix run .#noctalia-config -- capture
+```
 
-A deployment's profile is a label selected from its user's profiles. Deployment
-activates **all** profiles and modules selected by that user; it does not switch
-to an isolated profile. See [CONTEXT.md](CONTEXT.md) for composition terminology.
+Capture writes reviewed-scope preferences to
+[homes/abnertu/noctalia/config.toml](homes/abnertu/noctalia/config.toml).
+It validates before writing and leaves GUI overrides untouched. Inspect the
+result locally before committing. For applying the snapshot, resolving warnings
+and replacing conflicting GUI overrides, see [preference exchange](docs/noctalia-config.md).
 
-## Maintain the locked editor and desktop inputs
+### Locked Neovim and Hyprland inputs
 
-Neovim and Hyprland configuration are separate repositories locked by this flake.
-Develop them outside their runtime paths, for example under `~/codebase`.
+Develop these configurations in separate repositories outside runtime paths.
+Test a local Hyprland checkout without changing the lock:
 
 ```bash
 nix build --no-link --override-input hypr-config path:$HOME/codebase/hypr \
@@ -125,41 +105,25 @@ nix flake update hypr-config
 nix flake check
 ```
 
-Use `neovim-config` for the Neovim input. Neovim is linked as one directory;
-Hyprland uses a writable directory containing recursive links. Activation rejects
-Git worktrees at these targets and known adjacent backup paths. Resolve collisions
-at their source; backup-extension flags are rejected by deployment wrappers.
-Each managed skill is also linked as one directory.
+Use `neovim-config` for Neovim. Neovim and each managed skill are linked as
+whole directories; Hyprland uses recursive links inside a writable directory.
+Activation rejects worktrees and adjacent backups at managed runtime targets.
 
-## Optional Runner operations
+## Operations and development
 
-Removing or emptying `gitlabRunners` in the Host omits the Runner controller and
-its module dependencies from composition. It does not delete existing accounts,
-registrations or containers. Normal workstation deployment never reconciles or
-registers a Runner.
+- [Deployment and recovery](docs/deployment.md): prerequisites, update modes,
+  exit codes, locks and interrupted actions.
+- [Desktop session](docs/desktop-session.md): tray startup, Vesktop compatibility,
+  KeePassXC and Noctalia storage recovery.
+- [Noctalia preferences](docs/noctalia-config.md): capture, validation, deployment
+  and override receipts.
+- [Runner operations](docs/runners.md): explicit instance setup, registration
+  and verification. Workstation deployment does not run these operations.
+- [AGENTS.md](AGENTS.md): coding-agent rules and validation boundaries.
 
-For instance setup, registration and live verification, follow
-[the Runner operations guide](docs/runners.md). Each instance has one service
-account, subordinate-ID allocation, rootless Podman socket and manager. Jobs
-remain unprivileged, use concurrency one and receive no host socket.
-
-## Develop and troubleshoot
-
-Start with `just check-fast`, then run `nix flake check`. The checks include
-GitHub workflow linting alongside
-isolated Arch command tests, Runner validation and reconciliation tests, and
-generated Home Manager units. Test data belongs beside its owner and must not
-depend on real host registrations or credentials.
-
-[GitHub Actions](.github/workflows/check.yml) runs these checks and builds the
-deployment artifacts on pushes to `main`, pull requests and manual dispatch.
-It uses an Ubuntu runner for Nix builds; it never activates the workstation or
-runs live Runner operations. Action revisions are pinned to commit hashes.
-
-New Nix inputs must be tracked before flake evaluation; stage only intended
-paths. Use the locked formatter with `nix fmt -- path/to/file.nix`.
-[AGENTS.md](AGENTS.md) contains the coding-agent contract.
-
-For exit codes, pending actions, deployment locks and recovery behavior, see
-[the deployment guide](docs/deployment.md). There is no automatic cleanup,
-package removal, garbage collection, directory backup service or Runner purge.
+Stage exact intended inputs before flake evaluation. Use `nix fmt -- path/to/file.nix`
+for Nix formatting, then `nix flake check` and `git diff --check`.
+[CI](.github/workflows/check.yml) runs source checks and builds on Ubuntu without
+activating the workstation. Native-command tests use fake commands and temporary
+paths. No deployment performs automatic package removal, garbage collection,
+directory backups or Runner retirement.

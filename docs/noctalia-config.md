@@ -1,129 +1,125 @@
-# Capture and deploy Noctalia v5 preferences
+# Noctalia preference exchange
 
-Run from this repository's root. Before the command is installed in the home
-profile, use `nix run .#noctalia-config --` in place of `noctalia-config`.
-Use `--repo /absolute/path/to/nix` when running outside the checkout.
+`noctalia-config` captures reviewed UI preferences into Git and deploys them
+through Home Manager. Run from `~/.config/nix`, or pass `--repo` with the absolute
+checkout path. Use `nix run .#noctalia-config --` to run the current source without
+first installing the command.
+
+## Capture current preferences
 
 ```bash
-noctalia-config capture --dry-run
-noctalia-config capture
-
-noctalia-config deploy --dry-run
-noctalia-config deploy
+nix run .#noctalia-config -- capture --dry-run
+nix run .#noctalia-config -- capture
 ```
 
-`capture` writes reviewed-scope preferences to
-`homes/abnertu/noctalia/config.toml`. `deploy` builds and activates the **complete
-selected Home Manager configuration**, not only Noctalia. It never runs Arch
-package convergence. Neither operation stages, commits or pushes Git changes.
+The destination is
+[homes/abnertu/noctalia/config.toml](../homes/abnertu/noctalia/config.toml), or
+`~/.config/nix/homes/abnertu/noctalia/config.toml` in the normal checkout.
+Capture exports merged user settings, filters their scope, validates a private
+temporary candidate, and atomically replaces the snapshot only when needed.
+It leaves GUI overrides unchanged and never stages, commits or pushes.
 
-## What v5 stores where
+Inspect the captured diff locally before committing. Labels, custom text and
+paths can be private even when their fields pass the filter. Concurrent changes
+to the repository snapshot cause capture to stop rather than overwrite them.
 
-The [official v5 configuration model](https://docs.noctalia.dev/noctalia/configuration/)
-has three distinct files/owners:
+## Configuration ownership
 
-| Location (default) | Owner and meaning |
+| Location | Owner |
 | --- | --- |
-| `~/.config/noctalia/*.toml` | Handwritten configuration, including Home Manager links |
-| `~/.local/state/noctalia/settings.toml` | Writable GUI overrides; loaded after handwritten configuration |
-| `~/.local/state/noctalia/state.toml` | Internal runtime state; never synchronized by this command |
+| `homes/<user>/noctalia/config.toml` | Reviewed repository preferences |
+| `~/.config/noctalia/config.toml` | Home Manager link to the built snapshot |
+| Other `~/.config/noctalia/*.toml` files | Their existing configuration owners |
+| `~/.local/state/noctalia/settings.toml` | GUI overrides, loaded after configuration files |
+| Runtime state, encrypted data and keys | Noctalia and the local storage policy |
 
-Capture uses `/usr/bin/noctalia config export`, which merges user settings without
-materializing all built-in defaults. It does not copy the GUI file verbatim or
-use `export full`. Noctalia resolves its `NOCTALIA_CONFIG_HOME` and
-`NOCTALIA_STATE_HOME` overrides before the corresponding XDG roots. Capture
-honors those paths. Deployment currently requires this Host's default XDG roots;
-it rejects alternate roots until Home Manager ownership is configured for them.
+The [capture filter](../modules/home/noctalia-config/sync.py) owns the allowlist
+of UI sections. Unknown sections and whole sections containing nonempty
+command, action, URL, account or credential-like fields are excluded for review.
+Storage and calendar policy belong to
+[noctalia-storage.nix](../modules/home/noctalia-storage.nix). Wallpaper selection,
+plugin settings, internal state and encrypted data are outside capture scope.
 
-## Capture scope and review
+Capture uses `noctalia config export`, not `export full` or a wholesale GUI-file
+copy. It honors Noctalia/XDG config and state roots; deploy requires this Host's
+default roots. Builds never capture live preferences automatically.
 
-The Module explicitly permits selected UI sections: theme, bar, widget, dock,
-desktop, shell, OSD, notification, audio, brightness, battery, control center,
-accessibility and night light. A section containing nonempty fields whose names
-indicate commands, actions, scripts, URLs, keybindings, accounts or credentials
-is omitted as a whole for review. Unsupported/new sections are also omitted.
-Only section names, never values or a raw exported diff, appear in command output.
+## Resolve validation warnings
 
-This is a conservative preference exporter, not a complete configuration backup
-or a proof that arbitrary text is non-sensitive. Inspect the captured diff
-locally before committing, especially labels, custom text and filesystem paths.
-Do not broaden the allowlist to import secrets or executable settings implicitly.
-Storage and calendar policy stay in `noctalia-storage.nix`; key files, clipboard
-data, event caches and internal state are never exported.
-
-The checked-in preferences file starts empty. No live GUI settings are captured
-by builds or automatically when installing this command. Capture validates a
-private temporary candidate first, refuses validation warnings, and atomically
-writes the tracked file only if its content/metadata differs. Concurrent edits
-to the repository file cause capture to stop. It does not rewrite GUI overrides.
-
-## Deployment and GUI conflicts
-
-Home Manager remains the sole owner of `~/.config/noctalia/config.toml`.
-The command refuses an unmanaged file at that path and competing handwritten
-TOMLs that own the same sections; it never overwrites them itself.
-
-The repository owns each preference section it contains as a whole. GUI overrides
-that change or add values in those sections are conflicts. Default deployment
-reports their section names and stops before building or changing overrides.
-Overrides with identical values are harmless and can remain.
-
-To explicitly replace overrides for repository-owned sections:
+Warnings stop capture before the snapshot is written. The error reports known
+affected sections, such as `sections: widget`, and withholds raw diagnostics
+because they can quote private values. Inspect full live warnings locally:
 
 ```bash
-# Keep a terminal open; existing Hyprland application windows remain usable.
-systemctl --user stop noctalia.service
-noctalia-config deploy --replace-overrides && systemctl --user start noctalia.service
+/usr/bin/noctalia config validate
 ```
 
-The command does not stop/restart services on your behalf. Replacement requires
-Noctalia to be stopped, builds the home first, then writes a private backup and
-a pending receipt before removing owned sections from the GUI override file.
-Unowned sections remain. The backup lives under
-`~/.local/state/nix-config/noctalia-config/` (directory `0700`, backups `0600`).
-It is not adjacent to a Home Manager link and is never committed or imported
-into the Nix store. No automatic backup cleanup is performed.
+The full live configuration and filtered candidate can have different warnings.
+A widget referencing a disabled plugin can be unrecognized even when its files
+are installed. Decide whether to enable that plugin or remove the stale widget
+and its bar references. Capture does not make that decision automatically.
+Editing only the repository snapshot leaves the live overrides intact, so a
+subsequent capture can encounter the same warning until those are resolved.
 
-After Home Manager activation, the command exports the effective user config
-again and compares the managed sections with the repository. This detects a
-successful file deployment that did not actually take precedence. Unchanged
-override content does not create additional backups on repeat invocation.
+## Apply the snapshot
 
-Dry runs validate and report section names using temporary files only: no home
-build/activation, persistent lock, backup, override edit or repository write.
-They do inspect live configuration and should not be used as CI/source tests.
+```bash
+nix run .#noctalia-config -- deploy --dry-run
+nix run .#noctalia-config -- deploy
+```
 
-## Failure recovery
+Deploy builds and activates the **complete selected Home Manager configuration**,
+then verifies the effective managed sections. It does not run Arch convergence.
+Home Manager alone owns the config link; deployment refuses unmanaged files,
+competing TOML section owners and unreviewed includes.
 
-A failed activation or effective-config comparison restores changed GUI overrides
-when they still match the command's written version. It does **not** roll back
-the Home Manager generation or other home changes. Backups remain available.
-
-For an interrupted deployment:
+GUI overrides differing from repository-owned sections are reported as conflicts.
+Identical overrides can remain. To replace conflicting overrides deliberately:
 
 ```bash
 systemctl --user stop noctalia.service
-noctalia-config deploy --recover
+nix run .#noctalia-config -- deploy --replace-overrides && \
+  systemctl --user start noctalia.service
 ```
 
-Recovery restores the exact backed-up overrides only when the current file
-matches the before/after receipt hash. Concurrent GUI/manual edits cause recovery
-to stop rather than overwrite them. Preserve the backup and receipt for manual
+Keep a terminal open. This stops the panel and its coupled launcher; other
+application windows remain usable. The command itself never stops services.
+Replacement builds the home first, records a private backup and pending receipt,
+then clears only repository-owned override sections. It preserves unowned sections.
+A subsequent build or activation does not silently clear overrides.
+
+Dry-run capture/deploy inspect live settings but do not build or activate the
+home, write the snapshot, change overrides, or create persistent recovery state.
+They are operator previews, not source-validation tests.
+
+## Recover an interrupted deployment
+
+Recovery state lives under `~/.local/state/nix-config/noctalia-config/` with
+directory mode `0700` and backup mode `0600`. Retain receipts and the persistent
+lock inode; do not copy this directory into Git or remove backups automatically.
+
+A failed activation or effective-config check attempts to restore changed GUI
+overrides. Home Manager generations and other home changes are not rolled back.
+For an interrupted operation:
+
+```bash
+systemctl --user stop noctalia.service
+nix run .#noctalia-config -- deploy --recover
+```
+
+Recovery restores the saved bytes only when current settings match the receipt's
+before/after hashes. Concurrent GUI or manual edits require deliberate
 reconciliation. A pending receipt blocks further capture/deploy until recovery.
-Do not delete the persistent lock inode.
+Once resolved, review the snapshot, retry deployment and restart Noctalia.
+For missing keys or storage preparation failures, use the
+[desktop storage recovery guide](desktop-session.md#recover-storage-safely).
 
-Once recovery succeeds, review the repository and retry deployment. Start
-Noctalia only after resolving any storage migration failure as described in
-[desktop-session.md](desktop-session.md). Pausing Noctalia is sufficient; logging
-out of Hyprland is not required.
-
-## Source validation
+## Validate changes to the tool
 
 ```bash
-nix build --no-link .#checks.x86_64-linux.noctalia-config
-nix build --no-link .#noctalia-config
+nix build --no-link .#checks.x86_64-linux.noctalia-config .#noctalia-config
 nix flake check
 ```
 
-Tests use temporary repositories/homes and fake native, Git and Nix commands.
-They do not export the machine's settings, activate Home Manager or restart services.
+Tests use temporary homes and fake native/Nix commands. They do not read live
+settings, activate Home Manager or restart services.
