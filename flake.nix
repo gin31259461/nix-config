@@ -71,6 +71,7 @@
       arch-switch = import ./platforms/arch/package.nix {
         inherit lib pkgs deploymentUser;
         moduleGroups = virtualization.loginGroups;
+        moduleSystemUnits = virtualization.systemUnits;
         username = deployment.username;
         packages = nativePackages;
         hardware = archHost.hardware;

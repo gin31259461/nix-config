@@ -3,6 +3,12 @@
     "qemu-desktop"
     "edk2-ovmf"
   ];
+  gui = [
+    "dnsmasq"
+    "nftables"
+    "virt-manager"
+    "libvirt"
+  ];
   podman = [
     "podman"
     "netavark"

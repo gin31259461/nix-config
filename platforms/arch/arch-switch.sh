@@ -167,7 +167,7 @@ if [[ -e $root_state/units.pending ]]; then
   root rm -- "$root_state/units.pending"
   actions=$((actions + 1))
 fi
-for service in NetworkManager.service bluetooth.service power-profiles-daemon.service tailscaled.service; do
+for service in NetworkManager.service bluetooth.service power-profiles-daemon.service tailscaled.service "${module_system_units[@]}"; do
   if ! native systemctl is-enabled --quiet "$service"; then root systemctl enable "$service"; actions=$((actions + 1)); fi
   if ! native systemctl is-active --quiet "$service"; then root systemctl start "$service"; actions=$((actions + 1)); fi
 done

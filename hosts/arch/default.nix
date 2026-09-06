@@ -14,6 +14,7 @@
   virtualization = {
     enable = true;
     kvm.enable = true;
+    kvm.gui.enable = true;
     podman.enable = true;
   };
   users = import ./users.nix;

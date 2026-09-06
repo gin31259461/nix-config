@@ -24,6 +24,10 @@ let
   enabled = ai { enable = true; };
   disabled = ai { enable = false; };
   v = virtualization { enable = true; };
+  gui = virtualization {
+    enable = true;
+    kvm.gui.enable = true;
+  };
   host = import ../hosts/arch;
   home = (import ../lib/mk-home-configuration.nix { inherit inputs; }) {
     inherit (host)
@@ -68,6 +72,39 @@ assert (virtualization { enable = false; }).loginGroups == [ ];
 assert builtins.elem "qemu-desktop" v.requiredPackages;
 assert builtins.elem "podman" v.requiredPackages;
 assert v.loginGroups == [ "kvm" ];
+assert v.systemUnits == [ ];
+assert !(builtins.elem "virt-manager" v.requiredPackages);
+assert builtins.elem "virt-manager" gui.requiredPackages;
+assert builtins.elem "libvirt" gui.requiredPackages;
+assert gui.systemUnits == [ "libvirtd.socket" ];
+assert gui.loginGroups == [ "kvm" ];
+assert lib.all
+  (
+    raw:
+    let
+      disabledGui = virtualization raw;
+    in
+    disabledGui.systemUnits == [ ]
+    && !(builtins.elem "virt-manager" disabledGui.requiredPackages)
+    && !(builtins.elem "libvirt" disabledGui.requiredPackages)
+  )
+  [
+    {
+      enable = false;
+      kvm.gui.enable = true;
+    }
+    {
+      enable = true;
+      kvm.enable = false;
+      kvm.gui.enable = true;
+    }
+    {
+      enable = true;
+      kvm.gui.enable = false;
+    }
+  ];
+assert !(valid "virtualization" { kvm.gui.enable = "true"; });
+assert !(valid "virtualization" { kvm.gui.enabel = true; });
 assert
   !(builtins.elem "podman"
     (virtualization {

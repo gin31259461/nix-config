@@ -88,8 +88,9 @@ directory backup service or Runner purge.
 ## AI and virtualization
 
 The Host selects both capabilities in [hosts/arch/default.nix](../hosts/arch/default.nix).
-Each parent defaults to disabled when omitted; child switches default to enabled
-and take effect only when the parent is enabled.
+Each parent defaults to disabled when omitted. Codex, skills presets, KVM and
+Podman child switches default to enabled and take effect only when their parent
+is enabled. The optional KVM GUI defaults to disabled.
 
 - `ai.enable` gates `ai.codex.enable` (the AUR Codex package) and
   `ai.skillsPresets.enable` (the repository's existing skill presets).
@@ -107,8 +108,29 @@ Enable CPU virtualization in firmware before use. The kernel loads its
 CPU-specific KVM driver automatically; no CPU vendor detection or initramfs
 rewrite is needed by this Module. For an existing VM disk, a typical invocation
 is `/usr/bin/qemu-system-x86_64 -accel kvm -cpu host -m 4G -drive file=vm.qcow2,format=qcow2 -nic user`.
-Disk creation, guest installation, bridge networking and libvirt services are
-operator choices outside this declaration.
+Disk creation, guest installation and bridge networking remain operator choices.
+
+Set `virtualization.kvm.gui.enable = true;` to add virt-manager, libvirt and
+the DNS/DHCP and nftables tools used by libvirt virtual networks.
+The current Host enables it explicitly. Both `virtualization.enable` and
+`virtualization.kvm.enable` must also be true. Arch deployment enables and starts
+the package-provided local `libvirtd.socket`; repeat deployment repairs socket
+drift without restarting running guests. It uses libvirt's standard polkit
+authentication and does not grant passwordless management or enable TCP access.
+
+After `just arch-workstation update`, launch
+`/usr/bin/virt-manager --connect qemu:///system` from your graphical session and
+authenticate if prompted. Use its wizard to create a VM. Virtual networks and
+their autostart remain explicit choices in virt-manager; deployment does not
+create guests, pools or networks. Store system-managed VM disks in a
+libvirt-accessible storage pool rather than assuming your private home is
+accessible. Existing custom or modular libvirt daemon setups must be reconciled
+before deployment; deployment does not migrate or unmask their units.
+
+Turning the GUI off stops declaring its packages and socket. It does not stop
+libvirt or delete existing guests. See libvirt's
+[socket activation](https://libvirt.org/daemons.html) and
+[authentication](https://libvirt.org/auth.html) documentation.
 
 Podman runs through the Arch-owned executable without an automatically enabled
 API socket. Before rootless use, provision non-overlapping subordinate UID and

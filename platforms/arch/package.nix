@@ -6,6 +6,7 @@
   packages,
   hardware,
   moduleGroups ? [ ],
+  moduleSystemUnits ? [ ],
 }:
 pkgs.writeShellApplication {
   name = "arch-switch";
@@ -35,6 +36,7 @@ pkgs.writeShellApplication {
         lib.unique (deploymentUser.groups ++ moduleGroups ++ lib.optional deploymentUser.admin "wheel")
       )
     })
+    module_system_units=(${lib.escapeShellArgs moduleSystemUnits})
     initramfs_modules=(${lib.escapeShellArgs hardware.initramfsModules})
     initramfs_images=(${lib.escapeShellArgs hardware.initramfsImages})
     user_services=(${

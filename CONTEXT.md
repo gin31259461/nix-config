@@ -35,7 +35,8 @@ Application instances remain private to their Module and Host declaration.
 The Host also selects AI and virtualization through typed parent and child
 enable switches. AI exports AUR requirements and a shared Home Manager module
 for skill presets. Virtualization exports native package requirements and login
-groups for direct QEMU/KVM and Podman use. Arch realizes these values; Runner
+groups for QEMU/KVM and Podman use. Its optional KVM GUI also exports the local
+libvirt socket for Arch to converge. Arch realizes these values; Runner
 requirements remain independent of the login-user virtualization selection.
 
 The Runner Module accepts zero or more instances. With zero instances, it

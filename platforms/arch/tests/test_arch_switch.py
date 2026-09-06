@@ -64,6 +64,7 @@ class ArchSwitchTests(unittest.TestCase):
                     "lizardbyte_package_names=(sunshine)",
                     "lizardbyte_packages=(lizardbyte/sunshine)",
                     "required_groups=(wheel i2c)",
+                    "module_system_units=()",
                     "initramfs_modules=(usbhid amdgpu)",
                     "initramfs_images=(/boot/initramfs-linux.img)",
                     "user_services=(openrazer-daemon.service app-dev.lizardbyte.app.Sunshine.service)",
@@ -185,6 +186,50 @@ class ArchSwitchTests(unittest.TestCase):
         self.invoke()
         self.assertEqual(self.state["sysctl"]["net.ipv4.ip_forward"], "1")
         self.assertTrue(self.state["services"]["system:bluetooth.service"]["active"])
+
+    def enable_gui(self):
+        self.script.write_text(
+            self.script.read_text().replace(
+                "module_system_units=()", "module_system_units=(libvirtd.socket)"
+            )
+        )
+
+    def test_gui_socket_converges_and_repairs_drift(self):
+        self.enable_gui()
+        self.invoke()
+        socket = self.state["services"]["system:libvirtd.socket"]
+        self.assertTrue(socket["enabled"] and socket["active"])
+        self.assertIn("0 files updated, 0 runtime actions", self.invoke().stdout)
+        self.state["services"]["system:libvirtd.socket"]["active"] = False
+        self.save()
+        self.invoke()
+        self.assertTrue(self.state["services"]["system:libvirtd.socket"]["active"])
+
+    def test_gui_socket_start_failure_is_retried(self):
+        self.enable_gui()
+        self.invoke()
+        self.state["services"]["system:libvirtd.socket"]["active"] = False
+        self.state["fail"] = ["systemctl", "start"]
+        self.save()
+        self.invoke(code=1)
+        self.assertFalse(self.state["services"]["system:libvirtd.socket"]["active"])
+        self.state.pop("fail")
+        self.save()
+        self.invoke()
+        self.assertTrue(self.state["services"]["system:libvirtd.socket"]["active"])
+
+    def test_disabled_gui_does_not_retire_socket(self):
+        self.enable_gui()
+        self.invoke()
+        self.script.write_text(
+            self.script.read_text().replace(
+                "module_system_units=(libvirtd.socket)", "module_system_units=()"
+            )
+        )
+        (self.root / "commands.jsonl").unlink()
+        self.invoke()
+        self.assertFalse(any("libvirtd.socket" in call for call in self.commands()))
+        self.assertTrue(self.state["services"]["system:libvirtd.socket"]["active"])
 
     def test_update_order_and_failure_short_circuit(self):
         self.invoke("--update")
