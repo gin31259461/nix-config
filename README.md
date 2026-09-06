@@ -9,10 +9,7 @@ Noctalia, Home Manager development tools, and optional rootless GitLab Runners.
 The declared target is `arch-workstation` on `x86_64-linux`, with home
 configuration `abnertu@arch`.
 
-![Current Noctalia wallpaper: a blue night city with an Arch-shaped tower](docs/assets/noctalia-wallpaper.png)
-
-*Wallpaper preview used by Noctalia. The image is a documentation asset; wallpaper
-selection remains local to Noctalia.*
+![Preview](docs/assets/preview.png)
 
 ## Build, then deploy
 
@@ -119,7 +116,7 @@ Activation rejects worktrees and adjacent backups at managed runtime targets.
   and override receipts.
 - [Runner operations](docs/runners.md): explicit instance setup, registration
   and verification. Workstation deployment does not run these operations.
-- [AGENTS.md](AGENTS.md): coding-agent rules and validation boundaries.
+- [AGENTS.md](./AGENTS.md): coding-agent rules and validation boundaries.
 
 Stage exact intended inputs before flake evaluation. Use `nix fmt -- path/to/file.nix`
 for Nix formatting, then `nix flake check` and `git diff --check`.
