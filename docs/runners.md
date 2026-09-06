@@ -27,7 +27,10 @@ sudo "$runnerctl_path/bin/runnerctl" reconcile frontend
 interface readiness and GitLab health. `reconcile` converges the dedicated
 account, subordinate IDs, runtime, Podman socket, manager image, configuration
 and service. It preserves a single existing registration and rejects conflicting
-ownership or supplementary host roles.
+ownership or supplementary host roles. Existing service accounts must have a
+locked password, checked through the native password-status command without
+reading password hashes. An unlocked or passwordless existing account requires
+explicit ownership review; reconciliation does not silently adopt it.
 
 Each manager can mount only its own rootless Podman socket. Jobs are unprivileged,
 use concurrency one and per-job networks, and receive no host socket. Required
@@ -55,7 +58,14 @@ sudo "$runnerctl_path/bin/runnerctl" verify frontend
 ```
 
 Verification checks the manager, registration, isolation and a disposable job
-network, which is also removed after failure. It is not a source-only test.
+network, which is also removed after failure. Manager inspection compares the
+running image ID against the declared local image and checks all three managed
+bind mounts, including the exact instance socket, plus network and privilege
+settings. `status` reports `container=matches-declaration`, `drifted` or `absent`;
+it does not claim a complete security audit. Raw inspect data is never printed.
+The manager disables implicit image volumes so its mount set is explicit.
+Reconciliation restarts a drifted running manager and retains a pending marker
+if that repair fails. It is not a source-only test.
 Never copy real tokens or registration metadata into expressions, fixtures,
 logs, Git or the Nix store.
 
@@ -65,7 +75,15 @@ Mutations share `/run/lock/nix-config-runner.lock` to serialize updates to share
 subordinate-ID files across instances. Keep the lock inode; unrelated
 administrative tools are not coordinated by it.
 
-Atomic writes preserve matching files. Instance config directories hold
+Managed file operations walk directories without following symlinks and hold
+directory descriptors through reads, replacement, metadata changes and removal.
+Symlinks, hard-linked managed files and unexpected file types are rejected.
+If a path is rejected, preserve the conflicting state and resolve its ownership
+before retrying; the controller does not move or delete it automatically.
+Registration metadata is parsed only from the single TOML Runner table; malformed
+or ambiguous registrations stop convergence with content-free diagnostics.
+
+Atomic writes preserve matching files and sync replacement directories. Instance config directories hold
 `.reconcile.pending` for unfinished manager actions and `.trust.pending` for
 CA refreshes. Leave these markers and registration state intact when an
 operation fails; correct the cause and rerun the same instance operation.

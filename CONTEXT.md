@@ -47,7 +47,10 @@ interface and fake-runtime tests remain available.
 
 Nix builds desired artifacts. Arch deployment compares those artifacts with
 managed system files and runtime state; Home Manager performs home activation.
-The two stages are ordered but do not share a rollback transaction.
+The deployment artifact fixes the Home Manager generation before either stage
+runs. Activation uses Home Manager's profile-managing driver rather than
+resolving the source again. The two stages are ordered but do not share a
+rollback transaction.
 
 A successful repeat deployment with unchanged declarations and healthy runtime
 state leaves managed file contents and service processes unchanged. Runtime

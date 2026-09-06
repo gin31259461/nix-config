@@ -21,7 +21,6 @@
 
   outputs =
     inputs@{
-      self,
       nixpkgs,
       ...
     }:
@@ -76,40 +75,25 @@
         packages = nativePackages;
         hardware = archHost.hardware;
       };
-      home-switch = pkgs.writeShellApplication {
-        name = "home-switch";
-        runtimeInputs = [ inputs.home-manager.packages.${system}.home-manager ];
-        text = ''
-          for argument in "$@"; do
-            case "$argument" in
-              -b*|--backup-file-extension*)
-                printf 'Adjacent Home Manager backups are not supported; resolve the conflicting path first.\n' >&2
-                exit 2 ;;
-            esac
-          done
-          exec home-manager switch --flake '${self}#${homeConfigurationName}' "$@"
-        '';
+      home-switch = import ./lib/deployment/home/package.nix {
+        inherit pkgs;
+        activationPackage = archHomes.${homeConfigurationName}.activationPackage;
       };
       noctalia-config = import ./modules/home/noctalia-config/package.nix {
         inherit pkgs;
         username = deployment.username;
         homeConfiguration = homeConfigurationName;
       };
-      archDeployment = pkgs.writeShellApplication {
-        name = deploymentName;
-        text = ''
-          readonly deployment_name=${lib.escapeShellArg deploymentName}
-          readonly activation_package=${archHomes.${homeConfigurationName}.activationPackage}
-          readonly arch_switch=${arch-switch}/bin/arch-switch
-          readonly home_switch=${home-switch}/bin/home-switch
-        ''
-        + builtins.readFile ./lib/deploy-home.sh;
+      archDeployment = import ./lib/deployment/package.nix {
+        inherit
+          lib
+          pkgs
+          deploymentName
+          arch-switch
+          home-switch
+          ;
       };
     in
-    assert lib.assertMsg (builtins.elem deployment.profile deploymentUser.profiles)
-      "deployment profile ${deployment.profile} is not selected by ${deployment.username}";
-    assert lib.assertMsg deploymentUser.admin
-      "deployment user ${deployment.username} must be an administrator";
     {
       homeConfigurations = archHomes;
 
@@ -118,20 +102,19 @@
         optional-modules = import ./checks/optional-modules.nix { inherit lib pkgs inputs; };
         source-format = import ./checks/format.nix { inherit lib pkgs; };
         arch-home = archHomes.${homeConfigurationName}.activationPackage;
-        host-interface =
-          assert import ./checks/host-interface.nix { inherit lib pkgs; };
-          pkgs.writeText "host-interface" "passed";
       }
       // (import ./checks {
         inherit
+          lib
           pkgs
           arch-switch
           archDeployment
           deploymentName
           ;
       })
+      // (import ./platforms/arch/checks.nix { inherit pkgs arch-switch; })
       // (import ./modules/home/checks.nix {
-        inherit pkgs;
+        inherit pkgs inputs;
         home = archHomes.${homeConfigurationName};
       })
       // runners.checks;

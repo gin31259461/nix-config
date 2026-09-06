@@ -1,5 +1,54 @@
-{ pkgs, home }:
 {
+  pkgs,
+  home,
+  inputs,
+}:
+let
+  lib = pkgs.lib;
+  fixture =
+    full:
+    (import ../../lib/mk-home-configuration.nix { inherit inputs; }) {
+      system = pkgs.stdenv.hostPlatform.system;
+      hostName = "fixture";
+      platform = "arch";
+      hardware = {
+        graphics = "generic";
+        openrazer = full;
+      };
+      username = if full then "tester" else "second";
+      user = {
+        homeDirectory = if full then "/home/tester" else "/home/team/second";
+        stateVersion = "26.05";
+        profiles = [ ];
+        modules = [
+          "graphical-session"
+        ]
+        ++ lib.optionals full [
+          "keepassxc"
+          "noctalia-storage"
+        ];
+        homeModules = lib.optional full ./tests/session-home.nix;
+      };
+    };
+  sessionFixture =
+    full:
+    let
+      generated = fixture full;
+    in
+    {
+      units = "${generated.activationPackage}/home-files/.config/systemd/user";
+      expected = pkgs.writeText "session-expectations.json" (
+        builtins.toJSON {
+          home = generated.config.home.homeDirectory;
+          keepassxc = full;
+          storage = full;
+          openrazer = full;
+        }
+      );
+    };
+in
+{
+  overview-refresh = import ./overview/checks.nix { inherit pkgs; };
   noctalia-config = import ./noctalia-config/checks.nix { inherit pkgs; };
   noctalia-storage =
     pkgs.runCommand "noctalia-storage-check" { nativeBuildInputs = [ pkgs.python3 ]; }
@@ -17,7 +66,19 @@
         ];
       }
       ''
-        python ${./tests/test_session.py} ${home.activationPackage}/home-files/.config/systemd/user
+        ${lib.concatMapStringsSep "\n"
+          (
+            full:
+            let
+              f = sessionFixture full;
+            in
+            "python ${./tests/test_session.py} ${f.units} ${f.expected}"
+          )
+          [
+            true
+            false
+          ]
+        }
         touch "$out"
       '';
   home-projection =
@@ -54,6 +115,7 @@
       tailscale-systray.service \
       vesktop.service \
       vicinae.service; do
+      [[ -f "$units/$unit" ]] || continue
       if ${pkgs.gnugrep}/bin/grep -Eq '^Exec(Start|StartPre|StartPost|Reload)=.*/nix/store/' "$units/$unit"; then
         printf 'Arch graphical unit references a Nix package: %s\n' "$unit" >&2
         exit 1
@@ -64,6 +126,7 @@
       tailscale-systray.service \
       vesktop.service \
       vicinae.service; do
+      [[ -f "$units/$unit" ]] || continue
       if ! ${pkgs.gnugrep}/bin/grep -qx 'After=noctalia.service' "$units/$unit"; then
         printf 'Tray consumer does not start after Noctalia: %s\n' "$unit" >&2
         exit 1

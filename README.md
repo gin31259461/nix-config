@@ -35,7 +35,9 @@ For first-time Noctalia storage setup, follow the
 [offline preparation steps](docs/desktop-session.md#prepare-storage-on-a-new-home)
 before activation.
 
-Deployment builds the home, converges Arch, then activates Home Manager.
+Deployment builds the home, converges Arch, then activates that exact Home
+Manager generation. The deployment accepts `--update` first and optional
+`--verbose`; source/target overrides are rejected before Arch changes.
 Routine runs check installed packages and repair managed files/runtime policy;
 missing packages exit 3. Only `--update` performs a full `pacman -Syu` followed
 by AUR convergence. A kernel mismatch exits 75: reboot and rerun the update.

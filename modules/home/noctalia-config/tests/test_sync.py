@@ -2,6 +2,10 @@
 
 import importlib.util
 import json
+import contextlib
+import io
+import time
+from unittest import mock
 from pathlib import Path
 import sys
 import tempfile
@@ -30,6 +34,8 @@ class SyncTests(unittest.TestCase):
         self.commands = []
         self.exported = {"theme": {"mode": "light"}}
         self.fail_build = self.fail_switch = self.running = self.mismatch = False
+        self.built = None
+        self.mutate_after_build = False
         self.validation_warning = False
         self.validation_output = None
         self.instance = sync.Sync(
@@ -59,14 +65,23 @@ class SyncTests(unittest.TestCase):
             return sync.encode(self.exported)
         if argv[:2] == ["/usr/bin/nix", "build"]:
             sync.require(not self.fail_build, "fake build failure")
+            self.built = sync.parse(self.target.read_bytes())
+            output = Path(argv[argv.index("--out-link") + 1])
+            output.mkdir()
+            (output / "activate").write_text("fixture")
+            if self.mutate_after_build:
+                (self.repo / "flake.nix").write_text("different composition")
+                (self.repo / "flake.lock").write_text("different lock")
             return b""
-        if argv[:2] == ["/usr/bin/nix", "run"]:
+        if Path(argv[0]).name == "activate":
+            self.assertTrue(Path(argv[0]).exists())
+            self.assertEqual(argv[1:], ["--driver-version", "0"])
             sync.require(not self.fail_switch, "fake activation failure")
             self.exported = (
                 {}
                 if self.mismatch
                 else sync.merge(
-                    sync.parse(self.target.read_bytes()),
+                    self.built,
                     sync.parse(sync.read(self.settings)),
                 )
             )
@@ -163,7 +178,7 @@ class SyncTests(unittest.TestCase):
         run = self.instance.run
 
         def interrupt(argv):
-            if argv[:2] == ["/usr/bin/nix", "run"]:
+            if Path(argv[0]).name == "activate":
                 raise KeyboardInterrupt()
             return run(argv)
 
@@ -215,12 +230,58 @@ class SyncTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "Another TOML"):
             self.instance.deploy(replace=True)
 
+    def test_activation_uses_built_artifact_after_other_source_changes(self):
+        self.mutate_after_build = True
+        self.instance.deploy()
+        self.assertEqual(self.exported, self.built)
+        builds = [c for c in self.commands if c[:2] == ["/usr/bin/nix", "build"]]
+        self.assertEqual(len(builds), 1)
+        self.assertIn("test@host", builds[0][-1])
+        self.assertFalse(any(c[:2] == ["/usr/bin/nix", "run"] for c in self.commands))
+        self.assertFalse(Path(builds[0][builds[0].index("--out-link") + 1]).exists())
+
+    def test_capture_redacts_unknown_section_names(self):
+        self.exported["private-account-name"] = {}
+        output = io.StringIO()
+        with contextlib.redirect_stdout(output):
+            self.instance.capture()
+        self.assertNotIn("private-account-name", output.getvalue())
+        self.assertIn("1 unsupported sections", output.getvalue())
+
+    def test_activation_timeout_preserves_receipt_and_releases_lock(self):
+        self.settings.write_text('[theme]\nmode="light"\n')
+        original = self.settings.read_bytes()
+        run = self.instance.run
+
+        def timeout(argv):
+            if Path(argv[0]).name == "activate":
+                raise sync.CommandTimeout("fixture timeout")
+            return run(argv)
+
+        self.instance.run = timeout
+        with self.assertRaises(sync.CommandTimeout):
+            self.instance.deploy(replace=True)
+        self.assertTrue(self.instance.pending.exists())
+        self.instance.deploy(recover=True)
+        self.assertEqual(self.settings.read_bytes(), original)
+
+    def test_execute_timeout_kills_children_before_return_and_redacts(self):
+        marker = self.control.parent / "late-write"
+        script = "import subprocess,sys,time; subprocess.Popen([sys.executable,'-c',sys.argv[1]]); print('private',flush=True); time.sleep(10)"
+        child = f"import time; from pathlib import Path; time.sleep(.3); Path({str(marker)!r}).touch()"
+        with mock.patch.dict(sync.COMMAND_TIMEOUTS, {"query": 0.1}):
+            with self.assertRaises(sync.CommandTimeout) as raised:
+                sync.execute([sys.executable, "-c", script, child])
+        self.assertNotIn("private", str(raised.exception))
+        time.sleep(0.4)
+        self.assertFalse(marker.exists())
+
     def test_receipt_never_contains_override_values(self):
         self.settings.write_text('[theme]\nmode="light"\n')
         run = self.instance.run
 
         def interrupt(argv):
-            if argv[:2] == ["/usr/bin/nix", "run"]:
+            if Path(argv[0]).name == "activate":
                 raise KeyboardInterrupt()
             return run(argv)
 

@@ -19,7 +19,7 @@ let
     Wants = [ "noctalia.service" ];
   };
   waitForStatusNotifierWatcher = ''
-    ${bin "bash"} -c 'for _ in {1..100}; do ${bin "busctl"} --user get-property org.kde.StatusNotifierWatcher /StatusNotifierWatcher org.kde.StatusNotifierWatcher RegisteredStatusNotifierItems >/dev/null 2>&1 && exit 0; ${bin "sleep"} 0.1; done; exit 0'
+    ${bin "bash"} -c 'deadline=$$((SECONDS + 10)); while (( SECONDS < deadline )); do ${bin "busctl"} --user --timeout=1s get-property org.kde.StatusNotifierWatcher /StatusNotifierWatcher org.kde.StatusNotifierWatcher RegisteredStatusNotifierItems >/dev/null 2>&1 && exit 0; ${bin "sleep"} 0.1; done; exit 0'
   '';
   # Vicinae can run without a tray; timeout deliberately permits degraded startup.
   restartableService = {
@@ -58,6 +58,7 @@ in
           Type = "simple";
           Environment = [ "VICINAE_OVERRIDES=%h/.config/vicinae/nix-managed.json" ];
           ExecStartPre = waitForStatusNotifierWatcher;
+          TimeoutStartSec = "15s";
           ExecStart = "${bin "vicinae"} server --replace";
           ExecReload = "${bin "kill"} -HUP $MAINPID";
           KillMode = "process";

@@ -169,6 +169,13 @@ class RunnerControlTests(unittest.TestCase):
             stack.enter_context(
                 mock.patch.object(self.runnerctl, "run_as", side_effect=run_as)
             )
+            inspect = stack.enter_context(
+                mock.patch.object(
+                    self.runnerctl,
+                    "inspect_manager",
+                    return_value="matches-declaration",
+                )
+            )
             self.assertTrue(self.runnerctl.reconcile(instance, platform, paths=paths))
             files = [path for path in root.rglob("*") if path.is_file()]
             before = {path: path.stat().st_ino for path in files}
@@ -191,6 +198,17 @@ class RunnerControlTests(unittest.TestCase):
             self.assertFalse(
                 (root / "gitlab-runner/config/.reconcile.pending").exists()
             )
+            self.assertFalse(self.runnerctl.reconcile(instance, platform, paths=paths))
+            inspect.return_value = "drifted"
+            fail_restart = True
+            with self.assertRaisesRegex(self.runnerctl.RunnerError, "restart failed"):
+                self.runnerctl.reconcile(instance, platform, paths=paths)
+            self.assertTrue((root / "gitlab-runner/config/.reconcile.pending").exists())
+            fail_restart = False
+            calls.clear()
+            self.assertTrue(self.runnerctl.reconcile(instance, platform, paths=paths))
+            self.assertTrue(any("restart" in call for call in calls))
+            inspect.return_value = "matches-declaration"
             self.assertFalse(self.runnerctl.reconcile(instance, platform, paths=paths))
 
     def test_cli_exposes_the_arch_runner_lifecycle_without_token_arguments(
@@ -303,6 +321,35 @@ class RunnerControlTests(unittest.TestCase):
             config.write_text('token = "orphaned-marker"\n')
 
             self.assertEqual(self.runnerctl.registration_metadata(config), {})
+
+    def test_registration_metadata_is_scoped_and_round_trips(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "config.toml"
+            path.write_text(
+                'token = "outside"\n[[runners]]\nid = 42\ntoken = "inside\\"quoted"\ntoken_obtained_at = 2026-01-02T03:04:05Z\n[runners.docker]\ntoken = "nested"\n'
+            )
+            metadata = self.runnerctl.registration_metadata(path)
+            self.assertEqual(metadata["token"], 'inside"quoted')
+            path.write_text(
+                self.runnerctl.render_config(self.instances["frontend"], metadata)
+            )
+            self.assertEqual(self.runnerctl.registration_metadata(path), metadata)
+
+    def test_invalid_registration_is_redacted_and_not_rewritten(self):
+        for body in (
+            'token = "private"\ntoken = "private"',
+            'id = true\ntoken = "private"',
+            "token = 123",
+            'token = "private"\ntoken_expires_at = "private"',
+        ):
+            with self.subTest(body=body), tempfile.TemporaryDirectory() as directory:
+                path = Path(directory) / "config.toml"
+                content = "[[runners]]\n" + body
+                path.write_text(content)
+                with self.assertRaises(self.runnerctl.RunnerError) as raised:
+                    self.runnerctl.registration_metadata(path)
+                self.assertNotIn("private", str(raised.exception))
+                self.assertEqual(path.read_text(), content)
 
     def test_reconcile_checks_prerequisites_before_mutating_accounts(self) -> None:
         instance = self.instances["frontend"]
@@ -436,7 +483,7 @@ class RunnerControlTests(unittest.TestCase):
                 )
 
             with (
-                mock.patch.object(self.runnerctl.os, "chown"),
+                mock.patch.object(self.runnerctl.os, "fchown"),
                 mock.patch.object(
                     self.runnerctl, "atomic_write", side_effect=write_as_test_user
                 ),
@@ -519,6 +566,98 @@ class RunnerControlTests(unittest.TestCase):
             self.assertNotIn(authentication_value, arguments)
             self.assertEqual(environment["CI_SERVER_TOKEN"], authentication_value)
             self.assertNotIn("UNRELATED_SECRET", environment)
+
+    def test_manager_inspection_rejects_runtime_drift(self):
+        instance = self.instances["frontend"]
+        uid = instance["account"]["uid"]
+        state = {
+            "running": True,
+            "network": "host",
+            "privileged": False,
+            "image": "fixture-image",
+            "mounts": [
+                {
+                    "Type": "bind",
+                    "Source": source,
+                    "Destination": destination,
+                    "RW": True,
+                }
+                for destination, source in {
+                    "/etc/gitlab-runner": instance["account"]["home"]
+                    + "/gitlab-runner/config",
+                    "/cache": instance["account"]["home"] + "/gitlab-runner/cache",
+                    "/run/podman/podman.sock": f"/run/user/{uid}/podman/podman.sock",
+                }.items()
+            ],
+        }
+        self.assertTrue(
+            self.runnerctl.manager_matches(instance, uid, state, "fixture-image")
+        )
+        for change in (
+            {"running": False},
+            {"network": "bridge"},
+            {"privileged": True},
+            {"image": "other"},
+            {"mounts": []},
+            {"mounts": state["mounts"] + [state["mounts"][0]]},
+        ):
+            self.assertFalse(
+                self.runnerctl.manager_matches(
+                    instance, uid, state | change, "fixture-image"
+                )
+            )
+        state["mounts"][2]["Source"] = "/run/user/999/podman/podman.sock"
+        self.assertFalse(
+            self.runnerctl.manager_matches(instance, uid, state, "fixture-image")
+        )
+        self.assertFalse(
+            self.runnerctl.manager_matches(instance, uid, [], "fixture-image")
+        )
+
+    def test_existing_account_requires_locked_password(self):
+        instance = self.instances["frontend"]
+        account = instance["account"]
+        entry = self.runnerctl.pwd.struct_passwd(
+            (
+                account["user"],
+                "x",
+                account["uid"],
+                1001,
+                "",
+                account["home"],
+                "/bin/bash",
+            )
+        )
+        primary = self.runnerctl.grp.struct_group((account["user"], "x", 1001, []))
+        for state in ("L", "P", "NP"):
+            with (
+                mock.patch.object(self.runnerctl.pwd, "getpwnam", return_value=entry),
+                mock.patch.object(self.runnerctl.grp, "getgrgid", return_value=primary),
+                mock.patch.object(
+                    self.runnerctl.os, "getgrouplist", return_value=[1001]
+                ),
+                mock.patch.object(
+                    self.runnerctl,
+                    "run",
+                    return_value=subprocess.CompletedProcess(
+                        [], 0, f"{account['user']} {state} fixture"
+                    ),
+                ),
+            ):
+                if state == "L":
+                    self.assertEqual(
+                        self.runnerctl.ensure_account(
+                            instance, self.document["platform"]
+                        ),
+                        entry,
+                    )
+                else:
+                    with self.assertRaisesRegex(
+                        self.runnerctl.RunnerError, "locked password"
+                    ):
+                        self.runnerctl.ensure_account(
+                            instance, self.document["platform"]
+                        )
 
     def test_job_network_is_removed_when_validation_fails(self) -> None:
         instance = self.instances["frontend"]

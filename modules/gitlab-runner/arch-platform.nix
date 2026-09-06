@@ -6,6 +6,7 @@
   aardvarkDns = "/usr/lib/podman/aardvark-dns";
   trust = "/usr/bin/trust";
   useradd = "/usr/bin/useradd";
+  passwd = "/usr/bin/passwd";
   usermod = "/usr/bin/usermod";
   runuser = "/usr/bin/runuser";
   loginctl = "/usr/bin/loginctl";

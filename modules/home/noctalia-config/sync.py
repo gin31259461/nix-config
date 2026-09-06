@@ -8,6 +8,7 @@ import json
 import os
 from pathlib import Path
 import re
+import signal
 import stat
 import subprocess
 import sys
@@ -121,17 +122,62 @@ def atomic_write(path, raw, mode=0o600):
             os.unlink(name)
 
 
+class CommandTimeout(RuntimeError):
+    """A timed-out operation needs explicit recovery, never an implicit rollback."""
+
+
+COMMAND_TIMEOUTS = {"query": 30, "deployment": 3600}
+
+
 def execute(argv):
-    result = subprocess.run(argv, capture_output=True, check=False)
+    deployment = argv[0] == "/usr/bin/nix" or Path(argv[0]).name == "activate"
+    timeout = COMMAND_TIMEOUTS["deployment" if deployment else "query"]
+    environment = dict(os.environ)
+    if Path(argv[0]).name == "activate":
+        for name in (
+            "HOME_MANAGER_BACKUP_EXT",
+            "HOME_MANAGER_BACKUP_OVERWRITE",
+            "SKIP_SANITY_CHECKS",
+            "DRY_RUN",
+        ):
+            environment.pop(name, None)
+    process = subprocess.Popen(
+        argv,
+        env=environment,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        start_new_session=True,
+    )
+    try:
+        stdout, stderr = process.communicate(timeout=timeout)
+    except BaseException as error:
+        # Kill the entire ordinary child process group before releasing our lock.
+        # Do not recover overrides after an activation timeout: keep the receipt.
+        try:
+            os.killpg(process.pid, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
+        try:
+            process.communicate(timeout=5)
+        except subprocess.TimeoutExpired:
+            # A detached descendant may still hold a pipe. Do not wait forever
+            # or attempt recovery while its state is uncertain.
+            process.stdout.close()
+            process.stderr.close()
+            process.wait(timeout=5)
+            raise CommandTimeout(
+                "Command termination is uncertain; preserve the receipt and inspect the operation before recovery."
+            ) from None
+        if isinstance(error, subprocess.TimeoutExpired):
+            raise CommandTimeout(
+                "External command timed out; output withheld. Preserve any pending receipt and use deploy --recover before retrying."
+            ) from None
+        raise
     require(
-        result.returncode == 0,
+        process.returncode == 0,
         "External command failed; output withheld to protect settings",
     )
-    return (
-        result.stdout + result.stderr
-        if argv[1:3] == ["config", "validate"]
-        else result.stdout
-    )
+    return stdout + stderr if argv[1:3] == ["config", "validate"] else stdout
 
 
 class Sync:
@@ -184,6 +230,7 @@ class Sync:
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
             check=False,
+            timeout=10,
         )
         require(
             result.returncode == 1,
@@ -241,7 +288,8 @@ class Sync:
         print("Capture sections: " + ", ".join(sorted(data)))
         print(
             "Excluded sections (policy, unsupported or review required): "
-            + ", ".join(skipped)
+            + ", ".join(name for name in skipped if name in SECTIONS)
+            + f"; {sum(name not in SECTIONS for name in skipped)} unsupported sections"
         )
         if dry_run:
             return
@@ -351,15 +399,20 @@ class Sync:
         if dry_run:
             print("Dry run: no Home Manager build, activation or override changes.")
             return
-        with self.locked():
+        with (
+            self.locked(),
+            tempfile.TemporaryDirectory(prefix="noctalia-deploy-") as build_directory,
+        ):
             wanted, original, replacement = self.plan(replace)
+            artifact = Path(build_directory) / "generation"
             source = read(self.target)
             # Build the full home before touching mutable overrides.
             self.run(
                 [
                     "/usr/bin/nix",
                     "build",
-                    "--no-link",
+                    "--out-link",
+                    str(artifact),
                     "--no-update-lock-file",
                     str(self.repo)
                     + '#homeConfigurations."'
@@ -394,19 +447,14 @@ class Sync:
                 atomic_write(self.pending, json.dumps(journal).encode())
                 atomic_write(self.settings, replacement, journal["mode"])
             try:
-                self.run(
-                    [
-                        "/usr/bin/nix",
-                        "run",
-                        "--no-update-lock-file",
-                        str(self.repo) + "#home-switch",
-                    ]
-                )
+                self.run([str(artifact / "activate"), "--driver-version", "0"])
                 effective = self.export()
                 require(
                     all(effective.get(key) == value for key, value in wanted.items()),
                     "Effective preferences differ from repository after activation",
                 )
+            except CommandTimeout:
+                raise
             except Exception:
                 if changed:
                     self.recover()
@@ -470,7 +518,7 @@ def main():
     except RuntimeError as error:
         print(str(error), file=sys.stderr)
         return 1
-    except (OSError, ValueError, KeyError, TypeError):
+    except (OSError, ValueError, KeyError, TypeError, subprocess.TimeoutExpired):
         print(
             "Operation failed; details withheld to protect configuration values",
             file=sys.stderr,

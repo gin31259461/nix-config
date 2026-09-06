@@ -3,12 +3,9 @@ pragma ComponentBehavior: Bound
 
 import QtQuick
 import Quickshell
-import Quickshell.Io
 import Quickshell.Hyprland
+import "Refresh.js" as Refresh
 
-/**
- * Provides access to some Hyprland data not available in Quickshell.Hyprland.
- */
 Singleton {
     id: root
     property var windowList: []
@@ -20,118 +17,68 @@ Singleton {
     property var activeWorkspace: null
     property var monitors: []
     property var layers: ({})
+    property var scheduler: Refresh.createScheduler()
 
-    function updateWindowList() {
-        getClients.running = true;
+    function request(names) {
+        scheduler.request(names);
+        // Start, not restart: sustained events cannot postpone refresh forever.
+        if (!flush.running) flush.start();
     }
 
-    function updateLayers() {
-        getLayers.running = true;
-    }
+    function updateWindowList() { request(["clients"]); }
+    function updateLayers() { request(["layers"]); }
+    function updateMonitors() { request(["monitors"]); }
+    function updateWorkspaces() { request(["workspaces", "activeworkspace"]); }
+    function updateAll() { request(Refresh.queries); }
 
-    function updateMonitors() {
-        getMonitors.running = true;
-    }
-
-    function updateWorkspaces() {
-        getWorkspaces.running = true;
-        getActiveWorkspace.running = true;
-    }
-
-    function updateAll() {
-        updateWindowList();
-        updateMonitors();
-        updateLayers();
-        updateWorkspaces();
+    function accept(query, value) {
+        scheduler.complete(query);
+        if (value !== null) {
+            if (query === "clients") {
+                const index = {};
+                value.forEach(win => index[win.address] = win);
+                windowByAddress = index;
+                windowList = value;
+                addresses = value.map(win => win.address);
+            } else if (query === "workspaces") {
+                const index = {};
+                value.forEach(workspace => index[workspace.id] = workspace);
+                workspaceById = index;
+                workspaces = value;
+                workspaceIds = value.map(workspace => workspace.id);
+            } else if (query === "activeworkspace") activeWorkspace = value;
+            else if (query === "monitors") monitors = value;
+            else if (query === "layers") layers = value;
+        }
+        // Finish a dirty in-flight query once more; no event gets lost.
+        if (!flush.running) flush.start();
     }
 
     function biggestWindowForWorkspace(workspaceId) {
-        const windowsInThisWorkspace = HyprlandData.windowList.filter(w => w.workspace.id == workspaceId);
-        return windowsInThisWorkspace.reduce((maxWin, win) => {
-            const maxArea = (maxWin?.size?.[0] ?? 0) * (maxWin?.size?.[1] ?? 0);
-            const winArea = (win?.size?.[0] ?? 0) * (win?.size?.[1] ?? 0);
-            return winArea > maxArea ? win : maxWin;
+        return windowList.filter(w => w.workspace.id === workspaceId).reduce((largest, window) => {
+            const area = (window.size?.[0] ?? 0) * (window.size?.[1] ?? 0);
+            const largestArea = (largest?.size?.[0] ?? 0) * (largest?.size?.[1] ?? 0);
+            return area > largestArea ? window : largest;
         }, null);
     }
 
-    Component.onCompleted: {
-        updateAll();
-    }
-
+    Component.onCompleted: updateAll()
     Connections {
         target: Hyprland
-
-        function onRawEvent(event) {
-            updateAll()
+        function onRawEvent(event) { root.request(Refresh.queriesForEvent(event.name)); }
+    }
+    Timer {
+        id: flush
+        interval: 40
+        onTriggered: {
+            const processes = {clients: clients, monitors: monitorsQuery, layers: layersQuery,
+                workspaces: workspacesQuery, activeworkspace: activeWorkspaceQuery};
+            root.scheduler.take().forEach(name => processes[name].request());
         }
     }
-
-    Process {
-        id: getClients
-        command: ["hyprctl", "clients", "-j"]
-        stdout: StdioCollector {
-            id: clientsCollector
-            onStreamFinished: {
-                root.windowList = JSON.parse(clientsCollector.text)
-                let tempWinByAddress = {};
-                for (var i = 0; i < root.windowList.length; ++i) {
-                    var win = root.windowList[i];
-                    tempWinByAddress[win.address] = win;
-                }
-                root.windowByAddress = tempWinByAddress;
-                root.addresses = root.windowList.map(win => win.address);
-            }
-        }
-    }
-
-    Process {
-        id: getMonitors
-        command: ["hyprctl", "monitors", "-j"]
-        stdout: StdioCollector {
-            id: monitorsCollector
-            onStreamFinished: {
-                root.monitors = JSON.parse(monitorsCollector.text);
-            }
-        }
-    }
-
-    Process {
-        id: getLayers
-        command: ["hyprctl", "layers", "-j"]
-        stdout: StdioCollector {
-            id: layersCollector
-            onStreamFinished: {
-                root.layers = JSON.parse(layersCollector.text);
-            }
-        }
-    }
-
-    Process {
-        id: getWorkspaces
-        command: ["hyprctl", "workspaces", "-j"]
-        stdout: StdioCollector {
-            id: workspacesCollector
-            onStreamFinished: {
-                root.workspaces = JSON.parse(workspacesCollector.text);
-                let tempWorkspaceById = {};
-                for (var i = 0; i < root.workspaces.length; ++i) {
-                    var ws = root.workspaces[i];
-                    tempWorkspaceById[ws.id] = ws;
-                }
-                root.workspaceById = tempWorkspaceById;
-                root.workspaceIds = root.workspaces.map(ws => ws.id);
-            }
-        }
-    }
-
-    Process {
-        id: getActiveWorkspace
-        command: ["hyprctl", "activeworkspace", "-j"]
-        stdout: StdioCollector {
-            id: activeWorkspaceCollector
-            onStreamFinished: {
-                root.activeWorkspace = JSON.parse(activeWorkspaceCollector.text);
-            }
-        }
-    }
+    HyprlandQuery { id: clients; query: "clients"; onCompleted: (query, value) => root.accept(query, value) }
+    HyprlandQuery { id: monitorsQuery; query: "monitors"; onCompleted: (query, value) => root.accept(query, value) }
+    HyprlandQuery { id: layersQuery; query: "layers"; onCompleted: (query, value) => root.accept(query, value) }
+    HyprlandQuery { id: workspacesQuery; query: "workspaces"; onCompleted: (query, value) => root.accept(query, value) }
+    HyprlandQuery { id: activeWorkspaceQuery; query: "activeworkspace"; onCompleted: (query, value) => root.accept(query, value) }
 }

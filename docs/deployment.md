@@ -25,14 +25,20 @@ Both deployment modes maintain the managed LizardByte pacman include; only
 to that repository. Existing unmanaged repository declarations require explicit
 ownership reconciliation.
 
-The wrapper accepts `--update` first and forwards remaining arguments to Home
-Manager. Adjacent-backup arguments are rejected. A deployment profile labels
-the complete user composition, not a subset of selected profiles.
+The wrapper accepts `--update` first and optional `--verbose`. Other arguments
+are rejected before Arch convergence, including source/target overrides and
+adjacent-backup arguments. `home-switch` alone accepts `--verbose` and
+`--dry-run`; a home dry run does not preview Arch changes. A deployment profile
+labels the complete user composition, not a subset of selected profiles.
 
 ## Understand the boundary between stages
 
 The deployment artifact includes the built Home Manager activation package.
 At runtime, Arch convergence must succeed before Home Manager activation begins.
+`home-switch` activates that exact package with Home Manager driver version 0;
+its activation script manages the generation profile at the write boundary,
+after preflight. It does not re-evaluate the checkout. Source and target changes
+require building a new deployment artifact.
 A home failure leaves completed Arch work in place: fix the reported problem
 and rerun. These stages do not share a rollback transaction.
 
@@ -144,3 +150,15 @@ Use the normal explicit update workflow to install newly selected packages.
 Routine deployment still exits 3 if any declared package is missing. Disabling
 a capability stops declaring its requirements; it does not remove installed
 packages, revoke groups or retire runtime state.
+
+## Source validation ownership
+
+[Deployment packaging and tests](../lib/deployment/) own the ordered workflow
+and the exact-generation activation contract. [Arch checks](../platforms/arch/checks.nix)
+exercise native convergence with fake commands. Global [checks](../checks/default.nix)
+wire cross-stage ordering, workflow linting and source validation.
+
+Login homes must use distinct absolute paths under `/home/`, with each path
+segment containing letters, digits, `_` or `-`. Nested paths such as
+`/home/team/user` are supported; empty segments, traversal and control characters
+are rejected during Host evaluation.

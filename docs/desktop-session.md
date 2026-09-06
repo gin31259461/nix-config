@@ -12,7 +12,8 @@ allows degraded startup if the tray is unavailable. It neither receives a
 password nor restarts automatically to repair an icon.
 
 Noctalia starts independently of KeePassXC. Tray consumers start after Noctalia;
-Vicinae also waits for the watcher with a bounded timeout. Vicinae stops before
+Vicinae also waits for the watcher for approximately ten seconds, with a
+one-second limit per D-Bus request and a fifteen-second unit startup limit. Vicinae stops before
 Noctalia and starts after it, preventing the launcher from claiming
 `org.kde.StatusNotifierWatcher` during a shell restart. Restarting Noctalia
 briefly closes the launcher and panel, but does not restart Vesktop or KeePassXC.
@@ -115,3 +116,34 @@ Closing KeePassXC must not stop Noctalia. Investigate unexpected prompts through
 the requesting application's startup behavior without dumping credentials,
 KeePassXC INI files or D-Bus secret payloads. Preference capture and GUI override
 recovery are covered in [Noctalia preferences](noctalia-config.md).
+
+## Overview refresh and source checks
+
+The active overview entry point is
+[`overview/shell.qml`](../files/home/.config/quickshell/overview/shell.qml),
+started only by the Home Manager graphical unit. Its data adapter coalesces
+Hyprland events over 40 milliseconds, selects relevant queries, and schedules
+one follow-up when events arrive during an in-flight query. Queries use the
+Arch-owned `hyprctl`, with a three-second watchdog. Failed commands and invalid
+JSON preserve the last valid state; diagnostics omit window data.
+
+The implementation uses the documented Quickshell
+[Process signals](https://quickshell.org/docs/v0.3.0/types/Quickshell.Io/Process/)
+and [event names](https://quickshell.org/docs/v0.3.0/types/Quickshell.Hyprland/HyprlandEvent/).
+Isolated scheduler tests cover burst coalescing and final refresh delivery.
+An offscreen QML harness uses fake process signals to cover both completion
+orders, invalid output, failed startup and the watchdog. It never runs hyprctl
+or connects to a desktop session. These tests measure request behavior, not
+live desktop CPU usage.
+
+The sibling legacy QML trees are still projected: this repository establishes
+its own `overview` entry point, but does not establish that no external
+configuration consumes the siblings. Do not remove them based only on similar
+names. The embedded upstream overview README describes upstream installation;
+this checkout's startup and deployment instructions are the ones in this document.
+
+`home-source-assets` parses tracked JSON, active overview QML and JavaScript,
+and checks skill shell/template syntax without executing them. Third-party
+JavaScript and imported QML are not automatically reformatted. Graphical-session
+relationship tests build independent synthetic homes with optional capabilities
+on and off; no source test attaches to the real desktop.

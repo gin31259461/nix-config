@@ -8,6 +8,9 @@ let
     ) "${context} has unknown fields";
     value;
   named = value: builtins.isString value && builtins.match "[a-z][a-z0-9_-]*" value != null;
+  loginHome =
+    value:
+    builtins.isString value && builtins.match "/home/[a-zA-Z0-9_-]+(/[a-zA-Z0-9_-]+)*" value != null;
   strings = value: builtins.isList value && lib.all builtins.isString value;
   host = fields "host" [
     "name"
@@ -44,10 +47,10 @@ let
       ] rawUser;
     in
     assert lib.assertMsg (named name) "invalid login username";
+    assert lib.assertMsg (builtins.isString user.description) "user.description must be a string";
     assert lib.assertMsg (builtins.isBool user.admin) "user.admin must be boolean";
-    assert lib.assertMsg (
-      builtins.isString user.homeDirectory && lib.hasPrefix "/home/" user.homeDirectory
-    ) "login home must be under /home";
+    assert lib.assertMsg (loginHome user.homeDirectory)
+      "login home must contain named path segments under /home without traversal";
     assert lib.assertMsg (
       builtins.isString user.stateVersion
       && builtins.match "[0-9]{2}\\.[0-9]{2}" user.stateVersion != null
@@ -92,6 +95,12 @@ assert lib.assertMsg (
     value: lib.hasPrefix "/boot/" value && !lib.hasInfix ".." value
   ) hardware.initramfsImages
 ) "initramfs images must be under /boot";
+assert lib.assertMsg (
+  let
+    homes = map (user: user.homeDirectory) (builtins.attrValues users);
+  in
+  builtins.length homes == builtins.length (lib.unique homes)
+) "login users must have distinct home directories";
 builtins.deepSeq users (
   host
   // {

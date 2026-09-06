@@ -2,12 +2,15 @@
 
 from pathlib import Path
 import shutil
+import json
+import time
 import sys
 import subprocess
 import tempfile
 import tomllib
 import unittest
 
+EXPECTED = json.loads(Path(sys.argv.pop()).read_text())
 UNITS = Path(sys.argv.pop())
 
 
@@ -26,6 +29,9 @@ def unit(name):
 
 class SessionTests(unittest.TestCase):
     def test_keepassxc_waits_for_tray_host_without_restart_coupling(self):
+        if not EXPECTED["keepassxc"]:
+            self.assertFalse((UNITS / "keepassxc.service").exists())
+            return
         keepass = unit("keepassxc")
         self.assertIn("noctalia.service", keepass["After"])
         self.assertNotIn("noctalia.service", keepass.get("PartOf", []))
@@ -56,6 +62,27 @@ class SessionTests(unittest.TestCase):
                 timeout=3,
             )
 
+    def test_launcher_wait_bounds_slow_calls_and_degrades(self):
+        launcher = unit("vicinae")
+        self.assertEqual(launcher["TimeoutStartSec"], ["15s"])
+        script = (
+            launcher["ExecStartPre"][0].split(" -c '", 1)[1][:-1].replace("$$", "$")
+        )
+        self.assertIn("--timeout=1s", script)
+        with tempfile.TemporaryDirectory() as directory:
+            fake = Path(directory) / "busctl"
+            for body in ("exit 0", "exit 1", "sleep 0.2; exit 1"):
+                fake.write_text(f"#!{shutil.which('bash')}\n" + body)
+                fake.chmod(0o755)
+                candidate = (
+                    script.replace("/usr/bin/busctl", str(fake))
+                    .replace("/usr/bin/sleep", shutil.which("sleep"))
+                    .replace("SECONDS + 10", "SECONDS + 1")
+                )
+                started = time.monotonic()
+                subprocess.run(["bash", "-c", candidate], check=True, timeout=3)
+                self.assertLess(time.monotonic() - started, 2.5)
+
     def test_launcher_releases_watcher_before_shell_stops(self):
         launcher = unit("vicinae")
         self.assertIn("noctalia.service", launcher["After"])
@@ -64,7 +91,8 @@ class SessionTests(unittest.TestCase):
         self.assertIn("vicinae.service", unit("noctalia").get("Wants", []))
         # Restart only the competing watcher, not communication apps or vaults.
         for name in ("vesktop", "keepassxc", "tailscale-systray"):
-            self.assertNotIn("noctalia.service", unit(name).get("PartOf", []))
+            if (UNITS / (name + ".service")).exists():
+                self.assertNotIn("noctalia.service", unit(name).get("PartOf", []))
 
     def test_vesktop_window_backend_is_consistent(self):
         command = unit("vesktop")["ExecStart"][0]
@@ -74,6 +102,9 @@ class SessionTests(unittest.TestCase):
         self.assertEqual(flags.strip(), "--ozone-platform=x11")
 
     def test_keepassxc_loads_at_login_without_password_delivery(self):
+        if not EXPECTED["keepassxc"]:
+            self.assertFalse((UNITS / "keepassxc.service").exists())
+            return
         keepass = unit("keepassxc")
         self.assertEqual(keepass["WantedBy"], ["graphical-session.target"])
         self.assertNotIn("ExecStartPost", keepass)
@@ -83,7 +114,7 @@ class SessionTests(unittest.TestCase):
         self.assertEqual(
             keepass["ExecStart"],
             [
-                '/usr/bin/keepassxc --minimized "/home/abnertu/.local/share/keepassxc/credentials.kdbx"'
+                f'/usr/bin/keepassxc --minimized "{EXPECTED["home"]}/.local/share/keepassxc/credentials.kdbx"'
             ],
         )
         self.assertFalse((UNITS / "keepassxc-tray-refresh.service").exists())
@@ -99,12 +130,16 @@ class SessionTests(unittest.TestCase):
         )
 
     def test_noctalia_uses_a_runtime_file_key(self):
+        if not EXPECTED["storage"]:
+            self.assertFalse((UNITS / "../../noctalia/storage.toml").exists())
+            return
         policy = tomllib.loads((UNITS / "../../noctalia/storage.toml").read_text())
         self.assertEqual(
             policy["storage"],
             {
                 "key_source": "file",
-                "key_file": "/home/abnertu/.local/share/noctalia/file-key-v1/master-key",
+                "key_file": EXPECTED["home"]
+                + "/.local/share/noctalia/file-key-v1/master-key",
             },
         )
         self.assertFalse(policy["calendar"]["enabled"])

@@ -18,6 +18,8 @@ The destination is
 Capture exports merged user settings, filters their scope, validates a private
 temporary candidate, and atomically replaces the snapshot only when needed.
 It leaves GUI overrides unchanged and never stages, commits or pushes.
+Diagnostics list only fixed, known section names; unsupported sections are
+reported by count to avoid exposing user-defined names.
 
 Inspect the captured diff locally before committing. Labels, custom text and
 paths can be private even when their fields pass the filter. Concurrent changes
@@ -70,6 +72,10 @@ nix run .#noctalia-config -- deploy
 
 Deploy builds and activates the **complete selected Home Manager configuration**,
 then verifies the effective managed sections. It does not run Arch convergence.
+The build creates a temporary GC root outside the repository and activation
+uses that exact generation, with Home Manager managing the generation profile.
+Changes to other source files during the build cannot select a different
+activation artifact. The temporary root is removed after the operation.
 Home Manager alone owns the config link; deployment refuses unmanaged files,
 competing TOML section owners and unreviewed includes.
 
@@ -98,8 +104,12 @@ Recovery state lives under `~/.local/state/nix-config/noctalia-config/` with
 directory mode `0700` and backup mode `0600`. Retain receipts and the persistent
 lock inode; do not copy this directory into Git or remove backups automatically.
 
-A failed activation or effective-config check attempts to restore changed GUI
-overrides. Home Manager generations and other home changes are not rolled back.
+An ordinary activation or effective-config failure attempts to restore changed
+GUI overrides. Timeouts preserve the pending receipt for explicit recovery.
+Queries have a 30-second limit; building and activation each allow one hour.
+On timeout the command's process group is killed before the tool releases its
+lock. If termination is uncertain, inspect the interrupted operation before
+recovery. Home Manager generations and other home changes are not rolled back.
 For an interrupted operation:
 
 ```bash

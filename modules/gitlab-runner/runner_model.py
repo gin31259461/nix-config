@@ -254,6 +254,7 @@ ExecStart={podman_path} run \\
   --rm \\
   --name {runner["serviceName"]} \\
   --network host \\
+  --image-volume=ignore \\
   --security-opt label=disable \\
   --stop-signal SIGQUIT \\
   --volume {config_dir}:/etc/gitlab-runner:rw \\
@@ -275,3 +276,38 @@ Delegate=yes
 [Install]
 WantedBy=default.target
 """
+
+
+def manager_matches(instance, uid, state, image_id):
+    """Evaluate only declared isolation facts; never return raw inspect data."""
+    if not isinstance(state, dict) or not isinstance(image_id, str) or not image_id:
+        return False
+    expected = {
+        "/etc/gitlab-runner": f"{instance['account']['home']}/gitlab-runner/config",
+        "/cache": f"{instance['account']['home']}/gitlab-runner/cache",
+        "/run/podman/podman.sock": f"/run/user/{uid}/podman/podman.sock",
+    }
+    mounts = state.get("mounts")
+    if not isinstance(mounts, list) or len(mounts) != len(expected):
+        return False
+    seen = set()
+    for mount in mounts:
+        if not isinstance(mount, dict):
+            return False
+        destination = mount.get("Destination")
+        if (
+            not isinstance(destination, str)
+            or destination in seen
+            or destination not in expected
+            or mount.get("Source") != expected[destination]
+            or mount.get("Type") != "bind"
+            or mount.get("RW") is not True
+        ):
+            return False
+        seen.add(destination)
+    return (
+        state.get("running") is True
+        and state.get("network") == "host"
+        and state.get("privileged") is False
+        and state.get("image") == image_id
+    )

@@ -5,6 +5,8 @@
 from __future__ import annotations
 
 import argparse
+from datetime import datetime
+import tomllib
 import grp
 import json
 import os
@@ -25,6 +27,7 @@ from runner_model import (
     render_registration_template,
     render_config,
     render_service,
+    manager_matches,
 )
 from host_io import (
     HostPaths,
@@ -32,6 +35,9 @@ from host_io import (
     atomic_write,
     ensure_subordinate_range,
     operation_lock,
+    ensure_directory,
+    read_managed,
+    remove_managed_file,
 )
 
 
@@ -104,31 +110,47 @@ def ensure_account(
     }
     if supplementary_groups:
         raise RunnerError(f"{account['user']} must not have supplementary host roles")
+    password = run([platform["passwd"], "--status", entry.pw_name], capture=True)
+    fields = password.stdout.split()
+    if len(fields) < 2 or fields[0] != entry.pw_name or fields[1] != "L":
+        raise RunnerError(
+            "Runner account must have a locked password; reconcile ownership manually"
+        )
     return entry
 
 
 def registration_metadata(config_path: Path) -> dict[str, str]:
-    if not config_path.exists():
-        return {}
-    content = config_path.read_text()
-    registration_count = len(re.findall(r"(?m)^\s*\[\[runners\]\]\s*$", content))
-    if registration_count > 1:
+    try:
+        document = tomllib.loads(read_managed(config_path))
+    except (ValueError, UnicodeError):
+        raise RunnerError("dedicated Runner config is invalid TOML") from None
+    registrations = document.get("runners", [])
+    if not isinstance(registrations, list):
+        raise RunnerError("dedicated Runner registrations must be a list")
+    if len(registrations) > 1:
         raise RunnerError("dedicated Runner config contains multiple registrations")
-    if registration_count == 0:
+    if not registrations:
         return {}
-    metadata: dict[str, str] = {}
-    patterns = {
-        "id": r"(?m)^\s*id\s*=\s*(\S+)\s*$",
-        "token": r'(?m)^\s*token\s*=\s*"([^"]+)"\s*$',
-        "token_obtained_at": r"(?m)^\s*token_obtained_at\s*=\s*(\S+)\s*$",
-        "token_expires_at": r"(?m)^\s*token_expires_at\s*=\s*(\S+)\s*$",
-    }
-    for key, pattern in patterns.items():
-        match = re.search(pattern, content)
-        if match:
-            metadata[key] = match.group(1)
-    if registration_count == 1 and "token" not in metadata:
+    runner = registrations[0]
+    if (
+        not isinstance(runner, dict)
+        or not isinstance(runner.get("token"), str)
+        or not runner["token"]
+    ):
         raise RunnerError("dedicated Runner config contains an incomplete registration")
+    metadata = {"token": runner["token"]}
+    if "id" in runner:
+        if type(runner["id"]) is not int or runner["id"] <= 0:
+            raise RunnerError("dedicated Runner registration has an invalid ID")
+        metadata["id"] = str(runner["id"])
+    for field in ("token_obtained_at", "token_expires_at"):
+        if field in runner:
+            value = runner[field]
+            if not isinstance(value, datetime) or value.tzinfo is None:
+                raise RunnerError(
+                    "dedicated Runner registration has an invalid timestamp"
+                )
+            metadata[field] = value.isoformat().replace("+00:00", "Z")
     return metadata
 
 
@@ -165,22 +187,16 @@ def ensure_directories(entry: pwd.struct_passwd) -> tuple[Path, Path, Path]:
     config_dir = root / "config"
     cache_dir = root / "cache"
     unit_dir = Path(entry.pw_dir) / ".config/systemd/user"
-    for path in (root, config_dir, cache_dir, unit_dir):
-        path.mkdir(parents=True, exist_ok=True)
-        os.chown(path, entry.pw_uid, entry.pw_gid)
-        os.chmod(path, 0o700)
+    for path in (
+        root,
+        config_dir,
+        cache_dir,
+        Path(entry.pw_dir) / ".config",
+        unit_dir.parent,
+        unit_dir,
+    ):
+        ensure_directory(path, mode=0o700, uid=entry.pw_uid, gid=entry.pw_gid)
     return config_dir, cache_dir, unit_dir
-
-
-def remove_managed_file(
-    path: Path, before_change: Callable[[], None] | None = None
-) -> bool:
-    if not path.exists():
-        return False
-    if before_change is not None:
-        before_change()
-    path.unlink()
-    return True
 
 
 def wait_for_path(path: Path, timeout: float = 30.0) -> None:
@@ -232,13 +248,11 @@ def reconcile_ca(
                 "GitLab CA certificate must be a readable .crt or .pem file"
             )
         content = source_path.read_text()
-        manager_certificate.parent.mkdir(parents=True, exist_ok=True)
-        os.chown(manager_certificate.parent, entry.pw_uid, entry.pw_gid)
-        os.chmod(manager_certificate.parent, 0o700)
+        ensure_directory(
+            manager_certificate.parent, mode=0o700, uid=entry.pw_uid, gid=entry.pw_gid
+        )
         for directory in (system_certificate.parent, registry_certificate.parent):
-            directory.mkdir(parents=True, exist_ok=True)
-            os.chown(directory, 0, 0)
-            os.chmod(directory, 0o755)
+            ensure_directory(directory, mode=0o755, uid=0, gid=0)
         manager_changed = atomic_write(
             manager_certificate,
             content,
@@ -271,7 +285,7 @@ def reconcile_ca(
         changed = manager_changed or system_trust_changed or registry_changed
     if system_trust_changed or trust_pending.exists():
         run([platform["trust"], "extract-compat"])
-        trust_pending.unlink(missing_ok=True)
+        remove_managed_file(trust_pending)
     return changed
 
 
@@ -338,6 +352,7 @@ def check_prerequisites(instance: dict[str, Any], platform: dict[str, str]) -> N
             "aardvarkDns",
             "useradd",
             "usermod",
+            "passwd",
             "runuser",
             "loginctl",
             "systemctl",
@@ -455,19 +470,25 @@ def reconcile(
         capture=True,
         check=False,
     )
+    manager_drift = (
+        service_active.returncode == 0
+        and inspect_manager(instance, platform, entry) != "matches-declaration"
+    )
+    if manager_drift:
+        mark_pending()
     if service_active.returncode != 0:
         run_as(
             entry,
             [platform["systemctl"], "--user", "start", service_unit],
             platform=platform,
         )
-    elif retry_pending or image_pulled:
+    elif retry_pending or image_pulled or manager_drift:
         run_as(
             entry,
             [platform["systemctl"], "--user", "restart", service_unit],
             platform=platform,
         )
-    pending.unlink(missing_ok=True)
+    remove_managed_file(pending)
     return (
         retry_pending
         or template_changed
@@ -475,6 +496,7 @@ def reconcile(
         or unit_changed
         or ca_changed
         or image_pulled
+        or manager_drift
         or service_active.returncode != 0
     )
 
@@ -611,6 +633,46 @@ def validate_job_network(
         )
 
 
+def inspect_manager(instance, platform, entry):
+    result = run_as(
+        entry,
+        [
+            platform["podman"],
+            "inspect",
+            "--format",
+            '{"running":{{json .State.Running}},"network":{{json .HostConfig.NetworkMode}},'
+            '"privileged":{{json .HostConfig.Privileged}},"mounts":{{json .Mounts}},"image":{{json .Image}}}',
+            instance["runner"]["serviceName"],
+        ],
+        platform=platform,
+        capture=True,
+        check=False,
+    )
+    if result.returncode != 0:
+        return "absent"
+    image = run_as(
+        entry,
+        [
+            platform["podman"],
+            "image",
+            "inspect",
+            "--format",
+            "{{.Id}}",
+            instance["runner"]["managerImage"],
+        ],
+        platform=platform,
+        capture=True,
+        check=False,
+    )
+    try:
+        matches = image.returncode == 0 and manager_matches(
+            instance, entry.pw_uid, json.loads(result.stdout), image.stdout.strip()
+        )
+    except (ValueError, TypeError):
+        matches = False
+    return "matches-declaration" if matches else "drifted"
+
+
 def verify(instance: dict[str, Any], platform: dict[str, str]) -> None:
     require_root()
     required_interface_is_up(
@@ -639,21 +701,9 @@ def verify(instance: dict[str, Any], platform: dict[str, str]) -> None:
         platform=platform,
         capture=True,
     )
-    manager_state = run_as(
-        entry,
-        [
-            platform["podman"],
-            "inspect",
-            "--format",
-            "{{.State.Running}} {{.HostConfig.NetworkMode}} {{.HostConfig.Privileged}}",
-            service_name,
-        ],
-        platform=platform,
-        capture=True,
-    )
-    if manager_state.stdout.strip() != "true host false":
+    if inspect_manager(instance, platform, entry) != "matches-declaration":
         raise RunnerError(
-            "Runner manager must be running, unprivileged, and on the host network"
+            "Runner manager does not match declared image, mounts or isolation"
         )
     runner_help = run_as(
         entry,
@@ -758,25 +808,7 @@ def status(
         )
         else "drifted"
     )
-    container_result = run_as(
-        entry,
-        [
-            platform["podman"],
-            "inspect",
-            "--format",
-            "{{.State.Running}} {{.HostConfig.NetworkMode}} {{.HostConfig.Privileged}}",
-            instance["runner"]["serviceName"],
-        ],
-        platform=platform,
-        capture=True,
-        check=False,
-    )
-    if container_result.returncode != 0:
-        container = "absent"
-    elif container_result.stdout.strip() == "true host false":
-        container = "secure"
-    else:
-        container = "invalid"
+    container = inspect_manager(instance, platform, entry)
     print(
         f"{instance_name}: account=present, subids={subids}, socket={socket_state}, "
         f"service={state}, container={container}, registration={registered}"
