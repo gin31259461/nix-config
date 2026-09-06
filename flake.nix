@@ -36,6 +36,7 @@
         username: user:
         lib.nameValuePair "${username}@${archHost.name}" (mkHomeConfiguration {
           inherit username user;
+          ai = archHost.ai;
           hostName = archHost.name;
           platform = archHost.platform;
           hardware = archHost.hardware;
@@ -53,13 +54,23 @@
         inherit lib pkgs;
         rawInstances = archHost.gitlabRunners;
       };
+      ai = import ./modules/ai {
+        inherit lib;
+        config = archHost.ai;
+      };
+      virtualization = import ./modules/virtualization {
+        inherit lib;
+        config = archHost.virtualization;
+      };
       nativePackages = import ./platforms/arch/packages.nix {
         inherit lib;
         hardware = archHost.hardware;
-        modulePackages = runners.requiredPackages;
+        modulePackages = runners.requiredPackages ++ virtualization.requiredPackages;
+        moduleAurPackages = ai.aurPackages;
       };
       arch-switch = import ./platforms/arch/package.nix {
         inherit lib pkgs deploymentUser;
+        moduleGroups = virtualization.loginGroups;
         username = deployment.username;
         packages = nativePackages;
         hardware = archHost.hardware;
@@ -102,6 +113,7 @@
       homeConfigurations = archHomes;
 
       checks.${system} = {
+        capabilities = import ./checks/capabilities.nix { inherit lib pkgs inputs; };
         optional-modules = import ./checks/optional-modules.nix { inherit lib pkgs inputs; };
         source-format = import ./checks/format.nix { inherit lib pkgs; };
         arch-home = archHomes.${homeConfigurationName}.activationPackage;

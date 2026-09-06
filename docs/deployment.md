@@ -84,3 +84,41 @@ Workstation deployment does not require GitLab registration or perform Runner
 reconciliation. Use the separate [Runner workflow](runners.md) when that state
 is in scope. There is no automatic package removal, garbage collection,
 directory backup service or Runner purge.
+
+## AI and virtualization
+
+The Host selects both capabilities in [hosts/arch/default.nix](../hosts/arch/default.nix).
+Each parent defaults to disabled when omitted; child switches default to enabled
+and take effect only when the parent is enabled.
+
+- `ai.enable` gates `ai.codex.enable` (the AUR Codex package) and
+  `ai.skillsPresets.enable` (the repository's existing skill presets).
+  Home Manager links each skill directory as a unit for every declared login
+  user's composition. Disabling presets removes their managed links on home
+  activation, without deleting the source presets.
+- `virtualization.enable` gates `virtualization.kvm.enable` and
+  `virtualization.podman.enable`. The Module's
+  [inventory](../modules/virtualization/packages.nix) owns native dependencies.
+  KVM adds the deployment login user to the `kvm` group. Log out and back in
+  after the first deployment changes group membership.
+
+KVM uses QEMU directly, with user networking and optional UEFI firmware.
+Enable CPU virtualization in firmware before use. The kernel loads its
+CPU-specific KVM driver automatically; no CPU vendor detection or initramfs
+rewrite is needed by this Module. For an existing VM disk, a typical invocation
+is `/usr/bin/qemu-system-x86_64 -accel kvm -cpu host -m 4G -drive file=vm.qcow2,format=qcow2 -nic user`.
+Disk creation, guest installation, bridge networking and libvirt services are
+operator choices outside this declaration.
+
+Podman runs through the Arch-owned executable without an automatically enabled
+API socket. Before rootless use, provision non-overlapping subordinate UID and
+GID ranges for the login account in `/etc/subuid` and `/etc/subgid`, as part of
+login-account preparation. Keep those ranges separate from Runner instances.
+The Module does not modify existing container storage or Runner registrations.
+See the [Arch Podman manual](https://man.archlinux.org/man/podman.1.en) and
+[QEMU guidance](https://wiki.archlinux.org/title/QEMU) for runtime preparation.
+
+Use the normal explicit update workflow to install newly selected packages.
+Routine deployment still exits 3 if any declared package is missing. Disabling
+a capability stops declaring its requirements; it does not remove installed
+packages, revoke groups or retire runtime state.

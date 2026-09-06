@@ -17,6 +17,8 @@ let
     "users"
     "gitlabRunners"
     "hardware"
+    "ai"
+    "virtualization"
   ] raw;
   deployment = fields "deployment" [ "username" "profile" ] host.deployment;
   hardware = fields "hardware" [
@@ -94,6 +96,14 @@ builtins.deepSeq users (
   host
   // {
     inherit users hardware deployment;
+    ai = import ../modules/ai/interface.nix {
+      inherit lib;
+      raw = host.ai or { };
+    };
+    virtualization = import ../modules/virtualization/interface.nix {
+      inherit lib;
+      raw = host.virtualization or { };
+    };
     gitlabRunners = host.gitlabRunners or { };
   }
 )

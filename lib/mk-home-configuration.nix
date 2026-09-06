@@ -6,6 +6,9 @@
   hardware,
   username,
   user,
+  ai ? {
+    enable = false;
+  },
 }:
 let
   pkgs = import inputs.nixpkgs {
@@ -41,6 +44,12 @@ inputs.home-manager.lib.homeManagerConfiguration {
 
       programs.home-manager.enable = true;
     }
+  ]
+  ++ [
+    (import ../modules/ai {
+      lib = inputs.nixpkgs.lib;
+      config = ai;
+    }).homeModule
   ]
   ++ user.homeModules
   ++ map (resolve profileRegistry "profile") user.profiles

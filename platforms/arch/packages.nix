@@ -2,6 +2,7 @@
   lib,
   hardware,
   modulePackages ? [ ],
+  moduleAurPackages ? [ ],
 }:
 {
   pacman = lib.unique (
@@ -153,5 +154,6 @@
     "vicinae-bin"
     "zen-browser-bin"
   ]
-  ++ lib.optional hardware.openrazer "polychromatic";
+  ++ lib.optional hardware.openrazer "polychromatic"
+  ++ moduleAurPackages;
 }

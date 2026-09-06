@@ -1,8 +1,6 @@
 { ... }:
 let
   sourceRoot = ../../files/home;
-  skillRoot = sourceRoot + "/.agents/skills";
-  skillNames = builtins.attrNames (builtins.readDir skillRoot);
   configDirectories = [
     "Kvantum"
     "btop"
@@ -47,11 +45,5 @@ in
       source = sourceRoot + "/Pictures/Wallpapers";
       recursive = true;
     };
-  }
-  // builtins.listToAttrs (
-    map (name: {
-      name = ".agents/skills/${name}";
-      value.source = skillRoot + "/${name}";
-    }) skillNames
-  );
+  };
 }

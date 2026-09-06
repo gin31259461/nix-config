@@ -6,6 +6,16 @@
     profile = "workstation";
     username = "abnertu";
   };
+  ai = {
+    enable = true;
+    codex.enable = true;
+    skillsPresets.enable = true;
+  };
+  virtualization = {
+    enable = true;
+    kvm.enable = true;
+    podman.enable = true;
+  };
   users = import ./users.nix;
   gitlabRunners = import ./gitlab-runners.nix;
   hardware = import ./hardware.nix;

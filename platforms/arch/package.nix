@@ -5,6 +5,7 @@
   username,
   packages,
   hardware,
+  moduleGroups ? [ ],
 }:
 pkgs.writeShellApplication {
   name = "arch-switch";
@@ -31,7 +32,7 @@ pkgs.writeShellApplication {
     aur_packages=(${lib.escapeShellArgs packages.aur})
     required_groups=(${
       lib.escapeShellArgs (
-        lib.unique (deploymentUser.groups ++ lib.optional deploymentUser.admin "wheel")
+        lib.unique (deploymentUser.groups ++ moduleGroups ++ lib.optional deploymentUser.admin "wheel")
       )
     })
     initramfs_modules=(${lib.escapeShellArgs hardware.initramfsModules})

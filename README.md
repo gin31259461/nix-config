@@ -68,6 +68,7 @@ Graphical units invoke Arch-owned paths.
 | Native packages | [platforms/arch/packages.nix](platforms/arch/packages.nix) |
 | Reusable CLI/development bundles | [profiles/default.nix](profiles/default.nix) |
 | User preferences | [homes/abnertu/home.nix](homes/abnertu/home.nix) |
+| AI and virtualization selection | [hosts/arch/default.nix](hosts/arch/default.nix), [operator preparation](docs/deployment.md#ai-and-virtualization) |
 | Shared home behavior | [modules/home/default.nix](modules/home/default.nix) |
 | Runner instances | [hosts/arch/gitlab-runners.nix](hosts/arch/gitlab-runners.nix) |
 
