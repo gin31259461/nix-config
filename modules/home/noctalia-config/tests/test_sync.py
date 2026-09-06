@@ -31,6 +31,7 @@ class SyncTests(unittest.TestCase):
         self.exported = {"theme": {"mode": "light"}}
         self.fail_build = self.fail_switch = self.running = self.mismatch = False
         self.validation_warning = False
+        self.validation_output = None
         self.instance = sync.Sync(
             self.repo,
             "test",
@@ -52,6 +53,8 @@ class SyncTests(unittest.TestCase):
         if argv[0] == "/usr/bin/noctalia":
             if argv[2] == "validate":
                 sync.parse(Path(argv[3]).read_bytes())
+                if self.validation_output is not None:
+                    return self.validation_output
                 return b"WARN fixture" if self.validation_warning else b"valid"
             return sync.encode(self.exported)
         if argv[:2] == ["/usr/bin/nix", "build"]:
@@ -190,6 +193,21 @@ class SyncTests(unittest.TestCase):
         original = self.target.read_bytes()
         with self.assertRaisesRegex(RuntimeError, "warnings"):
             self.instance.capture()
+        self.assertEqual(original, self.target.read_bytes())
+
+    def test_warning_reports_only_known_section_and_local_review_command(self):
+        self.validation_output = (
+            b'WARN  widget.private-label: unrecognized widget type "private-value"\n'
+            b"WARN  private-section: private-value\n"
+            b"Config is valid (2 warning(s))\n"
+        )
+        original = self.target.read_bytes()
+        with self.assertRaises(RuntimeError) as error:
+            self.instance.capture()
+        message = str(error.exception)
+        self.assertIn("sections: widget", message)
+        self.assertIn("/usr/bin/noctalia config validate", message)
+        self.assertNotIn("private-", message)
         self.assertEqual(original, self.target.read_bytes())
 
     def test_other_toml_ownership_is_not_overwritten(self):

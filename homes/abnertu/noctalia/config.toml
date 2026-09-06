@@ -1,2 +1,108 @@
-# Reviewed Noctalia preferences. Populate with noctalia-config capture.
-# Storage policy and calendar security remain owned by noctalia-storage.nix.
+[bar.default]
+background_opacity = 0.0
+capsule = true
+capsule_border = "outline"
+capsule_radius = 26
+capsule_thickness = 0.8999999836087227
+end = [
+    "media",
+    "tray",
+    "group:g1",
+]
+margin_edge = 2
+margin_ends = 14
+shadow = false
+start = [
+    "group:g2",
+    "workspaces",
+]
+thickness = 36
+
+[[bar.default.capsule_group]]
+accordion = false
+accordion_direction = "end"
+border = "outline"
+enabled = true
+fill = "surface_variant"
+id = "g1"
+members = [
+    "notifications",
+    "control-center",
+    "session",
+]
+opacity = 1.0
+padding = 14.0
+widget_spacing = 14
+
+[[bar.default.capsule_group]]
+accordion = false
+accordion_direction = "end"
+border = "outline"
+enabled = true
+fill = "surface_variant"
+id = "g2"
+members = [
+    "launcher",
+    "wallpaper",
+]
+opacity = 1.0
+padding = 14.0
+widget_spacing = 14
+
+[brightness]
+enable_ddcutil = true
+minimum_brightness = 0.19999999552965164
+sync_all_monitors = true
+
+[osd.kinds]
+keyboard_layout = false
+lock_keys = false
+media = false
+
+[shell]
+clipboard_enabled = false
+
+[shell.panel]
+clipboard_position = "auto"
+control_center_placement = "floating"
+open_near_click_clipboard = true
+open_near_click_control_center = true
+open_near_click_session = true
+session_placement = "floating"
+wallpaper_placement = "floating"
+wallpaper_position = "center"
+
+[theme]
+builtin = "Tokyo-Night"
+community_palette = "Tokyo Night Moon"
+mode = "dark"
+source = "builtin"
+wallpaper_scheme = "soft"
+
+[theme.templates]
+builtin_ids = [
+    "btop",
+    "cava",
+    "gtk3",
+    "gtk4",
+    "hyprland",
+    "kitty",
+    "qt",
+]
+community_ids = [
+    "zen-browser",
+    "bat",
+    "discord",
+    "lazygit",
+    "steam",
+    "hyprtoolkit",
+]
+
+[widget.clock]
+format = "{:%D  %H:%M}"
+
+[widget.control-center]
+glyph = "hyprland"
+
+[widget.launcher]
+glyph = "apps-filled"

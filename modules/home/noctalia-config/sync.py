@@ -153,9 +153,25 @@ class Sync:
             result = self.run(
                 ["/usr/bin/noctalia", "config", "validate", str(candidate)]
             )
+            # Diagnostics may quote arbitrary values or user-defined key names.
+            # Report only section names from our fixed preference allowlist.
+            sections = sorted(
+                set(
+                    re.findall(
+                        r"(?m)^WARN\s+([a-z_]+)(?=[.:])",
+                        result.decode(errors="replace"),
+                    )
+                )
+                & SECTIONS
+            )
+            detail = " (sections: " + ", ".join(sections) + ")" if sections else ""
             require(
                 b"warn" not in result.lower(),
-                "Noctalia validation warnings require review",
+                "Noctalia validation warnings require review"
+                + detail
+                + ". Run /usr/bin/noctalia config validate locally to inspect "
+                "the live configuration; candidate-only warnings may differ. "
+                "Raw diagnostics withheld to protect settings; no preferences written.",
             )
 
     def export(self):
