@@ -37,7 +37,9 @@ The [schema](lib/configuration-options.nix) and executable
 
 This is an Arch configuration, not a NixOS installation. New default-on settings
 include time synchronization, journal, console, logind and TRIM policy; review
-[adoption prerequisites](docs/system-settings.md) before deploying.
+[adoption prerequisites](docs/system-settings.md) before deploying. The selected
+Wi-Fi hotspot adopts a prepared NetworkManager connection; see
+[hotspot preparation](docs/hotspot.md) for local credential setup and recovery.
 
 ## Build and use
 

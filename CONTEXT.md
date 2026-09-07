@@ -56,6 +56,10 @@ Arch rendering, preflight and convergence. The Arch service inventory owns
 workstation service policy; Module units retain their existing owners.
 The controller holds one deployment lock across both preflight and mutation.
 System settings never belong to Home Manager or reusable Profiles.
+The Host also selects a prepared Wi-Fi hotspot under `networking.hotspot`. Arch
+adopts its public NetworkManager settings and derives scoped UFW exceptions;
+NetworkManager retains credentials and NAT ownership. NetworkManager selection
+gates hotspot management, and firewall selection gates its UFW contributions.
 
 The Runner Module accepts zero or more enabled instances under
 `services.gitlabRunner`. Its parent and instance enables default to true; an

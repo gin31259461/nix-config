@@ -136,6 +136,7 @@
       "xdg-user-dirs"
       "yad"
     ]
+    ++ lib.optionals ((systemSettings.hotspot or null) != null) [ "iw" ]
     ++ lib.optionals ((systemSettings.firewall or null) != null) [ "ufw" ]
     ++ lib.optionals (hardware.graphics == "amd") [
       "amd-ucode"

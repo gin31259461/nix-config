@@ -1,5 +1,25 @@
 { pkgs }:
 let
+  hotspotManifest = pkgs.writeText "hotspot-fixture.json" (
+    builtins.toJSON {
+      hotspot = {
+        interface = "guestbridge";
+        uplink = "inside";
+        address = "198.51.100.1/24";
+      };
+    }
+  );
+  hotspotDriver = pkgs.writeText "hotspot-firewall-fixture.py" ''
+    import json
+    import sys
+    from runtime import System
+    from firewall import Firewall
+    with open(sys.argv[1]) as source:
+        desired = json.load(source)
+    with open(sys.argv[2]) as source:
+        desired.update(json.load(source))
+    Firewall(System(desired)).converge()
+  '';
   ufw = import ./package.nix { inherit pkgs; };
   manifest =
     (import ../default.nix {
@@ -100,6 +120,26 @@ pkgs.testers.runNixOSTest {
     machine.succeed("ip addr add 198.51.100.1/24 dev guestbridge; ip link set guestbridge up; ip netns exec guest ip addr add 198.51.100.2/24 dev guestif; ip netns exec guest ip link set guestif up; ip netns exec guest ip link set lo up; ip netns exec guest ip route add default via 198.51.100.1")
     machine.succeed("ip netns exec client socat TCP4-LISTEN:9999,reuseaddr,fork EXEC:cat >/dev/null 2>&1 &")
     machine.fail("ip netns exec guest sh -c 'echo routed | socat -T2 - TCP4:192.0.2.2:9999,connect-timeout=2' | grep routed")
+    # A hotspot needs DHCP/DNS input and scoped forwarding even when NM owns NAT.
+    hotspot_adapter = "PYTHONPATH=${../.} ${pkgs.python3}/bin/python3 ${hotspotDriver} ${manifest} ${hotspotManifest}"
+    for protocol, port in [("UDP", 67), ("UDP", 53), ("TCP", 53)]:
+        listener = f"{protocol}4-RECVFROM:{port}" if protocol == "UDP" else f"TCP4-LISTEN:{port}"
+        machine.succeed(f"socat {listener},reuseaddr,fork EXEC:cat >/dev/null 2>&1 &")
+        timeout = ",connect-timeout=2" if protocol == "TCP" else ""
+        probe = f"ip netns exec guest sh -c 'echo hotspot | socat -T2 - {protocol}4:198.51.100.1:{port}{timeout}' | grep hotspot"
+        machine.fail(probe)
+    machine.succeed(hotspot_adapter)
+    for protocol, port in [("UDP", 67), ("UDP", 53), ("TCP", 53)]:
+        timeout = ",connect-timeout=2" if protocol == "TCP" else ""
+        machine.wait_until_succeeds(f"ip netns exec guest sh -c 'echo hotspot | socat -T2 - {protocol}4:198.51.100.1:{port}{timeout}' | grep hotspot")
+        machine.fail(f"ip netns exec client sh -c 'echo denied | socat -T2 - {protocol}4:192.0.2.1:{port}{timeout}' | grep denied")
+    machine.wait_until_succeeds("ip netns exec guest sh -c 'echo routed | socat -T2 - TCP4:192.0.2.2:9999,connect-timeout=2' | grep routed")
+    machine.succeed("sha256sum /etc/ufw/user.rules /etc/ufw/user6.rules > /tmp/hotspot.before")
+    machine.succeed(hotspot_adapter)
+    machine.succeed("sha256sum --check /tmp/hotspot.before")
+    machine.succeed("iptables -D ufw-user-forward -i guestbridge -o inside -s 198.51.100.0/24 -j ACCEPT")
+    machine.succeed(hotspot_adapter)
+    machine.succeed("iptables -C ufw-user-forward -i guestbridge -o inside -s 198.51.100.0/24 -j ACCEPT")
     machine.succeed("iptables -A LIBVIRT_FWI -s 198.51.100.0/24 -j ACCEPT; iptables -A LIBVIRT_FWI -d 198.51.100.0/24 -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT")
     nat_probe = "ip netns exec guest sh -c 'echo routed | socat -T2 - TCP4:192.0.2.2:9999,connect-timeout=2' | grep routed"
     machine.wait_until_succeeds(nat_probe)

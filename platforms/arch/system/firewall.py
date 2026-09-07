@@ -3,6 +3,7 @@
 import re
 
 from files import Conflict, assignments
+from hotspot import converge_firewall
 
 
 def rule_port(rule):
@@ -192,4 +193,5 @@ class Firewall:
         ):
             f.mark("firewall")
             raise Conflict("UFW policy or kernel rules did not converge")
+        converge_firewall(self.system)
         f.clear("firewall")

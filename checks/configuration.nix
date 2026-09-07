@@ -152,7 +152,28 @@ let
     }
   ];
   valid = module: (builtins.tryEval (builtins.deepSeq (evaluate [ module ]).host true)).success;
+  hotspot = evaluate [ { networking.hotspot.enable = true; } ];
+  hotspotOff = evaluate [ { networking.hotspot.enable = false; } ];
+  hotspotParentOff = evaluate [
+    {
+      networking.hotspot.enable = true;
+      networking.networkmanager.enable = false;
+    }
+  ];
+  hotspotOverride = evaluate [
+    {
+      networking.hotspot = {
+        enable = true;
+        channel = 149;
+      };
+    }
+  ];
+
 in
+assert hotspot.host.systemSettings.hotspot.channel == 36;
+assert hotspotOverride.host.systemSettings.hotspot.channel == 149;
+assert hotspotOff.host.systemSettings.hotspot == null;
+assert hotspotParentOff.host.systemSettings.hotspot == null;
 # Check the composed initialization, including Home Manager's own definitions.
 assert lib.assertMsg (lib.hasInfix "powerlevel10k.zsh-theme" home.config.programs.zsh.initContent)
   "zsh initialization lost p10k";

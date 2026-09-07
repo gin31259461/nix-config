@@ -69,6 +69,7 @@ in
     };
     hostname.enable = enable "native hostname management";
     networkmanager.enable = enable "NetworkManager";
+    hotspot = systemSection system.hotspot { };
     firewall = systemSection system.firewall { };
   };
   nixpkgs.hostPlatform = option (types.enum [ "x86_64-linux" ]) "x86_64-linux" "Nix build platform.";

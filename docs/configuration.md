@@ -61,7 +61,7 @@ An empty Runner instance set creates no controller, accounts or requirements.
 
 | Namespace | Selection |
 | --- | --- |
-| `networking` | `hostName`, `hostname.enable`, `networkmanager.enable`, `firewall.enable` and rules |
+| `networking` | `hostName`, `hostname.enable`, `networkmanager.enable`, `hotspot`, `firewall.enable` and rules |
 | `i18n`, `time`, `console` | Locale generation, time zone and virtual-console settings, each with `enable` |
 | `services` | `timesyncd`, `journald`, `logind`, `fstrim`, `powerProfilesDaemon`, `tailscale`, `gitlabRunner` |
 | `hardware` | Declared graphics, `openrazer.enable`, `bluetooth.enable`, `initramfs.enable`, modules and images |
@@ -86,6 +86,28 @@ profile, also select an enabled profile as `deployment.profile`. Setting
 `desktop.enable = false` suppresses desktop realization while retaining that
 composition label. Runner Podman requirements remain independent of the login
 user's virtualization switch.
+
+## Declare a Wi-Fi hotspot
+
+`networking.hotspot` selects one prepared NetworkManager AP. Its typed public
+fields are `enable`, `connection`, `ssid`, `interface`, `uplink`, `band`,
+`channel`, `address`, `autoconnect` and `ipv6`. The [Host defaults](../hosts/arch/system.nix)
+select the existing Arch-Hyprland connection; override individual values in
+`configuration.nix`. `band` uses NetworkManager's `a` (5 GHz) or `bg` (2.4 GHz)
+notation. `address` is a usable IPv4 host CIDR with prefix 1–30; DHCP range and
+lease duration remain NetworkManager defaults. `ipv6` supports `shared` or
+`disabled`. There is no password option.
+
+With both hotspot and firewall management selected, Arch derives DHCP input,
+subnet-to-gateway DNS input, and IPv4 forwarding from the hotspot interface and
+subnet to the selected uplink. NetworkManager owns NAT. These exceptions do not
+select a default route or authorize IPv6 forwarding; normal routing still
+chooses egress. UFW keeps its default incoming and routed deny policy.
+
+Disabling `networking.networkmanager.enable` also withdraws hotspot management.
+Disabling only the firewall withdraws UFW management; it leaves hotspot management
+selected. Neither switch removes existing connections, firewall rules or pending
+receipts. See [hotspot preparation and recovery](hotspot.md) before deployment.
 
 ## Understand disabling
 

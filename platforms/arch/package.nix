@@ -29,6 +29,7 @@ pkgs.writeShellApplication {
           ./system/runtime.py
           ./system/files.py
           ./system/firewall.py
+          ./system/hotspot.py
         ];
       }
     }/runtime.py

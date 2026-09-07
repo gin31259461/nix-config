@@ -11,6 +11,7 @@
     pkgs.runCommand "system-settings-tests" { nativeBuildInputs = [ pkgs.python3 ]; }
       ''
         python ${./system}/tests/test_system.py
+        python ${./system}/tests/test_hotspot.py
         touch "$out"
       '';
   arch-switch-tests =

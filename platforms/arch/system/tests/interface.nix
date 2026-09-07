@@ -1,6 +1,14 @@
 { lib, pkgs }:
 let
   parse = raw: import ../../../../lib/system-settings.nix { inherit lib raw; };
+  ap = {
+    connection = "fixture";
+    ssid = "Fixture";
+    interface = "wifi0";
+    uplink = "eth0";
+    channel = 36;
+    address = "192.0.2.1/24";
+  };
   valid = raw: (builtins.tryEval (builtins.deepSeq (parse raw) true)).success;
   baseline =
     (import ../../../../lib/eval-configuration.nix {
@@ -35,6 +43,17 @@ assert
   optional.files.journald
   == "[Journal]\nMaxRetentionSec=30day\nStorage=persistent\nSystemMaxUse=1024M\n";
 assert optional.files.logind == "[Login]\nHandlePowerKey=ignore\n";
+assert valid { hotspot = ap; };
+assert lib.all (override: !(valid { hotspot = ap // override; })) [
+  { password = "forbidden-fixture-field"; }
+  { address = "999.0.2.1/24"; }
+  { address = "192.0.2.0/24"; }
+  { address = "192.0.2.255/24"; }
+  { address = "192.0.2.1/32"; }
+  { interface = "../bad"; }
+  { uplink = "wifi0"; }
+  { band = "bg"; }
+];
 assert valid { };
 assert (parse { }).locale == null && (parse { }).firewall == null;
 assert baseline.timeSync != null && baseline.journal != null && baseline.trim != null;

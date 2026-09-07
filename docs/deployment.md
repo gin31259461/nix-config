@@ -45,6 +45,8 @@ and rerun. These stages do not share a rollback transaction.
 First-time Noctalia storage preparation requires its service stopped; follow
 [desktop preparation](desktop-session.md#prepare-storage-on-a-new-home).
 Group membership changes require a new login session.
+The selected hotspot requires a prepared NetworkManager AP and local credentials;
+follow [hotspot preparation](hotspot.md) before its first deployment.
 
 System setting adoption, optional capabilities and UFW recovery are described
 in [Arch system settings](system-settings.md). Review that procedure before the

@@ -16,6 +16,7 @@ let
   ];
   section = options: types.submodule { inherit options; };
   port = bounded 1 65535;
+  octet = "(0|[1-9][0-9]?|1[0-9][0-9]|2[0-4][0-9]|25[0-5])";
 in
 {
   locale = nullable (section {
@@ -66,6 +67,34 @@ in
     enable = mkOption {
       type = enum [ true ];
       default = true;
+    };
+  });
+  hotspot = nullable (section {
+    connection = mkOption { type = types.strMatching "[a-zA-Z0-9][a-zA-Z0-9 _.-]*"; };
+    ssid = mkOption { type = types.strMatching "[a-zA-Z0-9][a-zA-Z0-9 _.-]{0,31}"; };
+    interface = mkOption { type = types.strMatching "[a-zA-Z0-9][a-zA-Z0-9_.-]{0,14}"; };
+    uplink = mkOption { type = types.strMatching "[a-zA-Z0-9][a-zA-Z0-9_.-]{0,14}"; };
+    band = mkOption {
+      type = enum [
+        "a"
+        "bg"
+      ];
+      default = "a";
+    };
+    channel = mkOption { type = bounded 1 196; };
+    address = mkOption {
+      type = types.strMatching "${octet}\\.${octet}\\.${octet}\\.${octet}/([1-9]|[12][0-9]|30)";
+    };
+    autoconnect = mkOption {
+      type = types.bool;
+      default = true;
+    };
+    ipv6 = mkOption {
+      type = enum [
+        "shared"
+        "disabled"
+      ];
+      default = "shared";
     };
   });
   firewall = nullable (section {

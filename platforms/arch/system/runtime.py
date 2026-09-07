@@ -13,6 +13,7 @@ import sys
 
 from files import Conflict, Files, locale_gen, replace_keys
 from firewall import Firewall
+from hotspot import Hotspot
 
 
 class Native:
@@ -210,6 +211,7 @@ class System:
                 "timeSync": ("systemctl", "timedatectl"),
                 "journal": ("systemctl", "systemd-tmpfiles", "journalctl"),
                 "trim": ("systemctl", "lsblk"),
+                "hotspot": ("nmcli", "ip", "iw"),
                 "firewall": ("systemctl", "ufw", "iptables", "ip6tables"),
             }.items():
                 if d.get(capability) is not None:
@@ -227,6 +229,7 @@ class System:
             "power": "power",
             "trim": "trim",
             "firewall": "firewall",
+            "hotspot": "hotspot",
         }.items():
             if d.get(capability) is not None:
                 f.pending(action)
@@ -259,6 +262,8 @@ class System:
             self.check_trim()
             if installed:
                 self.ready_unit("fstrim.timer")
+        if d.get("hotspot") is not None:
+            Hotspot(self).preflight()
         if d.get("firewall") is not None:
             Firewall(self).preflight(installed)
 
@@ -392,6 +397,8 @@ class System:
             f.clear("trim")
         if d.get("firewall") is not None:
             Firewall(self).converge()
+        if d.get("hotspot") is not None:
+            Hotspot(self).converge()
         print(
             f"System settings converged: {self.updates} files updated, {self.actions} runtime actions."
         )

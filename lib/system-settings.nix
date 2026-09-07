@@ -10,7 +10,31 @@ let
         raw
       ];
     }).config;
+  hotspotAddressValid =
+    if result.hotspot == null then
+      true
+    else
+      let
+        parts = lib.splitString "/" result.hotspot.address;
+        prefix = builtins.fromJSON (builtins.elemAt parts 1);
+        address = lib.foldl' (acc: value: acc * 256 + builtins.fromJSON value) 0 (
+          lib.splitString "." (builtins.head parts)
+        );
+        size = lib.foldl' (acc: _: acc * 2) 1 (lib.range 1 (32 - prefix));
+        offset = lib.mod address size;
+      in
+      offset != 0 && offset != size - 1;
 in
+assert lib.assertMsg hotspotAddressValid "hotspot requires a usable host address";
+assert lib.assertMsg (
+  result.hotspot == null || result.hotspot.interface != result.hotspot.uplink
+) "hotspot and uplink must differ";
+assert lib.assertMsg (
+  result.hotspot == null
+  || (
+    if result.hotspot.band == "bg" then result.hotspot.channel <= 14 else result.hotspot.channel > 14
+  )
+) "hotspot channel does not match band";
 assert lib.assertMsg (
   result.locale == null || builtins.elem result.locale.lang result.locale.generated
 ) "LANG must be generated";

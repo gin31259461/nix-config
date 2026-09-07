@@ -26,6 +26,7 @@ let
     systemSettings = {
       hostname.enable = cfg.networking.hostname.enable;
       firewall = setting cfg.networking.firewall;
+      hotspot = if cfg.networking.networkmanager.enable then setting cfg.networking.hotspot else null;
       locale = setting cfg.i18n;
       timeZone = if cfg.time.enable then cfg.time.timeZone else null;
       console = setting cfg.console;
