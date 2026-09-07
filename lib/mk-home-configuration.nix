@@ -4,6 +4,7 @@
   hostName,
   platform,
   hardware,
+  capabilities ? null,
   username,
   user,
   ai ? {
@@ -31,6 +32,7 @@ inputs.home-manager.lib.homeManagerConfiguration {
       hostName
       platform
       hardware
+      capabilities
       ;
   };
 
@@ -51,7 +53,35 @@ inputs.home-manager.lib.homeManagerConfiguration {
       config = ai;
     }).homeModule
   ]
+  ++ [ (user.homeConfig or { }) ]
+  ++ [
+    ({ lib, ... }: {
+      options.workstation.capabilities = lib.mkOption {
+        type = lib.types.attrsOf (
+          lib.types.submodule {
+            options.enable = lib.mkOption {
+              type = lib.types.bool;
+              default = true;
+            };
+          }
+        );
+        default = { };
+        internal = true;
+      };
+      config.workstation.capabilities = lib.genAttrs [ "keepassxc" "noctalia-config" ] (name: {
+        enable = builtins.elem name user.modules;
+      });
+    })
+  ]
+  ++ [
+    ../modules/home/keepassxc.nix
+    ../modules/home/noctalia-config
+  ]
   ++ user.homeModules
-  ++ map (resolve profileRegistry "profile") user.profiles
+  ++ map (resolve profileRegistry "profile") (
+    builtins.filter (
+      name: capabilities == null || capabilities.desktop.enable || name != "workstation"
+    ) user.profiles
+  )
   ++ map (resolve moduleRegistry "home module") user.modules;
 }

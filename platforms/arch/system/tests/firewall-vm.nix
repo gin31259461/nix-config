@@ -8,7 +8,25 @@ let
       hostName = "fixture";
       config = import ../../../../lib/system-settings.nix {
         inherit (pkgs) lib;
-        raw.firewall = (import ../../../../hosts/arch/system.nix).firewall;
+        raw.firewall.rules = [
+          {
+            protocol = "tcp";
+            fromPort = 7777;
+          }
+          {
+            protocol = "udp";
+            fromPort = 7777;
+          }
+          {
+            protocol = "tcp";
+            fromPort = 47990;
+          }
+          {
+            protocol = "udp";
+            fromPort = 27031;
+            toPort = 27036;
+          }
+        ];
       };
     }).manifest;
 in

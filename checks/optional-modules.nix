@@ -6,17 +6,34 @@
 let
   host = import ../lib/validate-host.nix {
     inherit lib;
-    raw = (import ../hosts/arch) // {
-      gitlabRunners = { };
-      hardware = (import ../hosts/arch/hardware.nix) // {
-        graphics = "generic";
-        openrazer = false;
-        initramfsModules = [
-          "usbhid"
-          "xhci_pci"
-        ];
-      };
-    };
+    raw = (
+      (import ../lib/eval-configuration.nix {
+        inherit lib;
+        modules = [ ./fixtures/configuration.nix ];
+      }).host
+      // {
+        gitlabRunners = { };
+        users =
+          lib.mapAttrs (_: user: builtins.removeAttrs user [ "homeConfig" ])
+            (import ../lib/eval-configuration.nix {
+              inherit lib;
+              modules = [ ./fixtures/configuration.nix ];
+            }).host.users;
+        hardware =
+          (import ../lib/eval-configuration.nix {
+            inherit lib;
+            modules = [ ./fixtures/configuration.nix ];
+          }).host.hardware
+          // {
+            graphics = "generic";
+            openrazer = false;
+            initramfsModules = [
+              "usbhid"
+              "xhci_pci"
+            ];
+          };
+      }
+    );
   };
   runners = import ../modules/gitlab-runner {
     inherit lib pkgs;

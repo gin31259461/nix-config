@@ -33,7 +33,7 @@
     wget
   ];
 
-  programs = {
+  programs = lib.mkDefault {
     fzf = {
       enable = true;
       enableZshIntegration = true;

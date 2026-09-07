@@ -3,6 +3,7 @@ let
   source = lib.fileset.toSource {
     root = ../.;
     fileset = lib.fileset.unions [
+      ../configuration.nix
       ../flake.nix
       ../lib
       ../hosts

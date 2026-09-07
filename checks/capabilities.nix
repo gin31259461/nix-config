@@ -23,12 +23,19 @@ let
     )).success;
   enabled = ai { enable = true; };
   disabled = ai { enable = false; };
-  v = virtualization { enable = true; };
+  v = virtualization {
+    enable = true;
+    kvm.gui.enable = false;
+  };
   gui = virtualization {
     enable = true;
     kvm.gui.enable = true;
   };
-  host = import ../hosts/arch;
+  host =
+    (import ../lib/eval-configuration.nix {
+      inherit lib;
+      modules = [ ./fixtures/configuration.nix ];
+    }).host;
   home = (import ../lib/mk-home-configuration.nix { inherit inputs; }) {
     inherit (host)
       system
@@ -67,7 +74,7 @@ assert
     enable = true;
     skillsPresets.enable = false;
   }).homeModule.home.file == { };
-assert (virtualization { }).requiredPackages == [ ];
+assert (virtualization { }).requiredPackages != [ ];
 assert (virtualization { enable = false; }).loginGroups == [ ];
 assert builtins.elem "qemu-desktop" v.requiredPackages;
 assert builtins.elem "podman" v.requiredPackages;

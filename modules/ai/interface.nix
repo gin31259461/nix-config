@@ -3,23 +3,12 @@
   raw ? { },
 }:
 let
-  config = lib.evalModules {
-    modules = [
-      ({ lib, ... }: {
-        options = {
-          enable = lib.mkEnableOption "ai";
-          codex.enable = lib.mkOption {
-            type = lib.types.bool;
-            default = true;
-          };
-          skillsPresets.enable = lib.mkOption {
-            type = lib.types.bool;
-            default = true;
-          };
-        };
-      })
-      raw
-    ];
-  };
+  result =
+    (lib.evalModules {
+      modules = [
+        { options = import ./options.nix { inherit lib; }; }
+        raw
+      ];
+    }).config;
 in
-builtins.deepSeq config.config config.config
+builtins.deepSeq result result

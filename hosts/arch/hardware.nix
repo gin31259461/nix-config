@@ -1,10 +1,11 @@
 {
   graphics = "amd";
-  openrazer = true;
-  initramfsModules = [
-    "usbhid"
-    "xhci_pci"
-    "amdgpu"
-  ];
-  initramfsImages = [ "/boot/initramfs-linux.img" ];
+  initramfs = {
+    modules = [
+      "usbhid"
+      "xhci_pci"
+      "amdgpu"
+    ];
+    images = [ "/boot/initramfs-linux.img" ];
+  };
 }

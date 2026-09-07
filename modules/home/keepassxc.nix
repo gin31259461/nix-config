@@ -12,7 +12,7 @@ in
     description = "Absolute runtime database filename; never a Nix path or database contents.";
   };
 
-  config = {
+  config = lib.mkIf (config.workstation.capabilities.keepassxc.enable or true) {
     assertions = [
       {
         assertion =

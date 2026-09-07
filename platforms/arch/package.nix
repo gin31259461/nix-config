@@ -5,6 +5,7 @@
   username,
   packages,
   hardware,
+  capabilities ? import ../../lib/default-capabilities.nix,
   systemSettings ? null,
   moduleGroups ? [ ],
   moduleSystemUnits ? [ ],
@@ -44,6 +45,13 @@ pkgs.writeShellApplication {
     readonly curl_bin=${pkgs.curl}/bin/curl
     readonly tar_bin=${pkgs.libarchive}/bin/bsdtar
     readonly flock_bin=${pkgs.util-linux}/bin/flock
+    readonly manage_network=${if capabilities.networking then "1" else "0"}
+    readonly manage_tailscale=${if capabilities.tailscale then "1" else "0"}
+    readonly manage_desktop=${if capabilities.desktop.enable then "1" else "0"}
+    readonly manage_sunshine=${
+      if capabilities.desktop.enable && capabilities.programs.sunshine.enable then "1" else "0"
+    }
+    readonly manage_initramfs=${if capabilities.initramfs then "1" else "0"}
     readonly expected_user=${lib.escapeShellArg username}
     pacman_packages=(${lib.escapeShellArgs packages.pacman})
     lizardbyte_package_names=(${lib.escapeShellArgs packages.lizardbyte})
@@ -54,13 +62,19 @@ pkgs.writeShellApplication {
         lib.unique (deploymentUser.groups ++ moduleGroups ++ lib.optional deploymentUser.admin "wheel")
       )
     })
-    system_units=(${lib.escapeShellArgs (lib.unique ((import ./services.nix) ++ moduleSystemUnits))})
-    initramfs_modules=(${lib.escapeShellArgs hardware.initramfsModules})
-    initramfs_images=(${lib.escapeShellArgs hardware.initramfsImages})
+    system_units=(${
+      lib.escapeShellArgs (
+        lib.unique ((import ./services.nix { inherit lib capabilities; }) ++ moduleSystemUnits)
+      )
+    })
+    initramfs_modules=(${lib.escapeShellArgs (lib.optionals capabilities.initramfs hardware.initramfsModules)})
+    initramfs_images=(${lib.escapeShellArgs (lib.optionals capabilities.initramfs hardware.initramfsImages)})
     user_services=(${
       lib.escapeShellArgs (
         lib.optional hardware.openrazer "openrazer-daemon.service"
-        ++ [ "app-dev.lizardbyte.app.Sunshine.service" ]
+        ++ lib.optional (
+          capabilities.desktop.enable && capabilities.programs.sunshine.enable
+        ) "app-dev.lizardbyte.app.Sunshine.service"
       )
     })
   ''

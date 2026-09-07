@@ -5,6 +5,13 @@ through Home Manager. Run from `~/.config/nix`, or pass `--repo` with the absolu
 checkout path. Use `nix run .#noctalia-config --` to run the current source without
 first installing the command.
 
+Preference exchange is selected by
+`users.users.<name>.modules.noctalia-config.enable` in
+[configuration.nix](../configuration.nix), default true. It controls the managed
+preference link, home helper package and deployment user's flake helper output.
+The separate `noctalia-storage` home selection owns encrypted-storage preparation.
+Turning off preference exchange does not delete live overrides or application data.
+
 ## Capture current preferences
 
 ```bash

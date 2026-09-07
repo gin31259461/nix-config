@@ -1,0 +1,82 @@
+{
+  lib,
+  modules ? [ ../configuration.nix ],
+}:
+let
+  evaluated = lib.evalModules {
+    class = "nixConfig";
+    modules = [ { options = import ./configuration-options.nix { inherit lib; }; } ] ++ modules;
+  };
+  cfg = evaluated.config;
+  selected = values: builtins.attrNames (lib.filterAttrs (_: value: value.enable) values);
+  setting = value: if value.enable then builtins.removeAttrs value [ "enable" ] else null;
+  raw = {
+    name = cfg.networking.hostName;
+    system = cfg.nixpkgs.hostPlatform;
+    platform = cfg.deployment.platform;
+    deployment = builtins.removeAttrs cfg.deployment [ "platform" ];
+    hardware = {
+      graphics = cfg.hardware.graphics;
+      openrazer = cfg.hardware.openrazer.enable && cfg.desktop.enable;
+      initramfsModules = cfg.hardware.initramfs.modules;
+      initramfsImages = cfg.hardware.initramfs.images;
+    };
+    ai = cfg.programs.ai;
+    virtualization = cfg.virtualisation;
+    systemSettings = {
+      hostname.enable = cfg.networking.hostname.enable;
+      firewall = setting cfg.networking.firewall;
+      locale = setting cfg.i18n;
+      timeZone = if cfg.time.enable then cfg.time.timeZone else null;
+      console = setting cfg.console;
+      timeSync = setting cfg.services.timesyncd;
+      journal = setting cfg.services.journald;
+      power = setting cfg.services.logind;
+      trim = if cfg.services.fstrim.enable then { enable = true; } else null;
+    };
+    gitlabRunners = lib.mapAttrs (_: value: builtins.removeAttrs value [ "enable" ]) (
+      lib.filterAttrs (
+        _: value: cfg.services.gitlabRunner.enable && value.enable
+      ) cfg.services.gitlabRunner.instances
+    );
+    users = lib.mapAttrs (
+      _: user:
+      (builtins.removeAttrs user [ "home" ])
+      // {
+        profiles = selected user.profiles;
+        modules = lib.optionals cfg.desktop.enable (selected user.modules);
+      }
+    ) cfg.users.users;
+  };
+  host = import ./validate-host.nix { inherit lib raw; };
+  capabilities = {
+    inherit (cfg) desktop programs;
+    networking = cfg.networking.networkmanager.enable;
+    bluetooth = cfg.hardware.bluetooth.enable;
+    power = cfg.services.powerProfilesDaemon.enable;
+    tailscale = cfg.services.tailscale.enable;
+    initramfs = cfg.hardware.initramfs.enable;
+  };
+in
+{
+  inherit (evaluated) options config;
+  inherit capabilities;
+  # Home Manager modules can contain recursive package sets. Their own evaluator
+  # checks those definitions; force only the serializable Host interface here.
+  host =
+    builtins.deepSeq
+      (
+        cfg
+        // {
+          users.users = lib.mapAttrs (_: user: builtins.removeAttrs user [ "home" ]) cfg.users.users;
+        }
+      )
+      (
+        host
+        // {
+          users = lib.mapAttrs (
+            name: user: user // { homeConfig = cfg.users.users.${name}.home; }
+          ) host.users;
+        }
+      );
+}

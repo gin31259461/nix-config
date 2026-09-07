@@ -20,7 +20,7 @@ checks are local, though Nix may still download build dependencies. Native
 packages are not version-locked by the flake. Removing an inventory entry does
 not uninstall the package.
 
-Both deployment modes maintain the managed LizardByte pacman include; only
+When Sunshine is selected, both deployment modes maintain its LizardByte pacman include; only
 `--update` installs or upgrades packages. Its signature exception is confined
 to that repository. Existing unmanaged repository declarations require explicit
 ownership reconciliation.
@@ -48,7 +48,9 @@ Group membership changes require a new login session.
 
 System setting adoption, optional capabilities and UFW recovery are described
 in [Arch system settings](system-settings.md). Review that procedure before the
-first rollout; the Host now selects locale, time zone, hostname and UFW policy.
+first rollout; default-on system capabilities now also include time synchronization,
+journal, console, logind and TRIM policy. Disable capabilities you intend to leave
+unmanaged in `configuration.nix`.
 
 ## Repeat execution and interrupted work
 
@@ -97,18 +99,18 @@ directory backup service or Runner purge.
 
 ## AI and virtualization
 
-The Host selects both capabilities in [hosts/arch/default.nix](../hosts/arch/default.nix).
-Each parent defaults to disabled when omitted. Codex, skills presets, KVM and
-Podman child switches default to enabled and take effect only when their parent
-is enabled. The optional KVM GUI defaults to disabled.
+Select capabilities in [configuration.nix](../configuration.nix). Parent and
+child switches, including the KVM GUI, default to true. The public namespaces
+are `programs.ai` and `virtualisation`; see [configuration](configuration.md)
+for override precedence and the full selection interface.
 
-- `ai.enable` gates `ai.codex.enable` (the AUR Codex package) and
-  `ai.skillsPresets.enable` (the repository's existing skill presets).
+- `programs.ai.enable` gates `programs.ai.codex.enable` (the AUR Codex package) and
+  `programs.ai.skillsPresets.enable` (the repository's existing skill presets).
   Home Manager links each skill directory as a unit for every declared login
   user's composition. Disabling presets removes their managed links on home
   activation, without deleting the source presets.
-- `virtualization.enable` gates `virtualization.kvm.enable` and
-  `virtualization.podman.enable`. The Module's
+- `virtualisation.enable` gates `virtualisation.kvm.enable` and
+  `virtualisation.podman.enable`. The Module's
   [inventory](../modules/virtualization/packages.nix) owns native dependencies.
   KVM adds the deployment login user to the `kvm` group. Log out and back in
   after the first deployment changes group membership.
@@ -120,10 +122,10 @@ rewrite is needed by this Module. For an existing VM disk, a typical invocation
 is `/usr/bin/qemu-system-x86_64 -accel kvm -cpu host -m 4G -drive file=vm.qcow2,format=qcow2 -nic user`.
 Disk creation, guest installation and bridge networking remain operator choices.
 
-Set `virtualization.kvm.gui.enable = true;` to add virt-manager, libvirt and
+Set `virtualisation.kvm.gui.enable = true;` to add virt-manager, libvirt and
 the DNS/DHCP and nftables tools used by libvirt virtual networks.
-The current Host enables it explicitly. Both `virtualization.enable` and
-`virtualization.kvm.enable` must also be true. Arch deployment enables and starts
+It is selected by default. Both `virtualisation.enable` and
+`virtualisation.kvm.enable` must also be true. Arch deployment enables and starts
 the package-provided local `libvirtd.socket`; repeat deployment repairs socket
 drift without restarting running guests. It uses libvirt's standard polkit
 authentication and does not grant passwordless management or enable TCP access.

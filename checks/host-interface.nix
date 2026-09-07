@@ -1,6 +1,13 @@
 { lib, pkgs }:
 let
-  raw = import ../hosts/arch;
+  evaluated =
+    (import ../lib/eval-configuration.nix {
+      inherit lib;
+      modules = [ ./fixtures/configuration.nix ];
+    }).host;
+  raw = evaluated // {
+    users = lib.mapAttrs (_: user: builtins.removeAttrs user [ "homeConfig" ]) evaluated.users;
+  };
   evaluate =
     value:
     (builtins.tryEval (

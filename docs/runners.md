@@ -1,10 +1,16 @@
 # Operate GitLab Runners
 
-Declare instances in [hosts/arch/gitlab-runners.nix](../hosts/arch/gitlab-runners.nix).
+Use `services.gitlabRunner.instances` in [configuration.nix](../configuration.nix).
+The Host supplies baseline declarations from
+[gitlab-runners.nix](../hosts/arch/gitlab-runners.nix); ordinary entry definitions
+can override them. Both `services.gitlabRunner.enable` and each instance's
+`enable` default to true. Set either false to withdraw the corresponding
+controller declarations without deleting accounts, registrations or containers.
+Zero enabled instances exports no controller or native requirements.
+
 The [Module](../modules/gitlab-runner/interface.nix) derives dedicated accounts,
 homes and service names and validates UID, image and subordinate-ID declarations.
-Omitting all instances removes the controller and its native requirements from
-composition without deleting existing accounts, registrations or containers.
+Its fixed security policy is not an option to weaken.
 
 Runner operations are explicit and separate from workstation deployment.
 All commands below using `runnerctl` inspect or mutate live state; source

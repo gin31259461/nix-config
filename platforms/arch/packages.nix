@@ -1,6 +1,7 @@
 {
   lib,
   hardware,
+  capabilities ? import ../../lib/default-capabilities.nix,
   modulePackages ? [ ],
   systemSettings ? { },
   moduleAurPackages ? [ ],
@@ -8,24 +9,64 @@
 {
   pacman = lib.unique (
     [
+      "base-devel"
+      "ca-certificates"
+      "ca-certificates-utils"
+      "coreutils"
+      "curl"
+      "dnsmasq"
+      "hostapd"
+      "i2c-tools"
+      "inxi"
+      "iproute2"
+      "libnewt"
+      "libva-utils"
+      "linux-headers"
+      "mtr"
+      "nvtop"
+      "pacman-contrib"
+      "p11-kit"
+      "procps-ng"
+      "realtime-privileges"
+      "rt-tests"
+      "rtirq"
+      "schedtool"
+      "shadow"
+      "systemd"
+      "tuna"
+      "util-linux"
+      "vulkan-tools"
+      "yt-dlp"
+      "zsh"
+    ]
+    ++ lib.optionals capabilities.networking [
+      "network-manager-applet"
+      "networkmanager"
+      "networkmanager-openconnect"
+      "networkmanager-openvpn"
+      "nm-connection-editor"
+    ]
+    ++ lib.optionals capabilities.bluetooth [
+      "bluez"
+      "bluez-utils"
+      "blueman"
+    ]
+    ++ lib.optionals capabilities.power [
+      "power-profiles-daemon"
+    ]
+    ++ lib.optionals capabilities.tailscale [
+      "tailscale"
+    ]
+    ++ lib.optionals capabilities.desktop.enable [
       "adobe-source-code-pro-fonts"
       "adw-gtk-theme"
       "adwaita-cursors"
       "adwaita-fonts"
       "adwaita-icon-theme"
-      "base-devel"
       "baobab"
-      "bluez"
-      "bluez-utils"
-      "blueman"
       "brightnessctl"
-      "ca-certificates"
-      "ca-certificates-utils"
       "cliphist"
-      "coreutils"
-      "curl"
       "ddcutil"
-      "dnsmasq"
       "fcitx5"
       "fcitx5-chewing"
       "fcitx5-configtool"
@@ -38,67 +79,42 @@
       "grim"
       "gvfs"
       "gvfs-mtp"
-      "hostapd"
       "hyprland"
       "noctalia"
       "hypridle"
       "hyprlock"
       "hyprpolkitagent"
       "hyprsunset"
-      "i2c-tools"
       "imagemagick"
-      "inxi"
-      "iproute2"
       "inter-font"
       "keepassxc"
       "kitty"
-      "libnewt"
       "libnotify"
-      "libva-utils"
-      "linux-headers"
       "loupe"
       "kvantum"
       "kvantum-qt5"
-      "mtr"
       "mpv"
-      "network-manager-applet"
-      "networkmanager"
-      "networkmanager-openconnect"
-      "networkmanager-openvpn"
-      "nm-connection-editor"
       "noto-fonts"
       "noto-fonts-emoji"
-      "nvtop"
       "nwg-displays"
       "nwg-look"
       "obs-studio"
       "obsidian"
       "otf-font-awesome"
-      "pacman-contrib"
       "papirus-icon-theme"
-      "p11-kit"
       "pavucontrol"
       "pipewire"
       "pipewire-alsa"
       "pipewire-audio"
       "pipewire-pulse"
       "playerctl"
-      "power-profiles-daemon"
-      "procps-ng"
       "qalculate-gtk"
       "qt5ct"
       "qt6-5compat"
       "qt6ct"
       "quickshell"
-      "realtime-privileges"
-      "rt-tests"
-      "rtirq"
-      "schedtool"
-      "shadow"
       "slurp"
       "swappy"
-      "systemd"
-      "tailscale"
       "thunar"
       "thunar-archive-plugin"
       "thunar-volman"
@@ -109,12 +125,8 @@
       "ttf-jetbrains-mono"
       "ttf-jetbrains-mono-nerd"
       "tumbler"
-      "tuna"
-      "util-linux"
-      "ufw"
       "uwsm"
       "vlc"
-      "vulkan-tools"
       "wireplumber"
       "wl-clipboard"
       "xarchiver"
@@ -123,9 +135,8 @@
       "xdg-desktop-portal-hyprland"
       "xdg-user-dirs"
       "yad"
-      "yt-dlp"
-      "zsh"
     ]
+    ++ lib.optionals ((systemSettings.firewall or null) != null) [ "ufw" ]
     ++ lib.optionals (hardware.graphics == "amd") [
       "amd-ucode"
       "amdgpu_top"
@@ -142,22 +153,25 @@
     ++ modulePackages
   );
 
-  lizardbyte = [ "sunshine" ];
+  lizardbyte = lib.optional (
+    capabilities.desktop.enable && capabilities.programs.sunshine.enable
+  ) "sunshine";
 
-  aur = [
-    "bibata-cursor-theme-bin"
-    "mpv-mpris"
-    "mpvpaper"
-    "noto-fonts-tc-vf"
-    "obs-pipewire-audio-capture"
-    "onedrive-abraunegg"
-    "onlyoffice-bin"
-    "powerpanel"
-    "ttf-victor-mono"
-    "vesktop-bin"
-    "vicinae-bin"
-    "zen-browser-bin"
-  ]
-  ++ lib.optional hardware.openrazer "polychromatic"
-  ++ moduleAurPackages;
+  aur =
+    lib.optionals capabilities.desktop.enable [
+      "bibata-cursor-theme-bin"
+      "mpv-mpris"
+      "mpvpaper"
+      "noto-fonts-tc-vf"
+      "obs-pipewire-audio-capture"
+      "onedrive-abraunegg"
+      "onlyoffice-bin"
+      "powerpanel"
+      "ttf-victor-mono"
+      "zen-browser-bin"
+    ]
+    ++ lib.optional (capabilities.desktop.enable && capabilities.programs.vesktop.enable) "vesktop-bin"
+    ++ lib.optional (capabilities.desktop.enable && capabilities.programs.vicinae.enable) "vicinae-bin"
+    ++ lib.optional hardware.openrazer "polychromatic"
+    ++ moduleAurPackages;
 }

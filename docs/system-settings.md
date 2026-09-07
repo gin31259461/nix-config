@@ -1,65 +1,38 @@
-# Arch system settings
+# Adopt system settings
 
-Declare Host values in [hosts/arch/system.nix](../hosts/arch/system.nix).
-The [typed interface](../lib/system-settings.nix) validates them; the
-[Arch adapter](../platforms/arch/system/default.nix) builds a fixed manifest for
-`arch-switch`. Home Manager does not write these system files.
+Select system policy in [configuration.nix](../configuration.nix), using the
+[namespaced interface](configuration.md). Every public capability enable defaults
+to true. The supplied Host overrides locales, time zone and inbound firewall
+rules; the other selected capabilities use schema defaults. Review each section
+before first deployment, or set its enable to false to leave it unmanaged.
 
-## Initial Host selection
+Arch owns rendering, preflight and convergence. Home Manager never owns these
+system files. Builds and flake checks validate source without inspecting the
+machine. Public settings normalize into a private adapter manifest; its internal
+keys and pending receipt names are not another configuration interface.
 
-The initial values preserve the system observed on 2026-09-07: English system
-messages, generated English and Traditional Chinese UTF-8 locales, Taipei time,
-and the Host's `arch` hostname. UFW remains enabled with the existing inbound
-rules, IPv4 and IPv6, low logging, incoming/routed deny and outgoing allow.
-The exact ports and protocols have one source in
-[the Host declaration](../hosts/arch/system.nix).
+## Settings and application timing
 
-NTP, journal overrides, console settings, power events and TRIM are initially
-unmanaged. Existing NetworkManager, Bluetooth, power-profiles-daemon and Tailscale
-service policy remains in [the Arch service inventory](../platforms/arch/services.nix).
-Module-owned units, including libvirt and Runner units, retain their owners.
-
-An omitted setting, or `null`, means **leave it unmanaged**. It does not disable
-a service, remove a file, remove firewall rules, or restore upstream defaults.
-Optional settings have no implicit Host defaults. `hostname.enable` defaults to
-false and derives its value from `Host.name` when enabled.
-
-## Adopt and deploy
-
-Build and validate source first using the [deployment workflow](deployment.md).
-Before applying it to a host, inspect that exact host's relevant settings and
-resolve ownership conflicts. Builds and the isolated VM check do not activate
-the real machine. `arch-switch --check` remains an external package inventory
-query, not a settings preview.
-
-Routine deployment checks all declared native packages and exits 3 if any are
-missing. Only `--update` installs/updates packages. Ownership preflight runs
-before configuration writes or package updates, then repeats after updates with
-native tool and asset checks. The running-kernel gate still applies.
-Arch must succeed before Home Manager activation starts.
-
-Do not pass alternate roots or commands to the system adapter. These seams are
-private to source tests. Use the packaged `arch-switch` through the normal
-workflow; it holds the deployment lock throughout preflight and convergence.
-
-## Setting contracts
-
-| Setting | Managed scope | When it takes effect |
+| Public capability | Managed scope | Effective time |
 | --- | --- | --- |
-| `locale` | A marked addition to locale.gen and only LANG in locale.conf | Generate first; new language applies to new login sessions |
-| `timeZone` | Native localtime symlink through timedatectl | During deployment; RTC mode stays unchanged |
-| `hostname.enable` | Static and transient hostname through hostnamectl | During deployment; pretty hostname, hosts file and DNS stay outside scope |
-| `timeSync` | A timesyncd drop-in and its service | During deployment; offline systems can still be waiting for synchronization |
-| `journal` | A journald drop-in | Restart/flush on change; normal journal rotation enforces retention |
-| `console` | Selected KEYMAP/FONT keys in vconsole.conf | Next boot; no live TTY keymap changes |
-| `power` | Selected logind power-key/lid-event keys | Next boot; no logind restart or suspend during deployment |
-| `firewall` | UFW requirements and missing inbound allow rules | During deployment; other rules stay intact |
-| `trim` | Native fstrim.timer with a no-catch-up drop-in | Timer becomes active; future native scheduled runs |
+| `i18n` | Selected generated locales and LANG | New login sessions |
+| `time` | Native time-zone link | During deployment |
+| `networking.hostname` | Hostname from `networking.hostName` | During deployment |
+| `services.timesyncd` | Native time synchronization and optional servers | During deployment |
+| `services.journald` | Journal storage and optional bounded retention | Journal restart when needed |
+| `console` | Native keymap and optional font | After native keymap application |
+| `services.logind` | Power-key and lid-event policy | Next boot; no logind restart |
+| `networking.firewall` | UFW requirements and missing inbound allows | During deployment |
+| `services.fstrim` | Native timer with no-catch-up drop-in | Future native scheduled runs |
+
+Each row has an `enable` boolean. False contributes no desired setting and does
+not undo previous deployment. Default values are documented in
+[configuration guidance](configuration.md#review-new-defaults-before-deployment).
 
 ### Locale, time and hostname
 
-The first interface supports `en_US.UTF-8` and `zh_TW.UTF-8`. `locale.generated`
-must contain `locale.lang`, without duplicates. Other enabled locale.gen entries
+The first interface supports `en_US.UTF-8` and `zh_TW.UTF-8`. `i18n.generated`
+must contain `i18n.lang`, without duplicates. Other enabled locale.gen entries
 and unowned locale.conf keys are preserved. Permanent `LC_ALL` is not exposed;
 see [locale.conf](https://man.archlinux.org/man/locale.conf.5.en).
 
@@ -73,7 +46,7 @@ conditions explicitly. The adapter does not convert the hardware clock's mode.
 The Host owns static and transient hostname when selected; configure other
 hostname setters consistently to avoid repeated drift.
 
-To opt into time synchronization, set `timeSync = { };` or add a `servers` list.
+To manage time synchronization, use `services.timesyncd.enable = true;` or add a `servers` list.
 Only systemd-timesyncd is supported. Existing enabled/active chrony, ntpd or
 OpenNTPD units conflict. An empty server list retains native server selection;
 a custom list sets system servers but does not exclude per-link or fallback
@@ -82,7 +55,7 @@ is reported separately from successful service convergence.
 
 ### Journal, console and power
 
-`journal.storage` accepts auto, persistent or volatile. Optional bounded fields
+`services.journald.storage` accepts auto, persistent or volatile. Optional bounded fields
 are `systemMaxUseMiB`, `systemKeepFreeMiB`, `runtimeMaxUseMiB` and
 `maxRetentionDays`; omitted fields remain at native defaults. Selecting retention
 can discard old logs during normal rotation. Successful configuration does not
@@ -92,7 +65,7 @@ Console requires a native `keymap`; `font` is optional. Both are validated
 against installed kbd assets. An omitted font preserves the current FONT key.
 Desktop keyboard configuration remains with Hyprland.
 
-Power accepts `powerKey` (ignore, poweroff, suspend) and `lidSwitch` (ignore,
+`services.logind` accepts `powerKey` (ignore, poweroff, suspend) and `lidSwitch` (ignore,
 suspend), with at least one selected. These are logind event settings, not idle
 policy. Hypridle remains responsible for desktop idle behavior. Desktop inhibitors
 still determine whether logind handles an event; no inhibitor is overridden.
@@ -139,7 +112,7 @@ pending marker until a corrected declaration converges successfully.
 
 ### TRIM
 
-Opt in with `trim = { };` only after selecting storage discard policy. Preflight
+The default-on selection is `services.fstrim.enable = true;` only after selecting storage discard policy. Preflight
 requires a mounted discard-capable block device, rejects mounted encrypted
 storage, and checks for another apparent TRIM schedule. Review filesystem and
 custom cron/service schedules as part of adoption; the check cannot infer the

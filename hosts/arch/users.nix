@@ -1,27 +1,17 @@
+{ config, lib }:
 {
   abnertu = {
-    description = "Abner Tu";
-    homeDirectory = "/home/abnertu";
-    stateVersion = "26.05";
-    admin = true;
-    groups = [
-      "i2c"
-      "openrazer"
-      "realtime"
-    ];
-
-    profiles = [
-      "base"
-      "dev"
-      "workstation"
-    ];
-    modules = [
-      "hyprland"
-      "graphical-session"
-      "keepassxc"
-      "noctalia-storage"
-      "noctalia-config"
-    ];
-    homeModules = [ ../../homes/abnertu/home.nix ];
+    description = lib.mkDefault "Abner Tu";
+    homeDirectory = lib.mkDefault "/home/abnertu";
+    stateVersion = lib.mkDefault "26.05";
+    admin = lib.mkDefault true;
+    groups = lib.mkDefault (
+      [
+        "i2c"
+        "realtime"
+      ]
+      ++ lib.optional (config.hardware.openrazer.enable && config.desktop.enable) "openrazer"
+    );
+    homeModules = lib.mkDefault [ ../../homes/abnertu/home.nix ];
   };
 }

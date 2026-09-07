@@ -4,6 +4,18 @@ UWSM starts Hyprland and owns the graphical session. Arch supplies the desktop
 executables; Home Manager supplies their user-unit policy. Keep one startup
 owner per application and use package-unit drop-ins at canonical unit names.
 
+## Select desktop behavior
+
+The [configuration entry](../configuration.nix) selects `desktop.enable`,
+`programs.vicinae.enable`, `programs.vesktop.enable` and `programs.sunshine.enable`.
+All default to true. Native desktop dependencies belong to the Arch bundle;
+`users.users.<name>.modules.<module>.enable` selects home behavior independently.
+The registered [home Modules](../modules/home/default.nix) include startup,
+KeePassXC, Noctalia storage and preference exchange. Disabling a consumer removes
+its managed unit/files from the next home generation; disabling Vicinae also
+removes Noctalia's Wants edge to it. See [disable semantics](configuration.md#understand-disabling)
+before applying a new generation.
+
 ## Login and tray behavior
 
 KeePassXC opens its database minimized at login and unlocks manually. Startup

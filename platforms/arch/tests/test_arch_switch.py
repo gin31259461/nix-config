@@ -99,6 +99,65 @@ class ArchSwitchTests(unittest.TestCase):
             else []
         )
 
+    def test_disabled_capabilities_preserve_files_and_pending_actions(self):
+        self.invoke()
+        before = {
+            str(path): (path.stat().st_ino, path.read_bytes())
+            for path in (self.root / "etc").rglob("*")
+            if path.is_file()
+        }
+        pending = self.root / "var/lib/nix-config/arch"
+        for action in ("network", "initramfs", "units"):
+            (pending / f"{action}.pending").touch()
+        source = self.script.read_text()
+        source = source.replace(
+            "lizardbyte_package_names=(sunshine)", "lizardbyte_package_names=()"
+        )
+        source = source.replace(
+            "lizardbyte_packages=(lizardbyte/sunshine)", "lizardbyte_packages=()"
+        )
+        source = source.replace(
+            "system_units=(NetworkManager.service bluetooth.service power-profiles-daemon.service tailscaled.service)",
+            "system_units=()",
+        )
+        source = source.replace(
+            "user_services=(openrazer-daemon.service app-dev.lizardbyte.app.Sunshine.service)",
+            "user_services=()",
+        )
+        self.script.write_text(
+            "manage_network=0\nmanage_sunshine=0\nmanage_desktop=0\nmanage_initramfs=0\n"
+            + source
+        )
+        for command in ("sunshine", "getcap", "setcap", "mkinitcpio"):
+            (self.root / f"bin/{command}").unlink()
+        (self.root / "commands.jsonl").unlink()
+        self.invoke()
+        self.assertFalse(
+            any(
+                call[0] in ("curl", "bsdtar", "getcap", "setcap", "mkinitcpio")
+                for call in self.commands()
+            )
+        )
+        self.assertFalse(
+            any(
+                call[0] == "systemctl" and "NetworkManager.service" in call
+                for call in self.commands()
+            )
+        )
+        self.assertEqual(
+            before,
+            {
+                str(path): (path.stat().st_ino, path.read_bytes())
+                for path in (self.root / "etc").rglob("*")
+                if path.is_file()
+            },
+        )
+        for action in ("network", "initramfs", "units"):
+            self.assertTrue((pending / f"{action}.pending").exists())
+        (self.root / "commands.jsonl").unlink()
+        self.invoke("--check")
+        self.assertFalse(any(call[0] in ("curl", "bsdtar") for call in self.commands()))
+
     def test_system_preflight_failure_precedes_configuration_writes(self):
         self.state["fail"] = ["python", "/fixture/adapter"]
         self.save()

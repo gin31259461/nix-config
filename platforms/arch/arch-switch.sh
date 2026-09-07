@@ -3,7 +3,10 @@
 usage() { printf 'usage: arch-switch [--check | --update]\n'; }
 native() { "$native_bin/$1" "${@:2}"; }
 root() { native sudo "$native_bin/$1" "${@:2}"; }
-fail() { printf '%s\n' "$1" >&2; exit "${2:-1}"; }
+fail() {
+  printf '%s\n' "$1" >&2
+  exit "${2:-1}"
+}
 
 check_only=0
 update_system=0
@@ -11,11 +14,20 @@ for argument in "$@"; do
   case "$argument" in
     --check) check_only=1 ;;
     --update) update_system=1 ;;
-    --help) usage; exit 0 ;;
-    *) usage >&2; exit 2 ;;
+    --help)
+      usage
+      exit 0
+      ;;
+    *)
+      usage >&2
+      exit 2
+      ;;
   esac
 done
-if (( check_only && update_system )); then usage >&2; exit 2; fi
+if ((check_only && update_system)); then
+  usage >&2
+  exit 2
+fi
 
 [[ -e $fs_root/etc/arch-release ]] || fail 'arch-switch only supports Arch Linux'
 [[ $(native id -u) != 0 ]] || fail 'run arch-switch as the login user, not root'
@@ -25,8 +37,11 @@ has_group() { native id -nG "$login_user" | tr ' ' '\n' | grep -Fxq "$1"; }
 has_group wheel || fail 'deployment user is not in required administrator group: wheel'
 
 # Check every native dependency before any mutation. Nix supplies text utilities.
-for command in id sudo pacman pacman-conf yay install mv rm touch mkdir mktemp \
-  systemctl sysctl gpasswd getcap setcap mkinitcpio modprobe; do
+required_commands=(id sudo pacman pacman-conf yay install mv rm touch mkdir mktemp
+  systemctl sysctl gpasswd modprobe)
+if ((${manage_sunshine:-1})); then required_commands+=(getcap setcap); fi
+if ((${manage_initramfs:-1})); then required_commands+=(mkinitcpio); fi
+for command in "${required_commands[@]}"; do
   [[ -x $native_bin/$command ]] || fail "required command is missing: $native_bin/$command"
 done
 
@@ -40,19 +55,24 @@ trap cleanup EXIT
 
 resolve_inventory() {
   native pacman --sync --print --needed -- "${pacman_packages[@]}" >/dev/null
-  "$curl_bin" --fail --location --show-error --silent --connect-timeout 10 --max-time 60 \
-    --output "$work_dir/lizardbyte.db" "$lizardbyte_server/lizardbyte.db"
-  "$tar_bin" -tf "$work_dir/lizardbyte.db" > "$work_dir/lizardbyte-files"
-  for package in "${lizardbyte_package_names[@]}"; do
-    grep -Eq "^$package-[^/]+/desc$" "$work_dir/lizardbyte-files" \
-      || fail "LizardByte package did not resolve: $package"
-  done
-  if (( ${#aur_packages[@]} )); then
+  if ((${#lizardbyte_package_names[@]})); then
+    "$curl_bin" --fail --location --show-error --silent --connect-timeout 10 --max-time 60 \
+      --output "$work_dir/lizardbyte.db" "$lizardbyte_server/lizardbyte.db"
+    "$tar_bin" -tf "$work_dir/lizardbyte.db" >"$work_dir/lizardbyte-files"
+    for package in "${lizardbyte_package_names[@]}"; do
+      grep -Eq "^$package-[^/]+/desc$" "$work_dir/lizardbyte-files" ||
+        fail "LizardByte package did not resolve: $package"
+    done
+  fi
+  if ((${#aur_packages[@]})); then
     native yay --sync --info -- "${aur_packages[@]}" >/dev/null
   fi
 }
-lizardbyte_server=$(native pacman-conf --config "$files/pacman-lizardbyte.conf" --repo lizardbyte Server)
-if (( check_only )); then
+lizardbyte_server=""
+if ((${#lizardbyte_package_names[@]})); then
+  lizardbyte_server=$(native pacman-conf --config "$files/pacman-lizardbyte.conf" --repo lizardbyte Server)
+fi
+if ((check_only)); then
   resolve_inventory
   printf 'Arch, LizardByte, and AUR package inventories resolve\n'
   exit 0
@@ -69,21 +89,21 @@ missing_packages=()
 for package in "${pacman_packages[@]}" "${lizardbyte_package_names[@]}" "${aur_packages[@]}"; do
   native pacman --query -- "$package" >/dev/null 2>&1 || missing_packages+=("$package")
 done
-if (( ! update_system && ${#missing_packages[@]} )); then
+if ((!update_system && ${#missing_packages[@]})); then
   printf 'declared Arch packages are missing; rerun with --update to install them safely:\n' >&2
   printf '  %s\n' "${missing_packages[@]}" >&2
   exit 3
 fi
 running_kernel=$(uname -r)
 check_kernel() {
-  [[ -d $fs_root/usr/lib/modules/$running_kernel ]] \
-    || fail "kernel modules do not match running kernel $running_kernel; reboot, then rerun the deployment" 75
+  [[ -d $fs_root/usr/lib/modules/$running_kernel ]] ||
+    fail "kernel modules do not match running kernel $running_kernel; reboot, then rerun the deployment" 75
 }
 check_kernel
 repo_file="$fs_root/etc/pacman.d/nix-config-lizardbyte.conf"
 repo_include='Include = /etc/pacman.d/nix-config-lizardbyte.conf'
-if ! grep -Fxq "$repo_include" "$fs_root/etc/pacman.conf" \
-  && native pacman-conf --repo lizardbyte Server >/dev/null 2>&1; then
+if ((${#lizardbyte_package_names[@]})) && ! grep -Fxq "$repo_include" "$fs_root/etc/pacman.conf" &&
+  native pacman-conf --repo lizardbyte Server >/dev/null 2>&1; then
   fail 'an unmanaged [lizardbyte] repository already exists in pacman.conf'
 fi
 system_settings() {
@@ -92,7 +112,7 @@ system_settings() {
 # Read-only ownership preflight precedes package/configuration writes. A second
 # pass after updates checks newly installed native tools and configuration.
 system_settings preflight
-if (( update_system )); then resolve_inventory; fi
+if ((update_system)); then resolve_inventory; fi
 
 root_state="$fs_root/var/lib/nix-config/arch"
 native sudo -v
@@ -105,8 +125,8 @@ actions=0
 ensure_file() {
   local source=$1 target=$2 action=${3:-}
   [[ ! -L $target ]] || fail "managed file is a symlink: $target"
-  if [[ -f $target ]] && cmp -s "$source" "$target" \
-    && [[ $(stat -c '%a:%u:%g' "$target") == "$managed_identity" ]]; then
+  if [[ -f $target ]] && cmp -s "$source" "$target" &&
+    [[ $(stat -c '%a:%u:%g' "$target") == "$managed_identity" ]]; then
     return 0
   fi
   if [[ -n $action ]]; then root touch "$root_state/$action.pending"; fi
@@ -118,68 +138,91 @@ ensure_file() {
   changed_files=$((changed_files + 1))
   printf 'updated %s\n' "${target#"$fs_root"}"
 }
-ensure_file "$files/pacman-lizardbyte.conf" "$repo_file"
-if ! grep -Fxq "$repo_include" "$fs_root/etc/pacman.conf"; then
-  { cat "$fs_root/etc/pacman.conf"; printf '\n%s\n' "$repo_include"; } > "$work_dir/pacman.conf"
-  ensure_file "$work_dir/pacman.conf" "$fs_root/etc/pacman.conf"
+if ((${#lizardbyte_package_names[@]})); then
+  ensure_file "$files/pacman-lizardbyte.conf" "$repo_file"
+  if ! grep -Fxq "$repo_include" "$fs_root/etc/pacman.conf"; then
+    {
+      cat "$fs_root/etc/pacman.conf"
+      printf '\n%s\n' "$repo_include"
+    } >"$work_dir/pacman.conf"
+    ensure_file "$work_dir/pacman.conf" "$fs_root/etc/pacman.conf"
+  fi
+  [[ $(native pacman-conf --repo lizardbyte Server) == "$lizardbyte_server" ]] ||
+    fail 'managed [lizardbyte] repository did not load as expected'
 fi
-[[ $(native pacman-conf --repo lizardbyte Server) == "$lizardbyte_server" ]] \
-  || fail 'managed [lizardbyte] repository did not load as expected'
-if (( update_system )); then
+if ((update_system)); then
   root pacman --sync --refresh --sysupgrade --needed --noconfirm -- \
     "${pacman_packages[@]}" "${lizardbyte_packages[@]}"
   check_kernel
-  if (( ${#aur_packages[@]} )); then native yay --sync --needed --noconfirm -- "${aur_packages[@]}"; fi
+  if ((${#aur_packages[@]})); then native yay --sync --needed --noconfirm -- "${aur_packages[@]}"; fi
 fi
 
 system_settings converge
 
-ensure_file "$files/NetworkManager-main.conf" "$fs_root/etc/NetworkManager/conf.d/main.conf" network
-ensure_file "$files/NetworkManager-tailscale.conf" "$fs_root/etc/NetworkManager/conf.d/99-tailscale.conf" network
+if ((${manage_network:-1})); then
+  ensure_file "$files/NetworkManager-main.conf" "$fs_root/etc/NetworkManager/conf.d/main.conf" network
+  if ((${manage_tailscale:-1})); then
+    ensure_file "$files/NetworkManager-tailscale.conf" "$fs_root/etc/NetworkManager/conf.d/99-tailscale.conf" network
+  fi
+fi
 ensure_file "$files/container-network-modules.conf" "$fs_root/etc/modules-load.d/nix-config-podman.conf"
 ensure_file "$files/sysctl.conf" "$fs_root/etc/sysctl.d/99-nix-config.conf"
-sed "s/@USER@/$login_user/g" "$files/tty1-autologin.conf" > "$work_dir/autologin.conf"
-ensure_file "$work_dir/autologin.conf" "$fs_root/etc/systemd/system/getty@tty1.service.d/override.conf" units
+if ((${manage_desktop:-1})); then
+  sed "s/@USER@/$login_user/g" "$files/tty1-autologin.conf" >"$work_dir/autologin.conf"
+  ensure_file "$work_dir/autologin.conf" "$fs_root/etc/systemd/system/getty@tty1.service.d/override.conf" units
 
-# Own only this marked addition, preserving administrator MODULES and HOOKS.
-awk '
+fi
+
+if ((${manage_initramfs:-1})); then
+  # Own only this marked addition, preserving administrator MODULES and HOOKS.
+  awk '
   /^# BEGIN nix-config modules$/ { if (managed) exit 1; managed = 1; next }
   /^# END nix-config modules$/ { if (!managed) exit 1; managed = 0; next }
   !managed { print }
   END { if (managed) exit 1 }
-' "$fs_root/etc/mkinitcpio.conf" > "$work_dir/mkinitcpio.conf"
-{
-  printf '# BEGIN nix-config modules\nMODULES+=('
-  printf ' %s' "${initramfs_modules[@]}"
-  printf ' )\n# END nix-config modules\n'
-} >> "$work_dir/mkinitcpio.conf"
-ensure_file "$work_dir/mkinitcpio.conf" "$fs_root/etc/mkinitcpio.conf" initramfs
-for image in "${initramfs_images[@]}"; do
-  if [[ ! -s $fs_root$image ]]; then root touch "$root_state/initramfs.pending"; fi
-done
-if [[ -e $root_state/initramfs.pending ]]; then
-  root mkinitcpio -P
+' "$fs_root/etc/mkinitcpio.conf" >"$work_dir/mkinitcpio.conf"
+  {
+    printf '# BEGIN nix-config modules\nMODULES+=('
+    printf ' %s' "${initramfs_modules[@]}"
+    printf ' )\n# END nix-config modules\n'
+  } >>"$work_dir/mkinitcpio.conf"
+  ensure_file "$work_dir/mkinitcpio.conf" "$fs_root/etc/mkinitcpio.conf" initramfs
   for image in "${initramfs_images[@]}"; do
-    [[ -s $fs_root$image ]] || fail "initramfs was not generated: $image"
+    if [[ ! -s $fs_root$image ]]; then root touch "$root_state/initramfs.pending"; fi
   done
-  root rm -- "$root_state/initramfs.pending"
-  actions=$((actions + 1))
+  if [[ -e $root_state/initramfs.pending ]]; then
+    root mkinitcpio -P
+    for image in "${initramfs_images[@]}"; do
+      [[ -s $fs_root$image ]] || fail "initramfs was not generated: $image"
+    done
+    root rm -- "$root_state/initramfs.pending"
+    actions=$((actions + 1))
+  fi
 fi
 groups_changed=0
 for group in "${required_groups[@]}"; do
-  if ! has_group "$group"; then root gpasswd --add "$login_user" "$group"; groups_changed=1; fi
+  if ! has_group "$group"; then
+    root gpasswd --add "$login_user" "$group"
+    groups_changed=1
+  fi
 done
 
-if [[ -e $root_state/units.pending ]]; then
+if (( ${manage_desktop:-1} )) && [[ -e $root_state/units.pending ]]; then
   root systemctl daemon-reload
   root rm -- "$root_state/units.pending"
   actions=$((actions + 1))
 fi
 for service in "${system_units[@]}"; do
-  if ! native systemctl is-enabled --quiet "$service"; then root systemctl enable "$service"; actions=$((actions + 1)); fi
-  if ! native systemctl is-active --quiet "$service"; then root systemctl start "$service"; actions=$((actions + 1)); fi
+  if ! native systemctl is-enabled --quiet "$service"; then
+    root systemctl enable "$service"
+    actions=$((actions + 1))
+  fi
+  if ! native systemctl is-active --quiet "$service"; then
+    root systemctl start "$service"
+    actions=$((actions + 1))
+  fi
 done
-if [[ -e $root_state/network.pending ]]; then
+if ((${manage_network:-1})) && [[ -e $root_state/network.pending ]]; then
   root systemctl restart NetworkManager.service
   root rm -- "$root_state/network.pending"
   actions=$((actions + 1))
@@ -191,25 +234,30 @@ while IFS= read -r module; do
     root modprobe "$module"
     actions=$((actions + 1))
   fi
-done < "$files/container-network-modules.conf"
+done <"$files/container-network-modules.conf"
 while IFS='=' read -r key desired; do
   key=$(printf '%s' "$key" | xargs)
   [[ -n $key && $key != \#* ]] || continue
   desired=$(printf '%s' "$desired" | xargs)
   actual=$(native sysctl -n "$key")
-  if [[ $actual != "$desired" ]]; then root sysctl -w "$key=$desired"; actions=$((actions + 1)); fi
-done < "$files/sysctl.conf"
+  if [[ $actual != "$desired" ]]; then
+    root sysctl -w "$key=$desired"
+    actions=$((actions + 1))
+  fi
+done <"$files/sysctl.conf"
 for service in "${user_services[@]}"; do
   if ! native systemctl --user is-enabled --quiet "$service"; then
     native systemctl --user enable "$service"
     actions=$((actions + 1))
   fi
 done
-sunshine=$(readlink -f "$native_bin/sunshine")
-[[ -f $sunshine ]] || fail 'Sunshine executable is missing'
-if [[ $(native getcap "$sunshine") != "$sunshine cap_sys_admin=p" ]]; then
-  root setcap cap_sys_admin+p "$sunshine"
-  actions=$((actions + 1))
+if ((${manage_sunshine:-1})); then
+  sunshine=$(readlink -f "$native_bin/sunshine")
+  [[ -f $sunshine ]] || fail 'Sunshine executable is missing'
+  if [[ $(native getcap "$sunshine") != "$sunshine cap_sys_admin=p" ]]; then
+    root setcap cap_sys_admin+p "$sunshine"
+    actions=$((actions + 1))
+  fi
 fi
 printf 'Arch converged: %s files updated, %s runtime actions.\n' "$changed_files" "$actions"
-if (( groups_changed )); then printf 'Group membership changed; log out and back in.\n'; fi
+if ((groups_changed)); then printf 'Group membership changed; log out and back in.\n'; fi

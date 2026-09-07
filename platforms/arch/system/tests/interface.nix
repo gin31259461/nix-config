@@ -2,7 +2,11 @@
 let
   parse = raw: import ../../../../lib/system-settings.nix { inherit lib raw; };
   valid = raw: (builtins.tryEval (builtins.deepSeq (parse raw) true)).success;
-  baseline = parse (import ../../../../hosts/arch/system.nix);
+  baseline =
+    (import ../../../../lib/eval-configuration.nix {
+      inherit lib;
+      modules = [ ../../../../checks/fixtures/configuration.nix ];
+    }).host.systemSettings;
   packages = import ../../packages.nix {
     inherit lib;
     systemSettings = baseline;
@@ -33,7 +37,7 @@ assert
 assert optional.files.logind == "[Login]\nHandlePowerKey=ignore\n";
 assert valid { };
 assert (parse { }).locale == null && (parse { }).firewall == null;
-assert baseline.timeSync == null && baseline.journal == null && baseline.trim == null;
+assert baseline.timeSync != null && baseline.journal != null && baseline.trim != null;
 assert valid {
   locale = {
     generated = [ "en_US.UTF-8" ];

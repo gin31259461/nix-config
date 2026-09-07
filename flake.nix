@@ -27,14 +27,13 @@
     let
       inherit (nixpkgs) lib;
       mkHomeConfiguration = import ./lib/mk-home-configuration.nix { inherit inputs; };
-      archHost = import ./lib/validate-host.nix {
-        inherit lib;
-        raw = import ./hosts/arch;
-      };
+      configuration = import ./lib/eval-configuration.nix { inherit lib; };
+      archHost = configuration.host;
+      capabilities = configuration.capabilities;
       archHomes = lib.mapAttrs' (
         username: user:
         lib.nameValuePair "${username}@${archHost.name}" (mkHomeConfiguration {
-          inherit username user;
+          inherit username user capabilities;
           ai = archHost.ai;
           hostName = archHost.name;
           platform = archHost.platform;
@@ -69,6 +68,7 @@
       nativePackages = import ./platforms/arch/packages.nix {
         inherit lib;
         hardware = archHost.hardware;
+        inherit capabilities;
         modulePackages = runners.requiredPackages ++ virtualization.requiredPackages;
         systemSettings = archHost.systemSettings;
         moduleAurPackages = ai.aurPackages;
@@ -78,6 +78,7 @@
           lib
           pkgs
           deploymentUser
+          capabilities
           systemSettings
           ;
         moduleGroups = virtualization.loginGroups;
@@ -90,6 +91,7 @@
         inherit pkgs;
         activationPackage = archHomes.${homeConfigurationName}.activationPackage;
       };
+      noctaliaEnabled = builtins.elem "noctalia-config" deploymentUser.modules;
       noctalia-config = import ./modules/home/noctalia-config/package.nix {
         inherit pkgs;
         username = deployment.username;
@@ -107,8 +109,10 @@
     in
     {
       homeConfigurations = archHomes;
+      configurations.arch = configuration.config;
 
       checks.${system} = {
+        configuration = import ./checks/configuration.nix { inherit lib pkgs inputs; };
         capabilities = import ./checks/capabilities.nix { inherit lib pkgs inputs; };
         optional-modules = import ./checks/optional-modules.nix { inherit lib pkgs inputs; };
         source-format = import ./checks/format.nix { inherit lib pkgs; };
@@ -131,18 +135,14 @@
       // runners.checks;
 
       packages.${system} = {
-        inherit arch-switch home-switch noctalia-config;
+        inherit arch-switch home-switch;
         ${deploymentName} = archDeployment;
         default = arch-switch;
       }
+      // lib.optionalAttrs noctaliaEnabled { inherit noctalia-config; }
       // runners.packages;
 
       apps.${system} = {
-        noctalia-config = {
-          type = "app";
-          program = "${noctalia-config}/bin/noctalia-config";
-          meta.description = "Capture or deploy reviewed Noctalia preferences";
-        };
         arch-switch = {
           type = "app";
           program = "${arch-switch}/bin/arch-switch";
@@ -162,6 +162,13 @@
           type = "app";
           program = "${pkgs.just}/bin/just";
           meta.description = "Run project commands before Home Manager is active";
+        };
+      }
+      // lib.optionalAttrs noctaliaEnabled {
+        noctalia-config = {
+          type = "app";
+          program = "${noctalia-config}/bin/noctalia-config";
+          meta.description = "Capture or deploy reviewed Noctalia preferences";
         };
       }
       // runners.apps;

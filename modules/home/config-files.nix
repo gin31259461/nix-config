@@ -1,5 +1,11 @@
-{ ... }:
+{
+  lib,
+  capabilities ? null,
+  hardware,
+  ...
+}:
 let
+  caps = if capabilities == null then import ../../lib/default-capabilities.nix else capabilities;
   sourceRoot = ../../files/home;
   configDirectories = [
     "Kvantum"
@@ -11,11 +17,13 @@ let
     "gtk-4.0"
     "kitty"
     "onedrive"
-    "openrazer"
     "qt5ct"
     "qt6ct"
     "quickshell"
     "swappy"
+  ]
+  ++ lib.optional hardware.openrazer "openrazer"
+  ++ lib.optionals caps.programs.vesktop.enable [
     "vesktop/settings"
     "vesktop/themes"
   ];
@@ -33,9 +41,15 @@ in
     )
     // {
       "electron-flags.conf".source = sourceRoot + "/.config/electron-flags.conf";
-      "polychromatic/preferences.json".source = sourceRoot + "/.config/polychromatic/preferences.json";
-      "sunshine/sunshine.conf".source = sourceRoot + "/.config/sunshine/sunshine.conf";
-      "vesktop/settings.json".source = sourceRoot + "/.config/vesktop/settings.json";
+      "polychromatic/preferences.json" = lib.mkIf (hardware.openrazer) {
+        source = sourceRoot + "/.config/polychromatic/preferences.json";
+      };
+      "sunshine/sunshine.conf" = lib.mkIf (caps.programs.sunshine.enable) {
+        source = sourceRoot + "/.config/sunshine/sunshine.conf";
+      };
+      "vesktop/settings.json" = lib.mkIf (caps.programs.vesktop.enable) {
+        source = sourceRoot + "/.config/vesktop/settings.json";
+      };
     };
 
   home.file = {

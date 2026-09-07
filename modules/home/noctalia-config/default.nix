@@ -10,7 +10,7 @@
     type = lib.types.path;
     description = "Reviewed, non-secret Noctalia user preferences in the repository.";
   };
-  config = {
+  config = lib.mkIf (config.workstation.capabilities.noctalia-config.enable or true) {
     xdg.configFile."noctalia/config.toml".source = config.workstation.noctalia.preferencesFile;
     home.packages = [
       (import ./package.nix {

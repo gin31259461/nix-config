@@ -95,10 +95,13 @@ in
         touch "$out"
       '';
   home-projection-interface =
-    assert pkgs.lib.hasInfix "exec /usr/bin/uwsm start hyprland.desktop"
-      home.config.home.file.".zprofile".text;
-    assert !home.config.xdg.configFile.nvim.recursive;
-    assert home.config.xdg.configFile.hypr.recursive;
+    assert
+      !(home.config.home.file ? ".zprofile")
+      ||
+        pkgs.lib.hasInfix "exec /usr/bin/uwsm start hyprland.desktop"
+          home.config.home.file.".zprofile".text;
+    assert !(home.config.xdg.configFile ? nvim) || !home.config.xdg.configFile.nvim.recursive;
+    assert !(home.config.xdg.configFile ? hypr) || home.config.xdg.configFile.hypr.recursive;
     assert builtins.all (
       name: !pkgs.lib.hasPrefix ".agents/skills/" name || !home.config.home.file.${name}.recursive
     ) (builtins.attrNames home.config.home.file);
@@ -132,6 +135,7 @@ in
         exit 1
       fi
     done
+    if [[ -f "$units/vicinae.service" ]]; then
     if ! ${pkgs.gnugrep}/bin/grep -q '^ExecStartPre=.*StatusNotifierWatcher' "$units/vicinae.service"; then
       printf 'Vicinae does not wait for Noctalia tray readiness\n' >&2
       exit 1
@@ -150,6 +154,7 @@ in
         exit 1
       fi
     done
+    fi
     for executable in \
       ghostty \
       gimp \

@@ -18,10 +18,18 @@ configuration. These terms describe the current implementation.
 
 ## Selection and realization
 
-`flake.nix` explicitly imports a Host, validates it, constructs its users' Home
-Manager configurations, and builds the selected deployment target. Registries
-in `profiles/default.nix` and `modules/home/default.nix` resolve named selections.
-Nothing discovers Hosts or loads overlays by scanning directories.
+`flake.nix` explicitly selects `configuration.nix` through
+`lib/eval-configuration.nix`. The entry imports Host modules and accepts ordinary
+user overrides. `lib/configuration-options.nix` composes typed namespaces;
+capability-owned schemas remain in their Modules. Host baselines use `mkDefault`.
+The module system merges imports and validates option names/types; the evaluator
+normalizes the result into private Host/adapter values and retains identity
+validation. `configurations.arch` exposes resolved public values for inspection.
+
+Registries in `profiles/default.nix` and `modules/home/default.nix` enumerate
+available home selections. Each selection has a default-on enable switch; no
+Host or overlay is discovered by scanning directories. Per-user `home` is a
+deferred Home Manager module, preserving that module system's own merge rules.
 
 A deployment is named `<host>-<profile>`. Its profile is a descriptive label
 that must occur in the selected user's profile list. The target activates that
@@ -32,21 +40,26 @@ The Host supplies hardware intent. The Arch adapter selects native packages
 from that intent and combines them with optional Module dependencies.
 Application instances remain private to their Module and Host declaration.
 
-The Host also selects AI and virtualization through typed parent and child
-enable switches. AI exports AUR requirements and a shared Home Manager module
+The Host selects `programs.ai` and `virtualisation` through typed default-on
+parent and child enable switches. AI exports AUR requirements and a shared Home Manager module
 for skill presets. Virtualization exports native package requirements and login
 groups for QEMU/KVM and Podman use. Its optional KVM GUI also exports the local
 libvirt socket for Arch to converge. Arch realizes these values; Runner
 requirements remain independent of the login-user virtualization selection.
 
-The Host selects typed `systemSettings`; omitted capabilities are unmanaged.
-`lib/system-settings.nix` owns the Interface, and `platforms/arch/system/` owns
+The public `networking`, `i18n`, `time`, `console` and `services` namespaces
+select system behavior with default-on enable switches. Disabled capabilities
+normalize to private unmanaged `systemSettings` values. Shared system option
+types and invariants live in `lib/system-settings-options.nix` and
+`lib/system-settings.nix`; `platforms/arch/system/` owns
 Arch rendering, preflight and convergence. The Arch service inventory owns
 workstation service policy; Module units retain their existing owners.
 The controller holds one deployment lock across both preflight and mutation.
 System settings never belong to Home Manager or reusable Profiles.
 
-The Runner Module accepts zero or more instances. With zero instances, it
+The Runner Module accepts zero or more enabled instances under
+`services.gitlabRunner`. Its parent and instance enables default to true; an
+empty instance set remains empty. With zero instances, it
 exports no controller app/package or native requirements; its independent
 interface and fake-runtime tests remain available.
 
@@ -64,7 +77,7 @@ state leaves managed file contents and service processes unchanged. Runtime
 drift can still require repair. Pending-action markers preserve unfinished
 work across failures; they are mutable host state, not repository inputs.
 
-Removing a declaration is not authorization to retire an account, remove
+Disabling or removing a declaration is not authorization to retire an account, remove
 packages or erase application state. Those operations are intentionally outside
 the deployment interface.
 

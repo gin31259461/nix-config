@@ -1,14 +1,11 @@
+{ lib, ... }:
 {
-  locale = {
-    generated = [
-      "en_US.UTF-8"
-      "zh_TW.UTF-8"
-    ];
-    lang = "en_US.UTF-8";
-  };
-  timeZone = "Asia/Taipei";
-  hostname.enable = true;
-  firewall.rules = [
+  i18n.generated = lib.mkDefault [
+    "en_US.UTF-8"
+    "zh_TW.UTF-8"
+  ];
+  time.timeZone = lib.mkDefault "Asia/Taipei";
+  networking.firewall.rules = lib.mkDefault [
     {
       protocol = "tcp";
       fromPort = 7777;
