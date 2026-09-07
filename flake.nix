@@ -61,14 +61,25 @@
         inherit lib;
         config = archHost.virtualization;
       };
+      systemSettings = import ./platforms/arch/system {
+        inherit lib pkgs;
+        config = archHost.systemSettings;
+        hostName = archHost.name;
+      };
       nativePackages = import ./platforms/arch/packages.nix {
         inherit lib;
         hardware = archHost.hardware;
         modulePackages = runners.requiredPackages ++ virtualization.requiredPackages;
+        systemSettings = archHost.systemSettings;
         moduleAurPackages = ai.aurPackages;
       };
       arch-switch = import ./platforms/arch/package.nix {
-        inherit lib pkgs deploymentUser;
+        inherit
+          lib
+          pkgs
+          deploymentUser
+          systemSettings
+          ;
         moduleGroups = virtualization.loginGroups;
         moduleSystemUnits = virtualization.systemUnits;
         username = deployment.username;

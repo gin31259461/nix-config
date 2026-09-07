@@ -2,6 +2,7 @@
   lib,
   hardware,
   modulePackages ? [ ],
+  systemSettings ? { },
   moduleAurPackages ? [ ],
 }:
 {
@@ -135,6 +136,9 @@
       "openrazer-daemon"
       "openrazer-driver-dkms"
     ]
+    ++ lib.optionals ((systemSettings.locale or null) != null) [ "glibc" ]
+    ++ lib.optionals ((systemSettings.timeZone or null) != null) [ "tzdata" ]
+    ++ lib.optionals ((systemSettings.console or null) != null) [ "kbd" ]
     ++ modulePackages
   );
 

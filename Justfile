@@ -10,7 +10,7 @@ check:
 
 # Check Nix/Python formatting and Python static errors without building the home.
 check-fast:
-    nix build --no-link .#checks.x86_64-linux.source-format .#checks.x86_64-linux.host-interface .#checks.x86_64-linux.gitlab-runner-interface
+    nix build --no-link .#checks.x86_64-linux.source-format .#checks.x86_64-linux.host-interface .#checks.x86_64-linux.gitlab-runner-interface .#checks.x86_64-linux.system-settings-interface
 
 # Query the remote Arch, LizardByte, and AUR inventories (requires connectivity).
 check-arch:

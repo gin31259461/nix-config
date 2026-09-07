@@ -46,6 +46,10 @@ First-time Noctalia storage preparation requires its service stopped; follow
 [desktop preparation](desktop-session.md#prepare-storage-on-a-new-home).
 Group membership changes require a new login session.
 
+System setting adoption, optional capabilities and UFW recovery are described
+in [Arch system settings](system-settings.md). Review that procedure before the
+first rollout; the Host now selects locale, time zone, hostname and UFW policy.
+
 ## Repeat execution and interrupted work
 
 File updates compare contents, owner and mode, then replace through a temporary

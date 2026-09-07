@@ -5,6 +5,7 @@
   username,
   packages,
   hardware,
+  systemSettings ? null,
   moduleGroups ? [ ],
   moduleSystemUnits ? [ ],
 }:
@@ -19,6 +20,23 @@ pkgs.writeShellApplication {
     gnused
   ];
   text = ''
+    readonly system_python=${pkgs.python3}/bin/python3
+    readonly system_adapter=${
+      lib.fileset.toSource {
+        root = ./system;
+        fileset = lib.fileset.unions [
+          ./system/runtime.py
+          ./system/files.py
+          ./system/firewall.py
+        ];
+      }
+    }/runtime.py
+    readonly system_manifest=${
+      if systemSettings == null then
+        pkgs.writeText "unmanaged-system.json" "{}"
+      else
+        systemSettings.manifest
+    }
     readonly fs_root=""
     readonly native_bin=/usr/bin
     readonly managed_identity=644:0:0
@@ -36,7 +54,7 @@ pkgs.writeShellApplication {
         lib.unique (deploymentUser.groups ++ moduleGroups ++ lib.optional deploymentUser.admin "wheel")
       )
     })
-    module_system_units=(${lib.escapeShellArgs moduleSystemUnits})
+    system_units=(${lib.escapeShellArgs (lib.unique ((import ./services.nix) ++ moduleSystemUnits))})
     initramfs_modules=(${lib.escapeShellArgs hardware.initramfsModules})
     initramfs_images=(${lib.escapeShellArgs hardware.initramfsImages})
     user_services=(${

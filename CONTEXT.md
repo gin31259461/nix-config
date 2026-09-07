@@ -39,6 +39,13 @@ groups for QEMU/KVM and Podman use. Its optional KVM GUI also exports the local
 libvirt socket for Arch to converge. Arch realizes these values; Runner
 requirements remain independent of the login-user virtualization selection.
 
+The Host selects typed `systemSettings`; omitted capabilities are unmanaged.
+`lib/system-settings.nix` owns the Interface, and `platforms/arch/system/` owns
+Arch rendering, preflight and convergence. The Arch service inventory owns
+workstation service policy; Module units retain their existing owners.
+The controller holds one deployment lock across both preflight and mutation.
+System settings never belong to Home Manager or reusable Profiles.
+
 The Runner Module accepts zero or more instances. With zero instances, it
 exports no controller app/package or native requirements; its independent
 interface and fake-runtime tests remain available.

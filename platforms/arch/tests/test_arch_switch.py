@@ -64,7 +64,10 @@ class ArchSwitchTests(unittest.TestCase):
                     "lizardbyte_package_names=(sunshine)",
                     "lizardbyte_packages=(lizardbyte/sunshine)",
                     "required_groups=(wheel i2c)",
-                    "module_system_units=()",
+                    "system_units=(NetworkManager.service bluetooth.service power-profiles-daemon.service tailscaled.service)",
+                    "system_python=/fixture/python",
+                    "system_adapter=/fixture/adapter",
+                    "system_manifest=/fixture/manifest",
                     "initramfs_modules=(usbhid amdgpu)",
                     "initramfs_images=(/boot/initramfs-linux.img)",
                     "user_services=(openrazer-daemon.service app-dev.lizardbyte.app.Sunshine.service)",
@@ -94,6 +97,38 @@ class ArchSwitchTests(unittest.TestCase):
             [json.loads(line) for line in path.read_text().splitlines()]
             if path.exists()
             else []
+        )
+
+    def test_system_preflight_failure_precedes_configuration_writes(self):
+        self.state["fail"] = ["python", "/fixture/adapter"]
+        self.save()
+        self.invoke(code=1)
+        self.assertFalse((self.root / "var").exists())
+        self.assertEqual((self.root / "etc/pacman.conf").read_text(), "[options]\n")
+
+    def test_system_settings_run_after_update_and_before_other_policy(self):
+        self.invoke("--update")
+        calls = self.commands()
+        preflight = calls.index(
+            ["python", "/fixture/adapter", "/fixture/manifest", "preflight"]
+        )
+        converge = calls.index(
+            ["python", "/fixture/adapter", "/fixture/manifest", "converge"]
+        )
+        upgrade = next(
+            i
+            for i, call in enumerate(calls)
+            if call[0] == "pacman" and "--sysupgrade" in call
+        )
+        aur = next(
+            i
+            for i, call in enumerate(calls)
+            if call[:3] == ["yay", "--sync", "--needed"]
+        )
+        self.assertLess(preflight, upgrade)
+        self.assertLess(aur, converge)
+        self.assertLess(
+            converge, next(i for i, call in enumerate(calls) if call[0] == "mkinitcpio")
         )
 
     def test_missing_package_has_no_mutations_or_remote_queries(self):
@@ -190,7 +225,7 @@ class ArchSwitchTests(unittest.TestCase):
     def enable_gui(self):
         self.script.write_text(
             self.script.read_text().replace(
-                "module_system_units=()", "module_system_units=(libvirtd.socket)"
+                "tailscaled.service)", "tailscaled.service libvirtd.socket)"
             )
         )
 
@@ -223,7 +258,7 @@ class ArchSwitchTests(unittest.TestCase):
         self.invoke()
         self.script.write_text(
             self.script.read_text().replace(
-                "module_system_units=(libvirtd.socket)", "module_system_units=()"
+                "tailscaled.service libvirtd.socket)", "tailscaled.service)"
             )
         )
         (self.root / "commands.jsonl").unlink()

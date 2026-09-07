@@ -33,7 +33,10 @@ def target(value):
     return path
 
 
-if command == "id":
+if command == "python":
+    assert args[:2] == ["/fixture/adapter", "/fixture/manifest"]
+    assert args[2] in ("preflight", "converge")
+elif command == "id":
     print(
         state.get("user", "tester")
         if "--name" in args

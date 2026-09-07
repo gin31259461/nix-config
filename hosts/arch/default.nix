@@ -17,6 +17,7 @@
     kvm.gui.enable = true;
     podman.enable = true;
   };
+  systemSettings = import ./system.nix;
   users = import ./users.nix;
   gitlabRunners = import ./gitlab-runners.nix;
   hardware = import ./hardware.nix;

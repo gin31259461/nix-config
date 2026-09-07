@@ -62,7 +62,12 @@ assert
       };
     }
   ));
-assert evaluate (builtins.removeAttrs raw [ "gitlabRunners" ]);
+assert evaluate (
+  builtins.removeAttrs raw [
+    "gitlabRunners"
+    "systemSettings"
+  ]
+);
 assert !(evaluate (raw // { typo = true; }));
 assert
   !(evaluate (

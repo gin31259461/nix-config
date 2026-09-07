@@ -66,6 +66,7 @@ Graphical units invoke Arch-owned paths.
 | --- | --- |
 | Host identity and deployment selection | [hosts/arch/default.nix](hosts/arch/default.nix) |
 | Login users, profiles and modules | [hosts/arch/users.nix](hosts/arch/users.nix) |
+| System settings | [hosts/arch/system.nix](hosts/arch/system.nix), [adoption and recovery](docs/system-settings.md) |
 | Hardware intent | [hosts/arch/hardware.nix](hosts/arch/hardware.nix) |
 | Native packages | [platforms/arch/packages.nix](platforms/arch/packages.nix) |
 | Reusable CLI/development bundles | [profiles/default.nix](profiles/default.nix) |

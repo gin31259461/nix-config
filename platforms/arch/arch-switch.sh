@@ -86,6 +86,12 @@ if ! grep -Fxq "$repo_include" "$fs_root/etc/pacman.conf" \
   && native pacman-conf --repo lizardbyte Server >/dev/null 2>&1; then
   fail 'an unmanaged [lizardbyte] repository already exists in pacman.conf'
 fi
+system_settings() {
+  native sudo "$system_python" "$system_adapter" "$system_manifest" "$1"
+}
+# Read-only ownership preflight precedes package/configuration writes. A second
+# pass after updates checks newly installed native tools and configuration.
+system_settings preflight
 if (( update_system )); then resolve_inventory; fi
 
 root_state="$fs_root/var/lib/nix-config/arch"
@@ -125,6 +131,8 @@ if (( update_system )); then
   check_kernel
   if (( ${#aur_packages[@]} )); then native yay --sync --needed --noconfirm -- "${aur_packages[@]}"; fi
 fi
+
+system_settings converge
 
 ensure_file "$files/NetworkManager-main.conf" "$fs_root/etc/NetworkManager/conf.d/main.conf" network
 ensure_file "$files/NetworkManager-tailscale.conf" "$fs_root/etc/NetworkManager/conf.d/99-tailscale.conf" network
@@ -167,7 +175,7 @@ if [[ -e $root_state/units.pending ]]; then
   root rm -- "$root_state/units.pending"
   actions=$((actions + 1))
 fi
-for service in NetworkManager.service bluetooth.service power-profiles-daemon.service tailscaled.service "${module_system_units[@]}"; do
+for service in "${system_units[@]}"; do
   if ! native systemctl is-enabled --quiet "$service"; then root systemctl enable "$service"; actions=$((actions + 1)); fi
   if ! native systemctl is-active --quiet "$service"; then root systemctl start "$service"; actions=$((actions + 1)); fi
 done
