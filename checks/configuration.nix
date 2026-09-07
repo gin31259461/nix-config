@@ -153,6 +153,20 @@ let
   ];
   valid = module: (builtins.tryEval (builtins.deepSeq (evaluate [ module ]).host true)).success;
 in
+# Check the composed initialization, including Home Manager's own definitions.
+assert lib.assertMsg (lib.hasInfix "powerlevel10k.zsh-theme" home.config.programs.zsh.initContent)
+  "zsh initialization lost p10k";
+assert home.config.programs.zsh.syntaxHighlighting.enable;
+assert home.config.programs.zsh.autosuggestion.enable;
+assert home.config.programs.zsh.enableCompletion;
+assert home.config.programs.zsh.oh-my-zsh.enable;
+assert lib.all (text: lib.hasInfix text home.config.programs.zsh.initContent) [
+  ".p10k.zsh"
+  "autosuggest-accept"
+  "zsh-syntax-highlighting.zsh"
+  "oh-my-zsh.sh"
+  "fzf --zsh"
+];
 assert switchesWork;
 assert builtins.length merged.host.systemSettings.firewall.rules == 2;
 assert builtins.attrNames oneRunner.host.gitlabRunners == [ "dotnet" ];

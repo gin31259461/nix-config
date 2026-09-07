@@ -33,56 +33,58 @@
     wget
   ];
 
-  programs = lib.mkDefault {
+  # Apply defaults to individual options: submodules and initialization fragments
+  # must still merge with Home Manager's generated definitions.
+  programs = {
     fzf = {
-      enable = true;
-      enableZshIntegration = true;
+      enable = lib.mkDefault true;
+      enableZshIntegration = lib.mkDefault true;
     };
 
     git = {
-      enable = true;
+      enable = lib.mkDefault true;
       settings = {
         core = {
-          autocrlf = false;
-          filemode = false;
-          fsmonitor = false;
-          ignorecase = true;
-          longpaths = true;
-          quotePath = false;
-          symlinks = true;
+          autocrlf = lib.mkDefault false;
+          filemode = lib.mkDefault false;
+          fsmonitor = lib.mkDefault false;
+          ignorecase = lib.mkDefault true;
+          longpaths = lib.mkDefault true;
+          quotePath = lib.mkDefault false;
+          symlinks = lib.mkDefault true;
         };
-        diff.algorithm = "histogram";
-        fetch.prune = true;
-        init.defaultBranch = "main";
-        merge.conflictStyle = "zdiff3";
-        pull.rebase = true;
-        rebase.autoStash = true;
+        diff.algorithm = lib.mkDefault "histogram";
+        fetch.prune = lib.mkDefault true;
+        init.defaultBranch = lib.mkDefault "main";
+        merge.conflictStyle = lib.mkDefault "zdiff3";
+        pull.rebase = lib.mkDefault true;
+        rebase.autoStash = lib.mkDefault true;
       };
     };
 
     zsh = {
-      enable = true;
-      autosuggestion.enable = true;
-      enableCompletion = true;
-      syntaxHighlighting.enable = true;
+      enable = lib.mkDefault true;
+      autosuggestion.enable = lib.mkDefault true;
+      enableCompletion = lib.mkDefault true;
+      syntaxHighlighting.enable = lib.mkDefault true;
       history = {
-        expireDuplicatesFirst = true;
-        ignoreAllDups = true;
-        ignoreDups = true;
-        ignoreSpace = true;
-        save = 10000;
-        share = true;
-        size = 10000;
+        expireDuplicatesFirst = lib.mkDefault true;
+        ignoreAllDups = lib.mkDefault true;
+        ignoreDups = lib.mkDefault true;
+        ignoreSpace = lib.mkDefault true;
+        save = lib.mkDefault 10000;
+        share = lib.mkDefault true;
+        size = lib.mkDefault 10000;
       };
       shellAliases = {
-        l = "lsd -l";
-        la = "lsd -a";
-        ll = "lsd -al";
-        lt = "lsd --tree";
-        v = "nvim";
+        l = lib.mkDefault "lsd -l";
+        la = lib.mkDefault "lsd -a";
+        ll = lib.mkDefault "lsd -al";
+        lt = lib.mkDefault "lsd --tree";
+        v = lib.mkDefault "nvim";
       };
       oh-my-zsh = {
-        enable = true;
+        enable = lib.mkDefault true;
         plugins = [ "git" ];
       };
       initContent = lib.mkOrder 1000 ''
