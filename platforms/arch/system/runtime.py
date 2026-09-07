@@ -99,7 +99,12 @@ class System:
                 or target.startswith("../usr/share/zoneinfo/")
             ) or ".." in target.removeprefix("../").split("/"):
                 raise Conflict("localtime has an unexpected symlink target")
-        values = self.run("timedatectl", "show", "--property=Timezone,LocalRTC").stdout
+        values = self.run(
+            "timedatectl",
+            "show",
+            "--property=Timezone",
+            "--property=LocalRTC",
+        ).stdout
         state = dict(line.split("=", 1) for line in values.splitlines() if "=" in line)
         if state.get("LocalRTC") != "no":
             raise Conflict("local RTC requires an explicit operator decision")
