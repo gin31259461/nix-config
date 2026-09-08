@@ -170,6 +170,15 @@ class AITests(unittest.TestCase):
         with self.assertRaises(runtime.Conflict):
             self.ai().preflight()
 
+    def test_adopts_package_caddyfile_with_requested_inline_site(self):
+        path = self.root / "etc/caddy/Caddyfile"
+        marker = "# Import additional caddy config files in /etc/caddy/conf.d/\n"
+        current = runtime.PACKAGE_CADDY.replace(
+            marker, runtime.CADDY_SITE + "\n" + marker
+        )
+        path.write_text(current)
+        self.assertEqual(self.ai().caddy_main(), runtime.CADDY_MAIN)
+
 
 if __name__ == "__main__":
     unittest.main()

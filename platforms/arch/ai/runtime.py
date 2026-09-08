@@ -64,6 +64,10 @@ CADDY_SITE = """:11435 {
 \t}
 }
 """
+PACKAGE_CADDY_WITH_SITE = PACKAGE_CADDY.replace(
+    "# Import additional caddy config files in /etc/caddy/conf.d/\n",
+    CADDY_SITE + "\n# Import additional caddy config files in /etc/caddy/conf.d/\n",
+)
 
 
 class Native:
@@ -117,7 +121,7 @@ class AI:
         current = self.files.read("/etc/caddy/Caddyfile")
         if current == CADDY_MAIN:
             return current
-        if not current or current == PACKAGE_CADDY:
+        if not current or current in (PACKAGE_CADDY, PACKAGE_CADDY_WITH_SITE):
             return CADDY_MAIN
         if (
             'admin "unix//run/caddy/admin.socket"' in current

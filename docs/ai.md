@@ -45,9 +45,11 @@ loaded models in memory; an API request can override it. See the
 The Arch Caddy package supplies the expected Unix admin endpoint and `conf.d`
 import. The first deployment accepts an empty file, the recognized Arch package
 template, or an already adopted Caddyfile with the same admin endpoint and
-import. Any custom or conflicting main file stops before adoption. The package
-welcome site is removed when its exact template is adopted, so this capability
-does not expose port 80.
+import. It also recognizes the exact package template with the requested Ollama
+site already added inline, then moves that site to the managed fragment. Any
+other custom or conflicting main file stops before adoption. The package welcome
+site is removed during these recognized adoptions, so this capability does not
+expose port 80.
 
 Caddy's package tmpfiles rule prepares `/run/caddy` as `0750 caddy:caddy`; Caddy
 creates `/run/caddy/admin.socket`. Deployment validates the complete config,
