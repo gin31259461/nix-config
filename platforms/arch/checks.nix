@@ -14,6 +14,18 @@
         python ${./system}/tests/test_hotspot.py
         touch "$out"
       '';
+  ai-services-tests = pkgs.runCommand "ai-services-tests" { nativeBuildInputs = [ pkgs.python3 ]; } ''
+    python ${./ai/tests/test_ai.py} ${
+      pkgs.lib.fileset.toSource {
+        root = ./.;
+        fileset = pkgs.lib.fileset.unions [
+          ./ai/runtime.py
+          ./system/files.py
+        ];
+      }
+    }/ai/runtime.py
+    touch "$out"
+  '';
   arch-switch-tests =
     pkgs.runCommand "arch-switch-tests"
       {

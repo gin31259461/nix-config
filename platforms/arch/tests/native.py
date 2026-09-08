@@ -34,7 +34,10 @@ def target(value):
 
 
 if command == "python":
-    assert args[:2] == ["/fixture/adapter", "/fixture/manifest"]
+    assert args[:2] in (
+        ["/fixture/adapter", "/fixture/manifest"],
+        ["/fixture/ai-adapter", "/fixture/ai-manifest"],
+    )
     assert args[2] in ("preflight", "converge")
 elif command == "id":
     print(

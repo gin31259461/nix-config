@@ -174,6 +174,9 @@ assert hotspot.host.systemSettings.hotspot.channel == 36;
 assert hotspotOverride.host.systemSettings.hotspot.channel == 149;
 assert hotspotOff.host.systemSettings.hotspot == null;
 assert hotspotParentOff.host.systemSettings.hotspot == null;
+assert base.host.ai.ollama.keepAlive == -1;
+assert base.host.ai.ollama.proxy.httpsPort == 443;
+assert disabled.host.ai.ollama.enable;
 # Check the composed initialization, including Home Manager's own definitions.
 assert lib.assertMsg (lib.hasInfix "powerlevel10k.zsh-theme" home.config.programs.zsh.initContent)
   "zsh initialization lost p10k";

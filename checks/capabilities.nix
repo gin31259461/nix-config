@@ -59,11 +59,16 @@ let
     inherit (host) hardware;
     modulePackages = v.requiredPackages;
     moduleAurPackages = enabled.aurPackages;
+    aiPackages = enabled.requiredPackages;
+    aiVulkan = true;
+    aiProxy = true;
   };
   skills = lib.filterAttrs (name: _: lib.hasPrefix ".agents/skills/" name) home.config.home.file;
 in
 assert enabled.aurPackages == [ "openai-codex-bin" ];
+assert enabled.requiredPackages == [ "ollama" ];
 assert disabled.aurPackages == [ ] && disabled.homeModule.home.file == { };
+assert disabled.requiredPackages == [ ];
 assert
   (ai {
     enable = true;
@@ -136,8 +141,23 @@ assert lib.all (name: !(valid name { enable = "true"; }) && !(valid name { typo 
   "virtualization"
 ];
 assert !(valid "ai" { codex.enabel = true; });
+assert !(valid "ai" { ollama.keepAlive = -2; });
+assert !(valid "ai" { ollama.proxy.httpsPort = 0; });
+assert !(valid "ai" { ollama.vulkan.visibleDevices = [ ]; });
+assert
+  !(valid "ai" {
+    ollama.vulkan.visibleDevices = [
+      0
+      0
+    ];
+  });
 assert !(valid "virtualization" { kvm.enabel = true; });
 assert builtins.elem "openai-codex-bin" native.aur;
+assert lib.all (name: builtins.elem name native.pacman) [
+  "ollama"
+  "ollama-vulkan"
+  "caddy"
+];
 assert builtins.elem "qemu-desktop" native.pacman && builtins.elem "podman" native.pacman;
 assert
   lib.filterAttrs (name: _: lib.hasPrefix ".agents/skills/" name) homeDisabled.config.home.file

@@ -109,9 +109,13 @@ fi
 system_settings() {
   native sudo "$system_python" "$system_adapter" "$system_manifest" "$1"
 }
+ai_settings() {
+  native sudo "$ai_python" "$ai_adapter" "$ai_manifest" "$1"
+}
 # Read-only ownership preflight precedes package/configuration writes. A second
 # pass after updates checks newly installed native tools and configuration.
 system_settings preflight
+ai_settings preflight
 if ((update_system)); then resolve_inventory; fi
 
 root_state="$fs_root/var/lib/nix-config/arch"
@@ -222,6 +226,7 @@ for service in "${system_units[@]}"; do
     actions=$((actions + 1))
   fi
 done
+ai_settings converge
 if ((${manage_network:-1})) && [[ -e $root_state/network.pending ]]; then
   root systemctl restart NetworkManager.service
   root rm -- "$root_state/network.pending"

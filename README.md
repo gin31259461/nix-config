@@ -40,6 +40,9 @@ include time synchronization, journal, console, logind and TRIM policy; review
 [adoption prerequisites](docs/system-settings.md) before deploying. The selected
 Wi-Fi hotspot adopts a prepared NetworkManager connection; see
 [hotspot preparation](docs/hotspot.md) for local credential setup and recovery.
+The native Ollama/Vulkan capability and optional tailnet proxy require explicit
+[AI service preparation](docs/ai.md), including review of the Ollama GPU ID and
+existing Tailscale Serve routes.
 
 ## Build and use
 
@@ -68,7 +71,8 @@ It never registers Runners or removes packages automatically. A kernel mismatch
 requires reboot and retry. See [deployment recovery](docs/deployment.md),
 [desktop/storage preparation](docs/desktop-session.md),
 [Noctalia preference exchange](docs/noctalia-config.md) and
-[Runner operations](docs/runners.md) for live workflows.
+[Runner operations](docs/runners.md) for live workflows. Ollama, Caddy and Serve
+checks and recovery are documented in [AI service operations](docs/ai.md).
 
 `just arch-workstation` and `just arch-workstation update` are shortcuts;
 `nix run .#just -- <recipe>` works before Home Manager activation.

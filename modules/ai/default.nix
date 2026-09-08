@@ -1,5 +1,10 @@
 { lib, config }:
+let
+  ollama = config.enable && config.ollama.enable;
+in
 {
+  inherit ollama;
+  requiredPackages = lib.optionals ollama [ "ollama" ];
   aurPackages = lib.optionals (config.enable && config.codex.enable) (import ./packages.nix);
   homeModule = {
     home.file = lib.optionalAttrs (config.enable && config.skillsPresets.enable) (

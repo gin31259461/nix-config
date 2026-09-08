@@ -72,6 +72,9 @@
         modulePackages = runners.requiredPackages ++ virtualization.requiredPackages;
         systemSettings = archHost.systemSettings;
         moduleAurPackages = ai.aurPackages;
+        aiPackages = ai.requiredPackages;
+        aiVulkan = ai.ollama && archHost.hardware.graphics == "amd" && archHost.ai.ollama.vulkan.enable;
+        aiProxy = ai.ollama && archHost.ai.ollama.proxy.enable && capabilities.tailscale;
       };
       arch-switch = import ./platforms/arch/package.nix {
         inherit
@@ -86,6 +89,7 @@
         username = deployment.username;
         packages = nativePackages;
         hardware = archHost.hardware;
+        aiConfig = archHost.ai;
       };
       home-switch = import ./lib/deployment/home/package.nix {
         inherit pkgs;

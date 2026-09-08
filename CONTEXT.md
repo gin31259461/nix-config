@@ -41,8 +41,11 @@ from that intent and combines them with optional Module dependencies.
 Application instances remain private to their Module and Host declaration.
 
 The Host selects `programs.ai` and `virtualisation` through typed default-on
-parent and child enable switches. AI exports AUR requirements and a shared Home Manager module
-for skill presets. Virtualization exports native package requirements and login
+parent and child enable switches. AI exports native Ollama requirements, an
+AMD-derived Vulkan backend, an optional Caddy/Tailscale Serve adapter, Codex AUR
+requirements and a shared Home Manager module for skill presets. The AI adapter
+owns its service policy and loopback proxy while reusing Arch's Tailscale owner.
+Virtualization exports native package requirements and login
 groups for QEMU/KVM and Podman use. Its optional KVM GUI also exports the local
 libvirt socket for Arch to converge. Arch realizes these values; Runner
 requirements remain independent of the login-user virtualization selection.

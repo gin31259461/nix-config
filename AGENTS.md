@@ -62,6 +62,11 @@ fixtures, Git and the Nix store.
 - False withdraws Arch declarations without retiring existing files, packages,
   services, registrations or pending actions. Home Manager retains its normal
   managed-generation transition semantics; never add application-data cleanup.
+- AI false selections leave Ollama/Caddy files, services, models and Tailscale
+  Serve routes untouched. Select Vulkan devices from Ollama's own numeric IDs;
+  do not infer its ordinal from generic Vulkan inventory order. Keep Ollama and
+  Caddy loopback-only, preserve Caddy sites during adoption, and never reset
+  unrelated Serve configuration.
 - Compare content and metadata before writes. Persist pending actions before
   mutation and clear only after success. Repair runtime drift on repeat runs.
   Lock mutations and preserve active lock inodes.

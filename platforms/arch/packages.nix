@@ -3,6 +3,9 @@
   hardware,
   capabilities ? import ../../lib/default-capabilities.nix,
   modulePackages ? [ ],
+  aiPackages ? [ ],
+  aiVulkan ? false,
+  aiProxy ? false,
   systemSettings ? { },
   moduleAurPackages ? [ ],
 }:
@@ -152,6 +155,9 @@
     ++ lib.optionals ((systemSettings.timeZone or null) != null) [ "tzdata" ]
     ++ lib.optionals ((systemSettings.console or null) != null) [ "kbd" ]
     ++ modulePackages
+    ++ aiPackages
+    ++ lib.optional aiVulkan "ollama-vulkan"
+    ++ lib.optional aiProxy "caddy"
   );
 
   lizardbyte = lib.optional (

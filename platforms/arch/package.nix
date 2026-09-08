@@ -7,9 +7,21 @@
   hardware,
   capabilities ? import ../../lib/default-capabilities.nix,
   systemSettings ? null,
+  aiConfig ? null,
   moduleGroups ? [ ],
   moduleSystemUnits ? [ ],
 }:
+let
+  ai =
+    if aiConfig == null then
+      null
+    else
+      import ./ai {
+        inherit pkgs hardware;
+        config = aiConfig;
+        tailscale = capabilities.tailscale;
+      };
+in
 pkgs.writeShellApplication {
   name = "arch-switch";
   runtimeInputs = with pkgs; [
@@ -38,6 +50,22 @@ pkgs.writeShellApplication {
         pkgs.writeText "unmanaged-system.json" "{}"
       else
         systemSettings.manifest
+    }
+    readonly ai_python=${pkgs.python3}/bin/python3
+    readonly ai_adapter=${
+      lib.fileset.toSource {
+        root = ./.;
+        fileset = lib.fileset.unions [
+          ./ai/runtime.py
+          ./system/files.py
+        ];
+      }
+    }/ai/runtime.py
+    readonly ai_manifest=${
+      if ai == null then
+        pkgs.writeText "unmanaged-ai.json" (builtins.toJSON { ollama = false; })
+      else
+        ai.manifest
     }
     readonly fs_root=""
     readonly native_bin=/usr/bin
