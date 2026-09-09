@@ -31,6 +31,11 @@ adjacent-backup arguments. `home-switch` alone accepts `--verbose` and
 `--dry-run`; a home dry run does not preview Arch changes. A deployment profile
 labels the complete user composition, not a subset of selected profiles.
 
+The `just arch-workstation` shortcut accepts `update` and `verbose` as
+independent options in either order. It validates them before building and maps
+them to the wrapper's canonical `--update --verbose` order. Unknown and repeated
+options are rejected.
+
 ## Understand the boundary between stages
 
 The deployment artifact includes the built Home Manager activation package.

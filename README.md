@@ -74,7 +74,10 @@ requires reboot and retry. See [deployment recovery](docs/deployment.md),
 [Runner operations](docs/runners.md) for live workflows. Ollama, Caddy and Serve
 checks and recovery are documented in [AI service operations](docs/ai.md).
 
-`just arch-workstation` and `just arch-workstation update` are shortcuts;
+`just arch-workstation` accepts composable `update` and `verbose` options; for
+example, `just arch-workstation update verbose` performs a full system update
+and enables verbose Home Manager activation output. The options may be supplied
+in either order. These are shortcuts;
 `nix run .#just -- <recipe>` works before Home Manager activation.
 `arch-switch`, `home-switch`, and enabled `noctalia-config` / `runnerctl` outputs
 also provide their separate interfaces. Inspect live state only deliberately;

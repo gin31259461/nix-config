@@ -20,12 +20,34 @@ check-arch:
 build deployment="arch-workstation":
     nix build --no-link ".#{{ deployment }}"
 
-# Build and activate the Arch workstation; pass `update` for a full system update.
-arch-workstation mode="switch": (build "arch-workstation")
+# Build and activate the Arch workstation; combine `update` and `verbose` as needed.
+arch-workstation option1="" option2="":
     #!/usr/bin/env bash
     set -euo pipefail
-    case '{{ mode }}' in
-      switch) nix run .#arch-workstation ;;
-      update) nix run .#arch-workstation -- --update ;;
-      *) printf 'usage: just arch-workstation [update]\n' >&2; exit 2 ;;
-    esac
+    readonly usage='usage: just arch-workstation [update] [verbose]'
+    options=({{ quote(option1) }} {{ quote(option2) }})
+    deployment_args=()
+    update_seen=0
+    verbose_seen=0
+    for option in "${options[@]}"; do
+      case "$option" in
+        '') ;;
+        update)
+          (( update_seen == 0 )) || { printf '%s\n' "$usage" >&2; exit 2; }
+          update_seen=1
+          ;;
+        verbose)
+          (( verbose_seen == 0 )) || { printf '%s\n' "$usage" >&2; exit 2; }
+          verbose_seen=1
+          ;;
+        *) printf '%s\n' "$usage" >&2; exit 2 ;;
+      esac
+    done
+    (( update_seen == 0 )) || deployment_args+=(--update)
+    (( verbose_seen == 0 )) || deployment_args+=(--verbose)
+    nix build --no-link .#arch-workstation
+    if ((${#deployment_args[@]})); then
+      nix run .#arch-workstation -- "${deployment_args[@]}"
+    else
+      nix run .#arch-workstation
+    fi

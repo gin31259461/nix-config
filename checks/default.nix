@@ -34,14 +34,47 @@
     touch "$out"
   '';
   justfile =
+    let
+      fakeNix = pkgs.writeShellScriptBin "nix" ''
+        printf '%s\n' "$*" >> "$JUST_NIX_LOG"
+      '';
+    in
     pkgs.runCommand "justfile-check"
       {
-        nativeBuildInputs = [ pkgs.just ];
+        nativeBuildInputs = [
+          pkgs.bash
+          pkgs.coreutils
+          pkgs.just
+          fakeNix
+        ];
       }
       ''
         just --justfile ${../Justfile} --summary > "$out"
         grep -Fxq 'arch-workstation build check check-arch check-fast default' "$out"
-        just --justfile ${../Justfile} --dry-run arch-workstation update >> "$out" 2>&1
-        grep -Fq 'nix run .#arch-workstation -- --update' "$out"
+
+        export JUST_NIX_LOG="$TMPDIR/nix.log"
+        run_recipe() {
+          just --justfile ${../Justfile} --dry-run arch-workstation "$@" 2>&1 |
+            tail -n +2 |
+            bash
+        }
+        run_recipe verbose update
+        grep -Fxq 'build --no-link .#arch-workstation' "$JUST_NIX_LOG"
+        grep -Fxq 'run .#arch-workstation -- --update --verbose' "$JUST_NIX_LOG"
+
+        : > "$JUST_NIX_LOG"
+        run_recipe update verbose
+        grep -Fxq 'run .#arch-workstation -- --update --verbose' "$JUST_NIX_LOG"
+
+        : > "$JUST_NIX_LOG"
+        run_recipe
+        grep -Fxq 'build --no-link .#arch-workstation' "$JUST_NIX_LOG"
+        grep -Fxq 'run .#arch-workstation' "$JUST_NIX_LOG"
+        test "$(wc -l < "$JUST_NIX_LOG")" -eq 2
+
+        : > "$JUST_NIX_LOG"
+        if run_recipe update update; then exit 1; fi
+        if run_recipe unknown; then exit 1; fi
+        test ! -s "$JUST_NIX_LOG"
       '';
 }

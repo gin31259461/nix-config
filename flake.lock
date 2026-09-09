@@ -40,11 +40,11 @@
     "neovim-config": {
       "flake": false,
       "locked": {
-        "lastModified": 1787037298,
-        "narHash": "sha256-vd0DhVWPUa7kbxsgVUOObKP+t7PgVmW8xTt21zfJZsw=",
+        "lastModified": 1788888429,
+        "narHash": "sha256-pvsBOk8DwRJ2+iE6J7lWMdSVyp370tyGZypIQTySX3o=",
         "owner": "Orbit-Lua",
         "repo": "orbitvim",
-        "rev": "3fc751c1bad2bddd8e27784dd5ed245ed542bec2",
+        "rev": "85783223424d2dee6d29d403b783a6461d5d771c",
         "type": "github"
       },
       "original": {
