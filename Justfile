@@ -29,15 +29,15 @@ prepare-ai mode="":
     #!/usr/bin/env bash
     set -euo pipefail
     case {{ quote(mode) }} in
-      '') exec sudo nix run --show-trace --print-build-logs .#llama-prepare ;;
-      build) exec sudo nix run --show-trace --print-build-logs .#llama-prepare -- --build-only ;;
-      model) exec sudo nix run --show-trace --print-build-logs .#llama-prepare -- --model-only ;;
+      '') exec sudo nix --extra-experimental-features 'nix-command flakes' run --show-trace --print-build-logs .#llama-prepare ;;
+      build) exec sudo nix --extra-experimental-features 'nix-command flakes' run --show-trace --print-build-logs .#llama-prepare -- --build-only ;;
+      model) exec sudo nix --extra-experimental-features 'nix-command flakes' run --show-trace --print-build-logs .#llama-prepare -- --model-only ;;
       *) printf '%s\n' 'usage: just prepare-ai [build|model]' >&2; exit 2 ;;
     esac
 
 # Reconcile one configured GitLab Runner instance before registration.
 prepare-runner instance:
-    sudo nix run --show-trace --print-build-logs .#runnerctl -- reconcile {{ quote(instance) }}
+    sudo nix --extra-experimental-features 'nix-command flakes' run --show-trace --print-build-logs .#runnerctl -- reconcile {{ quote(instance) }}
 
 # Register and verify one prepared GitLab Runner. Requires GITLAB_RUNNER_TOKEN.
 initialize-runner instance:
@@ -48,15 +48,15 @@ initialize-runner instance:
       exit 2
     }
     exec sudo --preserve-env=GITLAB_RUNNER_TOKEN \
-      nix run --show-trace --print-build-logs .#runnerctl -- register {{ quote(instance) }}
+      nix --extra-experimental-features 'nix-command flakes' run --show-trace --print-build-logs .#runnerctl -- register {{ quote(instance) }}
 
 # Verify a configured GitLab Runner instance.
 verify-runner instance:
-    sudo nix run --show-trace --print-build-logs .#runnerctl -- verify {{ quote(instance) }}
+    sudo nix --extra-experimental-features 'nix-command flakes' run --show-trace --print-build-logs .#runnerctl -- verify {{ quote(instance) }}
 
 # Show the current state of a configured GitLab Runner instance.
 status-runner instance:
-    sudo nix run --show-trace --print-build-logs .#runnerctl -- status {{ quote(instance) }}
+    sudo nix --extra-experimental-features 'nix-command flakes' run --show-trace --print-build-logs .#runnerctl -- status {{ quote(instance) }}
 
 # Build and activate the Arch workstation; combine update and verbose as needed.
 arch-workstation option1="" option2="":

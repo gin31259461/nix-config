@@ -27,9 +27,9 @@ just prepare-ai model
 Equivalent direct commands are:
 
 ```bash
-sudo nix run .#llama-prepare
-sudo nix run .#llama-prepare -- --build-only
-sudo nix run .#llama-prepare -- --model-only
+sudo nix --extra-experimental-features 'nix-command flakes' run .#llama-prepare
+sudo nix --extra-experimental-features 'nix-command flakes' run .#llama-prepare -- --build-only
+sudo nix --extra-experimental-features 'nix-command flakes' run .#llama-prepare -- --model-only
 ```
 
 Preparation builds the pinned llama.cpp revision, applies the reviewed grammar

@@ -9,7 +9,7 @@ case "${1:-}" in
   *) usage >&2; exit 2 ;;
 esac
 
-((EUID == 0)) || { printf 'run llama-prepare as root (sudo nix run .#llama-prepare)\n' >&2; exit 1; }
+((EUID == 0)) || { printf "run llama-prepare as root (sudo nix --extra-experimental-features 'nix-command flakes' run .#llama-prepare)\n" >&2; exit 1; }
 work=$(mktemp -d /var/tmp/nix-config-llama.XXXXXXXX)
 chmod 0700 "$work"
 trap 'rm -rf -- "$work"' EXIT
