@@ -12,6 +12,7 @@
       ''
         python ${./system}/tests/test_system.py
         python ${./system}/tests/test_hotspot.py
+        python ${./system}/tests/test_native.py ${./system}/native.py
         touch "$out"
       '';
   ai-services-tests = pkgs.runCommand "ai-services-tests" { nativeBuildInputs = [ pkgs.python3 ]; } ''
@@ -63,6 +64,7 @@
       }
       ''
         python ${./tests}/test_arch_switch.py ${./.}/arch-switch.sh
+        python ${./tests}/test_optional_lifecycle.py ${./.}/arch-switch.sh
         touch "$out"
       '';
 }
