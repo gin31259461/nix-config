@@ -1,118 +1,86 @@
-# Operate GitLab Runners
+# GitLab Runners
 
-Use `services.gitlabRunner.instances` in [configuration.nix](../configuration.nix).
-The Host supplies baseline declarations from
-[gitlab-runners.nix](../hosts/arch/gitlab-runners.nix); ordinary entry definitions
-can override them. Both `services.gitlabRunner.enable` and each instance's
-`enable` default to true. Set either false to withdraw the corresponding
-controller declarations without deleting accounts, registrations or containers.
-Zero enabled instances exports no controller or native requirements.
+GitLab Runner instances are declared under `services.gitlabRunner.instances`.
+The current Host defines `frontend` and `dotnet`. Each enabled instance owns a
+dedicated service account, subordinate UID/GID ranges, rootless Podman runtime,
+manager container, service and GitLab registration.
 
-The [Module](../modules/gitlab-runner/interface.nix) derives dedicated accounts,
-homes and service names and validates UID, image and subordinate-ID declarations.
-Its fixed security policy is not an option to weaken.
+Runner lifecycle is separate from workstation deployment. `just arch-workstation`
+installs selected native dependencies when run with `update`, but never creates or
+registers Runner instances.
 
-Runner operations are explicit and separate from workstation deployment.
-All commands below using `runnerctl` inspect or mutate live state; source
-validation uses `nix flake check` instead.
-
-## Prepare an instance
-
-Deploy native requirements through the workstation's explicit update workflow.
-Then build the controller and select one exact instance (`frontend` is declared
-by the current Host):
+## Prepare
 
 ```bash
-runnerctl_path="$(nix build --no-link --print-out-paths .#runnerctl)"
-sudo "$runnerctl_path/bin/runnerctl" status frontend
-sudo "$runnerctl_path/bin/runnerctl" check frontend
-sudo "$runnerctl_path/bin/runnerctl" reconcile frontend
+just prepare-runner frontend
+just prepare-runner dotnet
 ```
 
-`status` reports state. `check` inspects native prerequisites, required network
-interface readiness and GitLab health. `reconcile` converges the dedicated
-account, subordinate IDs, runtime, Podman socket, manager image, configuration
-and service. It preserves a single existing registration and rejects conflicting
-ownership or supplementary host roles. Existing service accounts must have a
-locked password, checked through the native password-status command without
-reading password hashes. An unlocked or passwordless existing account requires
-explicit ownership review; reconciliation does not silently adopt it.
+Preparation maps to `runnerctl reconcile`. It creates or validates the dedicated
+account, subordinate IDs, runtime directories, rootless Podman socket, manager
+configuration and user service. Existing resources with conflicting ownership,
+UIDs, groups or registration state are rejected rather than replaced.
 
-Each manager can mount only its own rootless Podman socket. Jobs are unprivileged,
-use concurrency one and per-job networks, and receive no host socket. Required
-interfaces indicate readiness; configure routing separately.
+Before reconciliation, the required network interface declared for the instance
+must be available. Current instances require `tailscale0`.
 
-## Register and verify
+## Initialize registration
 
-If registration is absent, create the Runner in GitLab and set tags, protection,
-locking and scheduling policy there. Read the authentication token into the
-environment rather than embedding it in command arguments:
+Create the Runner in GitLab and obtain its Runner authentication token. Keep the
+token in the process environment only for the registration command:
 
 ```bash
 read -rsp 'GitLab Runner token: ' GITLAB_RUNNER_TOKEN
 export GITLAB_RUNNER_TOKEN
-sudo --preserve-env=GITLAB_RUNNER_TOKEN \
-  "$runnerctl_path/bin/runnerctl" register frontend
+just initialize-runner frontend
 unset GITLAB_RUNNER_TOKEN
 ```
 
-Registration output is withheld to protect credentials. An existing registration
-with a different token is rejected. Verify the registered instance explicitly:
+`initialize-runner` preserves `GITLAB_RUNNER_TOKEN` through sudo only for the
+`runnerctl register` invocation. Do not store tokens in `configuration.nix`, Git,
+Nix derivations, command arguments or logs.
+
+An existing registration with a different token is rejected. Registration
+requires prior reconciliation.
+
+## Verify and inspect
 
 ```bash
-sudo "$runnerctl_path/bin/runnerctl" verify frontend
+just verify-runner frontend
+just status-runner frontend
+
+just verify-runner dotnet
+just status-runner dotnet
 ```
 
-Verification checks the manager, registration, isolation and a disposable job
-network, which is also removed after failure. Manager inspection compares the
-running image ID against the declared local image and checks all three managed
-bind mounts, including the exact instance socket, plus network and privilege
-settings. `status` reports `container=matches-declaration`, `drifted` or `absent`;
-it does not claim a complete security audit. Raw inspect data is never printed.
-The manager disables implicit image volumes so its mount set is explicit.
-Reconciliation restarts a drifted running manager and retains a pending marker
-if that repair fails. It is not a source-only test.
-Never copy real tokens or registration metadata into expressions, fixtures,
-logs, Git or the Nix store.
+Verification checks the dedicated registration, service state, manager image and
+mount isolation, rootless Podman socket, GitLab health and a disposable job
+network. `status` reports the current account, subordinate IDs, socket, service,
+container and registration states without printing registration metadata.
 
-## Recover and maintain
+Jobs remain unprivileged, use per-job networks and do not receive the host Podman
+socket. Manager access is limited to the instance's own rootless socket.
 
-Mutations share `/run/lock/nix-config-runner.lock` to serialize updates to shared
-subordinate-ID files across instances. Keep the lock inode; unrelated
-administrative tools are not coordinated by it.
+## Recovery
 
-Managed file operations walk directories without following symlinks and hold
-directory descriptors through reads, replacement, metadata changes and removal.
-Symlinks, hard-linked managed files and unexpected file types are rejected.
-If a path is rejected, preserve the conflicting state and resolve its ownership
-before retrying; the controller does not move or delete it automatically.
-Registration metadata is parsed only from the single TOML Runner table; malformed
-or ambiguous registrations stop convergence with content-free diagnostics.
+Runner mutations share `/run/lock/nix-config-runner.lock`. Managed configuration
+writes reject symlinks, hard-linked files and unexpected file types. Reconcile
+and trust operations retain private pending markers inside the instance config
+directory when interrupted.
 
-Atomic writes preserve matching files and sync replacement directories. Instance config directories hold
-`.reconcile.pending` for unfinished manager actions and `.trust.pending` for
-CA refreshes. Leave these markers and registration state intact when an
-operation fails; correct the cause and rerun the same instance operation.
+Correct the reported cause and rerun the same operation. Do not remove
+registrations, service accounts, subordinate-ID entries or pending markers merely
+to make a retry succeed.
 
-Native commands time out after five minutes by default; registration uses two
-minutes and direct status queries use thirty seconds. A timeout can leave
-partial work, so do not erase registration data as a recovery shortcut.
+Disabling an instance withdraws its controller and package requirements. It does
+not delete the account, container, registration or runtime data.
 
-Image tags are explicit but not immutable content hashes. The manager uses an
-existing local image when available. Change image policy in the Host or owning
-Module, validate the source, then reconcile the affected instance explicitly.
-No purge or automatic retirement workflow is provided.
+## Source validation
 
-## Change the implementation
+```bash
+just check
+nix build --no-link --show-trace --print-build-logs .#runnerctl
+```
 
-| Owner | Responsibility |
-| --- | --- |
-| `interface.nix` | Normalize Host declarations |
-| `runner_model.py` | Validate normalized data and render configuration |
-| `host_io.py` | Private process, atomic-file and locking primitives |
-| `runnerctl.py` | Lifecycle orchestration |
-| `tests/` | Independent declarations and isolated fake-runtime tests |
-
-These files live under [modules/gitlab-runner](../modules/gitlab-runner).
-Use `nix flake check` for source validation; live status, reconciliation and
-registration cannot substitute for those tests.
+Runner tests use isolated declarations and fake runtime operations; they do not
+register or mutate a live GitLab Runner.

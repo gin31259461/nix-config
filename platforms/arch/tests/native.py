@@ -39,6 +39,9 @@ if command == "python":
         ["/fixture/ai-adapter", "/fixture/ai-manifest"],
     )
     assert args[2] in ("preflight", "converge")
+    assert len(args) == 3 or args[3:] == ["--verbose"]
+    if args[0] == "/fixture/ai-adapter" and state.get("ai_not_ready"):
+        sys.exit(20)
 elif command == "id":
     print(
         state.get("user", "tester")
