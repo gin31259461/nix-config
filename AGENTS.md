@@ -32,12 +32,12 @@ when an explicit adapter readiness result proves that required preparation has
 not completed. Never convert ownership conflicts, invalid state, command
 failures or runtime drift into optional skips.
 
-All privileged Python native commands use the shared Arch native adapter.
+Privileged Arch deployment adapters use the shared native command adapter.
 Failures must preserve command, exit status, stdout and stderr. `--verbose` must
-reach both Nix orchestration and privileged adapters. Do not introduce a new
-subprocess wrapper that silently captures or discards diagnostics. Sensitive
-values must be specifically redacted rather than suppressing an entire command's
-output.
+reach both Nix orchestration and privileged deployment adapters. Do not introduce
+a deployment subprocess wrapper that silently captures or discards diagnostics.
+For token-bearing registration commands outside workstation deployment, preserve
+the existing non-logging policy unless a proven redaction path is added.
 
 Routine deployment never installs packages. Only explicit `--update` permits the
 full pacman update and AUR convergence. Preserve the running-kernel gate, pending
