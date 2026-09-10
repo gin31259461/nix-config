@@ -8,7 +8,6 @@ from pathlib import Path
 import sys
 import traceback
 
-sys.path.insert(0, str(Path(__file__).parents[1] / "system"))
 import runtime
 from files import Conflict
 from native import Native
