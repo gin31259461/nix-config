@@ -16,11 +16,15 @@ class Native:
 
     Normal operation captures output because callers inspect stdout. On failure,
     both streams are attached to the raised Conflict. Verbose operation also
-    prints the command and captured streams so adapter activity is observable.
+    prints each command and its complete captured streams.
     """
 
-    def __init__(self, *, verbose: bool = False, timeout: int = 300):
-        self.verbose = verbose
+    def __init__(self, *, verbose: bool | None = None, timeout: int = 300):
+        self.verbose = (
+            os.environ.get("NIX_CONFIG_VERBOSE") == "1"
+            if verbose is None
+            else verbose
+        )
         self.timeout = timeout
 
     @staticmethod
