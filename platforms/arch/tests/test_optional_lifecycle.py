@@ -38,9 +38,7 @@ class OptionalLifecycleTests(unittest.TestCase):
     def test_verbose_reaches_both_privileged_adapters(self):
         self.invoke("--verbose")
         adapter_calls = [
-            call
-            for call in self.commands()
-            if call and call[0] == "python"
+            call for call in self.commands() if call and call[0] == "python"
         ]
         self.assertTrue(adapter_calls)
         self.assertTrue(all(call[-1] == "--verbose" for call in adapter_calls))
