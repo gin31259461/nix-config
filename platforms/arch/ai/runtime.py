@@ -2,14 +2,13 @@
 
 import json
 import os
-from pathlib import Path
 import subprocess
 import sys
 import time
+from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parents[1] / "system"))
 from files import Conflict, Files  # noqa: E402
-
 
 PACKAGE_CADDY = """# The Caddyfile is an easy way to configure your Caddy web server.
 #
@@ -88,7 +87,9 @@ class Native:
         except (OSError, subprocess.TimeoutExpired):
             raise Conflict(f"native {args[0]} unavailable or timed out") from None
         if check and result.returncode:
-            raise Conflict(f"native {args[0]} failed; pending action retained ${result.stderr.strip() or result.stdout.strip()}")
+            raise Conflict(
+                f"native {args[0]} failed; pending action retained ${result.stderr.strip() or result.stdout.strip()}"
+            )
         return result
 
 
@@ -293,7 +294,7 @@ RestartSec=3
             self.run("systemctl", "daemon-reload")
             self.actions += 1
         self.ensure_service("llama-server.service", "ai-llama", restart=pending)
-        self._curl_ready(d['server']['port'])
+        self._curl_ready(d["server"]["port"])
         f.clear("ai-llama")
         if d["proxy"]:
             self.write("/etc/caddy/Caddyfile", self.caddy_main(), "ai-caddy")
@@ -340,7 +341,7 @@ RestartSec=3
                 )
                 self.actions += 1
             f.clear("ai-caddy")
-            self._curl_ready(d['localPort'])
+            self._curl_ready(d["localPort"])
             status = self.run("tailscale", "serve", "status", "--json").stdout
             target = f"http://127.0.0.1:{d['localPort']}"
             port = str(d["httpsPort"])
