@@ -1,146 +1,89 @@
 # AGENTS Instructions
 
-## Change the declared source
+## Work from declared ownership
 
-- Work in the normal `~/.config/nix` checkout; preserve unrelated edits. Read
-  [CONTEXT.md](CONTEXT.md) before changing composition or terminology.
-- Use `configuration.nix` as the explicit selected Host entry point. Declare
-  typed, grouped options in their owning interface; use `mkDefault` for Host
-  baselines and ordinary definitions for user overrides. Do not use import order
-  as override precedence or silently accept unknown fields.
-- Default public capability enable options to true. Gate every owned contribution
-  with its effective parent/child selection. Keep required identity and fixed
-  security policy constrained; never add switches that weaken Runner isolation.
-- Implement behavior before documenting it. Stage exact intended paths before
-  flake evaluation; exclude result links, registries, mutable state and secrets.
-- Use scoped Conventional Commits: `type(scope): imperative subject`.
-  Name executable packaging `package.nix`, inventories `packages.nix`, Python
-  tests `tests/test_*.py`; update imports, checks and docs when ownership moves.
+Read [CONTEXT.md](CONTEXT.md) before changing composition. `configuration.nix` is
+the selected Host entry. Public options belong in their owning typed interface;
+Host baselines use `lib.mkDefault`, while user overrides use ordinary module
+definitions. Do not use import order as precedence or accept unknown fields.
 
-## Respect module and platform ownership
+Keep one owner per package, file, account and service:
 
-| Owner | Responsibility and boundary |
+| Path | Owner |
 | --- | --- |
-| `flake.nix` | Explicit Host selection and output wiring; no directory discovery, implicit overlays or inline checks |
-| `configuration.nix`, `hosts/<name>/` | Entry overrides; Host defaults, identity, human users, hardware intent and instance values |
-| `lib/configuration-options.nix`, `lib/eval-configuration.nix` | Typed composition and normalization into private adapter values; no native convergence |
-| `platforms/arch/` | Arch realization, native inventories and pacman repositories; consume declared policy |
-| `profiles/` | Reusable home bundles; no Host names, hardware policy, secrets, service accounts or Runner instances |
-| `homes/<user>/` | Reviewed user differences; shared behavior stays in its Module |
-| `modules/home/` | Shared home behavior and graphical unit policy using Arch-owned executables |
-| `modules/gitlab-runner/` | Runner interface, derived identities, fixed security, native requirements, runtime and private tests |
-| `checks/`, Module checks | Source validation with isolated fixtures, never the real machine |
+| `flake.nix` | Output wiring and explicit composition |
+| `configuration.nix`, `hosts/` | Host selection, identity, hardware and instance values |
+| `lib/` | Schema evaluation, normalization and deployment composition |
+| `platforms/arch/` | Arch-native packages, services and privileged adapters |
+| `modules/` | Capability interfaces and feature-owned implementations |
+| `profiles/`, `homes/` | Reusable and user-specific Home Manager composition |
+| `checks/` | Isolated source validation |
+| `docs/` | Current operator procedures only |
 
-Keep one owner per package, file, account and service. Hide fixed policy behind
-small interfaces and keep test dependencies private. Arch owns Nix, graphical
-and session binaries, core OS packages, drivers, kernel integration, PAM, polkit
-and system services. Home Manager owns portable CLI/development packages, static
-files and safe user-unit policy. Graphical units call `/usr/bin` or `/usr/lib`;
-do not add desktop binaries or GPU wrappers to the home profile. Keep `nix.conf`
-directly tracked, never Home Manager-generated. Provision human accounts before
-deployment; service accounts never receive a home composition.
+Arch owns system packages, `/etc`, system services, kernel integration, PAM,
+polkit and native networking. Home Manager owns portable user packages, static
+home files and safe user services. Service accounts never receive a human home
+composition.
 
-## Keep live state outside source validation
+## Preserve deployment contracts
 
-Source builds do not authorize deployment. Bootstrap, Arch/Home Manager
-activation, package managers, service changes and Runner mutations require a
-task that includes that live state. Inspect the exact target before an authorized
-mutation. Runner status/check, Arch inventory queries and Noctalia capture/deploy
-dry runs also inspect external state; never use them as source tests or retire
-repositories during validation.
+Core deployment prerequisites fail fast. Optional modules may be skipped only
+when an explicit adapter readiness result proves that required preparation has
+not completed. Never convert ownership conflicts, invalid state, command
+failures or runtime drift into optional skips.
 
-Never read or print KeePassXC databases/INI files, systemd credentials, Runner
-tokens/config, private keys or ignored secrets. Keep authentication and
-registration material out of expressions, derivations, arguments, logs,
-fixtures, Git and the Nix store.
+Privileged Arch deployment adapters use the shared native command adapter.
+Failures must preserve command, exit status, stdout and stderr. `--verbose` must
+reach both Nix orchestration and privileged deployment adapters. Do not introduce
+a deployment subprocess wrapper that silently captures or discards diagnostics.
+For token-bearing registration commands outside workstation deployment, preserve
+the existing non-logging policy unless a proven redaction path is added.
 
-## Preserve convergence and recovery
+Routine deployment never installs packages. Only explicit `--update` permits the
+full pacman update and AUR convergence. Preserve the running-kernel gate, pending
+action markers, mutation lock and idempotent repeat behavior. A disabled
+capability withdraws management but does not retire existing packages, files,
+services, registrations or application data.
 
-- Routine `arch-switch` only checks installed packages; missing packages exit 3.
-  Only explicit `--update` permits full `pacman -Syu` then AUR convergence.
-  Preserve the running-kernel/reboot gate.
-- False withdraws Arch declarations without retiring existing files, packages,
-  services, registrations or pending actions. Home Manager retains its normal
-  managed-generation transition semantics; never add application-data cleanup.
-- AI false selections leave llama.cpp/Caddy files, services, models and Tailscale
-  Serve routes untouched. Keep llama.cpp and
-  Caddy loopback-only, preserve Caddy sites during adoption, and never reset
-  unrelated Serve configuration.
-- Compare content and metadata before writes. Persist pending actions before
-  mutation and clear only after success. Repair runtime drift on repeat runs.
-  Lock mutations and preserve active lock inodes.
-- Preserve unowned mkinitcpio settings; manage only the marked module addition.
-  Derive hardware intent from the Host, never loaded-module detection. Disabled
-  initramfs management leaves the existing addition and receipt untouched.
-- Deployment profile names label the complete user composition, never a
-  profile-selection mode. Do not add generic cleanup, automatic garbage
-  collection, package removal, directory backup services or Runner purge.
+AI preparation remains explicit. The prepared llama.cpp selector, build receipt
+and model must match the declaration before service convergence. Caddy and
+llama-server remain loopback-only; unrelated Tailscale Serve configuration is
+not overwritten.
 
-## Preserve desktop relationships and private data
+GitLab Runner remains outside workstation deployment. Each enabled instance owns
+one service account, subordinate ID ranges, rootless Podman runtime, manager and
+registration. Preserve unprivileged jobs, isolated sockets and fixed security
+policy. Registration tokens must not enter Git, Nix derivations or unredacted
+logs.
 
-- Keep UWSM as Hyprland's entry point and one startup owner per application.
-  Do not copy package units or track generated `.wants/` links; use drop-ins at
-  canonical package unit names.
-- KeePassXC starts minimized and unlocks manually. Preserve its bounded tray-host
-  wait and degraded startup. Do not deliver credentials, probe unlocked
-  collections or restart the vault to repair an icon.
-- Noctalia starts independently of KeePassXC and uses a runtime file key.
-  Prepare storage offline, preserve archives and never regenerate a missing
-  established key.
-- Tray consumers follow Noctalia. Keep Vicinae's bounded degraded wait and coupled
-  lifetime so it releases the watcher before shell shutdown. Do not propagate
-  shell restarts to Vesktop/KeePassXC or restore Remmina applet autostart. Keep
-  Vesktop compatibility flags app-specific. Disabled consumers leave no Wants
-  edge from Noctalia to their absent units.
-- `modules/home/noctalia-config/` owns preference exchange and tests;
-  `homes/<user>/noctalia/config.toml` owns reviewed preferences. Home Manager alone
-  deploys the config link. Never copy GUI state wholesale, silently discard
-  overrides or bypass validation warnings. Report safe diagnostic context only;
-  raw warnings may contain private settings.
-- Override replacement requires stopped Noctalia, a private recovery receipt and
-  preservation of unowned sections. Capture edits the repository snapshot, not
-  live overrides; dry runs still inspect live settings.
-- Link the locked Neovim input as one directory. Project Hyprland recursively
-  into a writable non-VCS directory with preflight before home links change.
-  Reject worktrees and adjacent backups; never migrate or delete them.
-- Link each managed `~/.agents/skills/<name>` directory as a unit. Leaf-file
-  projection and adjacent backups can break discovery.
+## Preserve user data
 
-## Preserve Runner isolation
+Never read or print KeePassXC databases, credentials, private keys, Runner tokens
+or secret payloads. Noctalia storage keys and mutable application data stay
+outside source. Home activation must not become application-data cleanup.
 
-Runner remains optional even with default-on selection: zero enabled instances
-exports no controller or native requirements. Each instance owns one account,
-home, subordinate range, Podman socket, manager and registration. Reject
-range overlap and supplementary Host roles. Service accounts have no password,
-wheel membership, Home Manager profile or desktop policy.
+Keep UWSM as the Hyprland entry point and one startup owner per application. Do
+not copy package units or generated `.wants/` links. Keep project source trees
+outside managed runtime paths.
 
-A manager accesses only its own rootless Podman socket. Jobs receive no host
-socket, stay unprivileged and use concurrency one. These are fixed policy.
-Required interfaces indicate readiness, not routing. Removing or disabling an
-instance never authorizes runtime retirement. Login-user virtualization toggles
-must not suppress independent Runner requirements.
+## Validate changes
 
-## Validate contracts and maintain focused documents
-
-Use focused checks while editing; run the complete checks for composition or
-orchestration changes:
+Use focused checks during implementation and complete checks for composition,
+adapter or deployment changes:
 
 ```bash
-nix build --no-link .#checks.x86_64-linux.source-format
-nix flake check
+just check-fast
+just check
+just build
 nix build --no-link '.#homeConfigurations."abnertu@arch".activationPackage'
-nix build --no-link .#arch-switch .#runnerctl
 git diff --check
 ```
 
-Build optional outputs only when selected. Test stable interfaces, override
-priorities, parent/child disabling, security, repeat execution, failure recovery
-and generated unit relationships with temporary paths and fake native commands.
-Keep workflow linting in flake checks. `.github/workflows/check.yml` contains only
-source checks/builds, commit-pinned actions and read-only repository permissions.
+Tests use temporary paths, fake native commands and isolated VMs. Source checks
+must never mutate the real workstation. Build optional outputs only when their
+configuration exports them.
 
-Keep README as the user/developer entry point, `docs/` as operator procedures and
-recovery, CONTEXT as composition terminology, and this file as agent constraints.
-Link executable inventories instead of copying them. Omit retired migration
-narrative while preserving preparation and recovery. `files/home/AGENTS.md`
-remains the concise home-root source; repository-specific rules stay here.
+Keep documentation limited to current behavior. Delete superseded planning,
+research and migration documents instead of maintaining historical narratives.
+README is the entry point, `docs/` contains operator runbooks, CONTEXT defines
+composition, and this file contains repository change constraints.

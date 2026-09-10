@@ -1,177 +1,105 @@
 # Workstation deployment
 
-Run `arch-workstation` as the Host's selected login user on Arch Linux.
-The account must already exist with administrator membership, native Nix and
-`yay`, and the prerequisites checked by
-[arch-switch.sh](../platforms/arch/arch-switch.sh). Sudo performs system changes.
-Boot a kernel whose module directory exists before deployment.
+Run deployment as the Host's selected login user on Arch Linux. The account must
+already exist, belong to `wheel`, have native Nix and `yay`, and boot a kernel
+whose module directory is present.
 
-## Choose an operation
+## Commands
 
-| Command | Behavior |
+```bash
+# Source validation only.
+just check-fast
+just check
+
+# Build without activation.
+just build
+
+# Routine convergence.
+just arch-workstation
+
+# Install/upgrade declared native packages, then converge.
+just arch-workstation update
+
+# Complete Nix and adapter diagnostics.
+just arch-workstation verbose
+just arch-workstation update verbose
+```
+
+Routine deployment never installs missing packages. It exits 3 and lists the
+missing packages. `update` permits the full pacman upgrade followed by AUR
+convergence.
+
+`just arch-workstation` always enables Nix `--show-trace` and
+`--print-build-logs`. `verbose` additionally enables Nix `--verbose` and passes
+`--verbose` into the deployment artifact, Arch adapter and Home Manager.
+
+For direct execution with the same diagnostic level:
+
+```bash
+nix run --show-trace --print-build-logs --verbose .#arch-workstation -- --verbose
+```
+
+An app argument cannot change logging for Nix evaluation that occurred before
+the app started, so the Nix flags belong before the flake target and the adapter
+flag belongs after `--`.
+
+## Deployment order
+
+The built deployment fixes one Home Manager activation package before runtime.
+Execution then follows this order:
+
+1. Validate Arch, login identity, administrator group and native command set.
+2. Check installed package state and running-kernel compatibility.
+3. Preflight core system settings.
+4. Preflight optional native modules.
+5. If `--update` is selected, resolve inventories and update pacman/AUR packages.
+6. Converge core Arch system settings, files, groups and services.
+7. Converge optional modules that reported ready.
+8. Activate the exact built Home Manager generation.
+
+Core failures stop immediately. Optional modules may continue only when their
+adapter returns the dedicated `not ready` status. A highlighted `SKIP optional
+module ...` message records that decision. All other optional-module errors are
+fatal.
+
+GitLab Runner reconciliation and registration are not part of this workflow.
+See [runners](runners.md).
+
+## Failure and recovery
+
+| Result | Meaning |
 | --- | --- |
-| `nix build --no-link .#arch-workstation` | Build artifacts without activation |
-| `nix run .#arch-switch -- --check` | Resolve Arch, LizardByte and AUR inventories without system convergence |
-| `nix run .#arch-workstation` | Check installed packages, converge Arch, activate the home |
-| `nix run .#arch-workstation -- --update` | Resolve inventories, fully upgrade pacman packages, converge AUR and deploy |
+| Exit 2 | Invalid CLI arguments |
+| Exit 3 | Declared native packages are missing; rerun with `update` |
+| Exit 75 | Deployment lock is busy or the running kernel no longer matches installed modules |
+| Highlighted optional skip | The module is enabled but has not completed explicit preparation |
+| Adapter command failure | Inspect the complete command, stdout and stderr and correct the native cause |
 
-Inventory checks inspect external state and need connectivity. Routine package
-checks are local, though Nix may still download build dependencies. Native
-packages are not version-locked by the flake. Removing an inventory entry does
-not uninstall the package.
+Privileged system and AI adapters use the shared native command adapter. Failed
+commands include the executable, exit status, stdout and stderr. Timeout errors
+also preserve partial output. In verbose mode every native command and its
+captured output is printed.
 
-When Sunshine is selected, both deployment modes maintain its LizardByte pacman include; only
-`--update` installs or upgrades packages. Its signature exception is confined
-to that repository. Existing unmanaged repository declarations require explicit
-ownership reconciliation.
+Managed writes compare content and metadata and use atomic replacement. Actions
+that must follow a write are recorded under `/var/lib/nix-config/arch/` before
+mutation and cleared only after success. Leave pending markers intact after a
+failure; the next deployment retries the unfinished action.
 
-The wrapper accepts `--update` first and optional `--verbose`. Other arguments
-are rejected before Arch convergence, including source/target overrides and
-adjacent-backup arguments. `home-switch` alone accepts `--verbose` and
-`--dry-run`; a home dry run does not preview Arch changes. A deployment profile
-labels the complete user composition, not a subset of selected profiles.
+A pacman update that replaces the running kernel stops before later convergence
+when `/usr/lib/modules/$(uname -r)` is unavailable. Reboot into the installed
+kernel and rerun the same deployment command.
 
-The `just arch-workstation` shortcut accepts `update` and `verbose` as
-independent options in either order. It validates them before building and maps
-them to the wrapper's canonical `--update --verbose` order. Unknown and repeated
-options are rejected.
+The Arch stage and Home Manager stage do not share a rollback transaction. If
+Home Manager fails, completed Arch work remains applied; fix the reported home
+problem and rerun.
 
-## Understand the boundary between stages
+## Preparation dependencies
 
-The deployment artifact includes the built Home Manager activation package.
-At runtime, Arch convergence must succeed before Home Manager activation begins.
-`home-switch` activates that exact package with Home Manager driver version 0;
-its activation script manages the generation profile at the write boundary,
-after preflight. It does not re-evaluate the checkout. Source and target changes
-require building a new deployment artifact.
-A home failure leaves completed Arch work in place: fix the reported problem
-and rerun. These stages do not share a rollback transaction.
+The AI module requires explicit native/model preparation; see [AI service](ai.md).
+The selected hotspot requires a NetworkManager connection with local credentials;
+see [hotspot](hotspot.md). Noctalia's first storage activation has a user-session
+precondition; see [desktop session](desktop-session.md).
 
-First-time Noctalia storage preparation requires its service stopped; follow
-[desktop preparation](desktop-session.md#prepare-storage-on-a-new-home).
-Group membership changes require a new login session.
-The selected hotspot requires a prepared NetworkManager AP and local credentials;
-follow [hotspot preparation](hotspot.md) before its first deployment.
-
-System setting adoption, optional capabilities and UFW recovery are described
-in [Arch system settings](system-settings.md). Review that procedure before the
-first rollout; default-on system capabilities now also include time synchronization,
-journal, console, logind and TRIM policy. Disable capabilities you intend to leave
-unmanaged in `configuration.nix`.
-
-## Repeat execution and interrupted work
-
-File updates compare contents, owner and mode, then replace through a temporary
-file in the destination directory. Managed-file symlinks are rejected. Healthy,
-unchanged system services are not restarted merely because deployment repeats.
-Runtime module and sysctl drift is repaired even when files already match.
-
-Network restart, systemd reload and initramfs work use pending markers under
-`/var/lib/nix-config/arch/`. Each marker precedes its related write and is cleared
-only after successful action. Preserve markers on failure; rerunning completes
-unfinished work. A private login-runtime lock serializes Arch mutations;
-unrelated manual administrative commands do not participate in that lock.
-
-The Host supplies early-module intent and expected initramfs images. Deployment
-preserves unowned mkinitcpio settings and manages only its marked `MODULES+=`
-addition. Missing images trigger regeneration. Changes to external hooks or
-other unowned inputs may still require the native initramfs rebuild workflow.
-
-## Resolve a failed run
-
-| Symptom | Next step |
-| --- | --- |
-| Exit 2 | Check arguments with `--help`; choose one mode |
-| Exit 3, missing native packages | Run the deployment with `--update` |
-| Exit 75, running kernel modules unavailable | Reboot into the installed kernel and rerun |
-| Exit 75, another deployment running | Wait for that invocation, then retry |
-| Unmanaged LizardByte repository | Reconcile the exact pacman declaration before retrying |
-| Managed file is a symlink | Inspect ownership; do not replace it blindly |
-| Initramfs or native-command failure | Fix the prerequisite and rerun with pending markers intact |
-| Home projection collision | Resolve the exact worktree, backup or conflicting file |
-
-After a pacman upgrade, a missing running-kernel module directory stops the
-workflow before AUR convergence and subsequent policy changes. Reboot and repeat
-the same update command.
-
-Neovim/Hyprland preflight rejects `.git` at managed targets or their ancestors
-along logical and resolved paths, plus adjacent `.bak`, `.backup` and `~` paths.
-It runs before Home Manager link changes and does not remove collisions. Keep
-input development repositories outside runtime paths.
-
-Workstation deployment does not require GitLab registration or perform Runner
-reconciliation. Use the separate [Runner workflow](runners.md) when that state
-is in scope. There is no automatic package removal, garbage collection,
-directory backup service or Runner purge.
-
-## AI and virtualization
-
-Select capabilities in [configuration.nix](../configuration.nix). Parent and
-child switches, including the KVM GUI, default to true. The public namespaces
-are `programs.ai` and `virtualisation`; see [configuration](configuration.md)
-for override precedence and the full selection interface.
-
-- `programs.ai.enable` gates `programs.ai.llama.enable`, `programs.ai.codex.enable` (the AUR Codex package) and
-  `programs.ai.skillsPresets.enable` (the repository's existing skill presets).
-  Home Manager links each skill directory as a unit for every declared login
-  user's composition. Disabling presets removes their managed links on home
-  activation, without deleting the source presets.
-- `virtualisation.enable` gates `virtualisation.kvm.enable` and
-  `virtualisation.podman.enable`. The Module's
-  [inventory](../modules/virtualization/packages.nix) owns native dependencies.
-  KVM adds the deployment login user to the `kvm` group. Log out and back in
-  after the first deployment changes group membership.
-
-KVM uses QEMU directly, with user networking and optional UEFI firmware.
-Enable CPU virtualization in firmware before use. The kernel loads its
-CPU-specific KVM driver automatically; no CPU vendor detection or initramfs
-rewrite is needed by this Module. For an existing VM disk, a typical invocation
-is `/usr/bin/qemu-system-x86_64 -accel kvm -cpu host -m 4G -drive file=vm.qcow2,format=qcow2 -nic user`.
-Disk creation, guest installation and bridge networking remain operator choices.
-
-Set `virtualisation.kvm.gui.enable = true;` to add virt-manager, libvirt and
-the DNS/DHCP and nftables tools used by libvirt virtual networks.
-It is selected by default. Both `virtualisation.enable` and
-`virtualisation.kvm.enable` must also be true. Arch deployment enables and starts
-the package-provided local `libvirtd.socket`; repeat deployment repairs socket
-drift without restarting running guests. It uses libvirt's standard polkit
-authentication and does not grant passwordless management or enable TCP access.
-
-After `just arch-workstation update`, launch
-`/usr/bin/virt-manager --connect qemu:///system` from your graphical session and
-authenticate if prompted. Use its wizard to create a VM. Virtual networks and
-their autostart remain explicit choices in virt-manager; deployment does not
-create guests, pools or networks. Store system-managed VM disks in a
-libvirt-accessible storage pool rather than assuming your private home is
-accessible. Existing custom or modular libvirt daemon setups must be reconciled
-before deployment; deployment does not migrate or unmask their units.
-
-Turning the GUI off stops declaring its packages and socket. It does not stop
-libvirt or delete existing guests. See libvirt's
-[socket activation](https://libvirt.org/daemons.html) and
-[authentication](https://libvirt.org/auth.html) documentation.
-
-Podman runs through the Arch-owned executable without an automatically enabled
-API socket. Before rootless use, provision non-overlapping subordinate UID and
-GID ranges for the login account in `/etc/subuid` and `/etc/subgid`, as part of
-login-account preparation. Keep those ranges separate from Runner instances.
-The Module does not modify existing container storage or Runner registrations.
-See the [Arch Podman manual](https://man.archlinux.org/man/podman.1.en) and
-[QEMU guidance](https://wiki.archlinux.org/title/QEMU) for runtime preparation.
-
-Use the normal explicit update workflow to install newly selected packages.
-Routine deployment still exits 3 if any declared package is missing. Disabling
-a capability stops declaring its requirements; it does not remove installed
-packages, revoke groups or retire runtime state.
-
-## Source validation ownership
-
-[Deployment packaging and tests](../lib/deployment/) own the ordered workflow
-and the exact-generation activation contract. [Arch checks](../platforms/arch/checks.nix)
-exercise native convergence with fake commands. Global [checks](../checks/default.nix)
-wire cross-stage ordering, workflow linting and source validation.
-
-Login homes must use distinct absolute paths under `/home/`, with each path
-segment containing letters, digits, `_` or `-`. Nested paths such as
-`/home/team/user` are supported; empty segments, traversal and control characters
-are rejected during Host evaluation.
+Disabling a capability stops declaring future management. Deployment does not
+automatically uninstall packages, delete service state, remove accounts, purge
+registrations or erase application data.

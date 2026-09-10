@@ -1,19 +1,24 @@
 # Private implementation. package.nix supplies all paths and declared values.
 # The test harness supplies an isolated filesystem and fake native commands.
-usage() { printf 'usage: arch-switch [--check | --update]\n'; }
+usage() { printf 'usage: arch-switch [--check | --update] [--verbose]\n'; }
 native() { "$native_bin/$1" "${@:2}"; }
 root() { native sudo "$native_bin/$1" "${@:2}"; }
 fail() {
   printf '%s\n' "$1" >&2
   exit "${2:-1}"
 }
+optional_skip() {
+  printf '\033[1;33mSKIP optional module %s: %s\033[0m\n' "$1" "$2" >&2
+}
 
 check_only=0
 update_system=0
+verbose=0
 for argument in "$@"; do
   case "$argument" in
     --check) check_only=1 ;;
     --update) update_system=1 ;;
+    --verbose) verbose=1 ;;
     --help)
       usage
       exit 0
@@ -106,16 +111,37 @@ if ((${#lizardbyte_package_names[@]})) && ! grep -Fxq "$repo_include" "$fs_root/
   native pacman-conf --repo lizardbyte Server >/dev/null 2>&1; then
   fail 'an unmanaged [lizardbyte] repository already exists in pacman.conf'
 fi
+adapter_args() {
+  local manifest=$1 phase=$2
+  local args=("$manifest" "$phase")
+  if ((verbose)); then args+=(--verbose); fi
+  printf '%s\0' "${args[@]}"
+}
 system_settings() {
-  native sudo "$system_python" "$system_adapter" "$system_manifest" "$1"
+  local args=()
+  mapfile -d '' -t args < <(adapter_args "$system_manifest" "$1")
+  native sudo "$system_python" "$system_adapter" "${args[@]}"
 }
 ai_settings() {
-  native sudo "$ai_python" "$ai_adapter" "$ai_manifest" "$1"
+  local args=()
+  mapfile -d '' -t args < <(adapter_args "$ai_manifest" "$1")
+  native sudo "$ai_python" "$ai_adapter" "${args[@]}"
 }
 # Read-only ownership preflight precedes package/configuration writes. A second
 # pass after updates checks newly installed native tools and configuration.
 system_settings preflight
-ai_settings preflight
+ai_skipped=0
+if ai_settings preflight; then
+  :
+else
+  ai_status=$?
+  if ((ai_status == 20)); then
+    ai_skipped=1
+    optional_skip 'ai' "llama.cpp build/model is not prepared; run 'just prepare-ai'"
+  else
+    exit "$ai_status"
+  fi
+fi
 if ((update_system)); then resolve_inventory; fi
 
 root_state="$fs_root/var/lib/nix-config/arch"
@@ -174,7 +200,6 @@ ensure_file "$files/sysctl.conf" "$fs_root/etc/sysctl.d/99-nix-config.conf"
 if ((${manage_desktop:-1})); then
   sed "s/@USER@/$login_user/g" "$files/tty1-autologin.conf" >"$work_dir/autologin.conf"
   ensure_file "$work_dir/autologin.conf" "$fs_root/etc/systemd/system/getty@tty1.service.d/override.conf" units
-
 fi
 
 if ((${manage_initramfs:-1})); then
@@ -226,7 +251,18 @@ for service in "${system_units[@]}"; do
     actions=$((actions + 1))
   fi
 done
-ai_settings converge
+if ((!ai_skipped)); then
+  if ai_settings converge; then
+    :
+  else
+    ai_status=$?
+    if ((ai_status == 20)); then
+      optional_skip 'ai' "prepared assets disappeared during deployment; rerun 'just prepare-ai'"
+    else
+      exit "$ai_status"
+    fi
+  fi
+fi
 if ((${manage_network:-1})) && [[ -e $root_state/network.pending ]]; then
   root systemctl restart NetworkManager.service
   root rm -- "$root_state/network.pending"

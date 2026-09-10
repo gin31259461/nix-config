@@ -28,7 +28,7 @@
         touch "$out"
       '';
   arch-switch-interface = pkgs.runCommand "arch-switch-interface-check" { } ''
-    ${arch-switch}/bin/arch-switch --help | ${pkgs.gnugrep}/bin/grep -Fxq 'usage: arch-switch [--check | --update]'
+    ${arch-switch}/bin/arch-switch --help | ${pkgs.gnugrep}/bin/grep -Fxq 'usage: arch-switch [--check | --update] [--verbose]'
     if ${arch-switch}/bin/arch-switch --check --update >/dev/null 2>&1; then exit 1; fi
     ${archDeployment}/bin/${deploymentName} --help | ${pkgs.gnugrep}/bin/grep -Fxq 'usage: ${deploymentName} [--update] [--verbose]'
     touch "$out"
@@ -50,7 +50,7 @@
       }
       ''
         just --justfile ${../Justfile} --summary > "$out"
-        grep -Fxq 'arch-workstation build check check-arch check-fast default' "$out"
+        grep -Fxq 'arch-workstation build check check-arch check-fast default initialize-runner prepare-ai prepare-runner status-runner verify-runner' "$out"
 
         export JUST_NIX_LOG="$TMPDIR/nix.log"
         run_recipe() {
@@ -59,17 +59,17 @@
             bash
         }
         run_recipe verbose update
-        grep -Fxq 'build --no-link .#arch-workstation' "$JUST_NIX_LOG"
-        grep -Fxq 'run .#arch-workstation -- --update --verbose' "$JUST_NIX_LOG"
+        grep -Fxq 'build --no-link --show-trace --print-build-logs --verbose .#arch-workstation' "$JUST_NIX_LOG"
+        grep -Fxq 'run --show-trace --print-build-logs --verbose .#arch-workstation -- --update --verbose' "$JUST_NIX_LOG"
 
         : > "$JUST_NIX_LOG"
         run_recipe update verbose
-        grep -Fxq 'run .#arch-workstation -- --update --verbose' "$JUST_NIX_LOG"
+        grep -Fxq 'run --show-trace --print-build-logs --verbose .#arch-workstation -- --update --verbose' "$JUST_NIX_LOG"
 
         : > "$JUST_NIX_LOG"
         run_recipe
-        grep -Fxq 'build --no-link .#arch-workstation' "$JUST_NIX_LOG"
-        grep -Fxq 'run .#arch-workstation' "$JUST_NIX_LOG"
+        grep -Fxq 'build --no-link --show-trace --print-build-logs .#arch-workstation' "$JUST_NIX_LOG"
+        grep -Fxq 'run --show-trace --print-build-logs .#arch-workstation' "$JUST_NIX_LOG"
         test "$(wc -l < "$JUST_NIX_LOG")" -eq 2
 
         : > "$JUST_NIX_LOG"

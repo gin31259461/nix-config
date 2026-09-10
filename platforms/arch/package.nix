@@ -40,13 +40,15 @@ pkgs.writeShellApplication {
       lib.fileset.toSource {
         root = ./system;
         fileset = lib.fileset.unions [
+          ./system/adapter.py
           ./system/runtime.py
+          ./system/native.py
           ./system/files.py
           ./system/firewall.py
           ./system/hotspot.py
         ];
       }
-    }/runtime.py
+    }/adapter.py
     readonly system_manifest=${
       if systemSettings == null then
         pkgs.writeText "unmanaged-system.json" "{}"
@@ -58,11 +60,13 @@ pkgs.writeShellApplication {
       lib.fileset.toSource {
         root = ./.;
         fileset = lib.fileset.unions [
+          ./ai/adapter.py
           ./ai/runtime.py
+          ./system/native.py
           ./system/files.py
         ];
       }
-    }/ai/runtime.py
+    }/ai/adapter.py
     readonly ai_manifest=${
       if ai == null then
         pkgs.writeText "unmanaged-ai.json" (builtins.toJSON { llama = false; })
