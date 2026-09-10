@@ -31,7 +31,7 @@ class PrepareTests(unittest.TestCase):
         curl.chmod(0o755)
         text = SOURCE.read_text()
         text = text.replace(
-            "((EUID == 0)) || { printf 'run llama-prepare as root (sudo nix run .#llama-prepare)\\n' >&2; exit 1; }",
+            "((EUID == 0)) || { printf \"run llama-prepare as root (sudo nix --extra-experimental-features 'nix-command flakes' run .#llama-prepare)\\n\" >&2; exit 1; }",
             "true",
         ).replace(
             "/run/lock/nix-config-llama-prepare.lock", str(self.root / "prepare.lock")
