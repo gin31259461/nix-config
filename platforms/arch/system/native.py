@@ -21,9 +21,7 @@ class Native:
 
     def __init__(self, *, verbose: bool | None = None, timeout: int = 300):
         self.verbose = (
-            os.environ.get("NIX_CONFIG_VERBOSE") == "1"
-            if verbose is None
-            else verbose
+            os.environ.get("NIX_CONFIG_VERBOSE") == "1" if verbose is None else verbose
         )
         self.timeout = timeout
 
