@@ -65,7 +65,7 @@ An empty Runner instance set creates no controller, accounts or requirements.
 | `i18n`, `time`, `console` | Locale generation, time zone and virtual-console settings, each with `enable` |
 | `services` | `timesyncd`, `journald`, `logind`, `fstrim`, `powerProfilesDaemon`, `tailscale`, `gitlabRunner` |
 | `hardware` | Declared graphics, `openrazer.enable`, `bluetooth.enable`, `initramfs.enable`, modules and images |
-| `programs.ai` | Parent enable, Codex package and skill preset children |
+| `programs.ai` | Parent enable, llama.cpp service, Codex package and skill preset children |
 | `programs` | `sunshine.enable`, `vesktop.enable`, `vicinae.enable` |
 | `virtualisation` | Parent enable, KVM, KVM GUI and Podman children |
 | `desktop` | Parent enable; polkit agent, overview and Tailscale tray children |

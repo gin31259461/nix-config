@@ -4,7 +4,11 @@
   networking.hostName = lib.mkDefault "arch";
   deployment.username = lib.mkDefault "abnertu";
   hardware = lib.mapAttrsRecursive (_: lib.mkDefault) (import ./hardware.nix);
-  programs.ai.ollama.vulkan.visibleDevices = lib.mkDefault [ 0 ];
+  programs.ai.llama = lib.mapAttrsRecursive (_: lib.mkDefault) {
+    model = {
+      device = "ROCm0";
+    };
+  };
   users.users = import ./users.nix { inherit config lib; };
   services.gitlabRunner.instances = lib.mapAttrs (
     _: value: lib.mapAttrsRecursive (_: lib.mkDefault) value

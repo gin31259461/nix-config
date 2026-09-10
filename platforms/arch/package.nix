@@ -8,6 +8,7 @@
   capabilities ? import ../../lib/default-capabilities.nix,
   systemSettings ? null,
   aiConfig ? null,
+  aiArtifacts ? null,
   moduleGroups ? [ ],
   moduleSystemUnits ? [ ],
 }:
@@ -19,6 +20,7 @@ let
       import ./ai {
         inherit pkgs hardware;
         config = aiConfig;
+        artifacts = aiArtifacts;
         tailscale = capabilities.tailscale;
       };
 in
@@ -63,7 +65,7 @@ pkgs.writeShellApplication {
     }/ai/runtime.py
     readonly ai_manifest=${
       if ai == null then
-        pkgs.writeText "unmanaged-ai.json" (builtins.toJSON { ollama = false; })
+        pkgs.writeText "unmanaged-ai.json" (builtins.toJSON { llama = false; })
       else
         ai.manifest
     }

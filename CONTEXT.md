@@ -41,10 +41,14 @@ from that intent and combines them with optional Module dependencies.
 Application instances remain private to their Module and Host declaration.
 
 The Host selects `programs.ai` and `virtualisation` through typed default-on
-parent and child enable switches. AI exports native Ollama requirements, an
-AMD-derived Vulkan backend, an optional Caddy/Tailscale Serve adapter, Codex AUR
-requirements and a shared Home Manager module for skill presets. The AI adapter
+parent and child enable switches. AI exports an explicit pinned native-build
+and model preparation command, a reviewed model inventory with per-model
+runtime presets, and an optional
+Caddy/Tailscale Serve adapter, Codex AUR requirements and a shared Home Manager
+module for skill presets. The AI adapter
 owns its service policy and loopback proxy while reusing Arch's Tailscale owner.
+Until the selected build and model are explicitly prepared, that adapter
+withdraws from native convergence without blocking the rest of the deployment.
 Virtualization exports native package requirements and login
 groups for QEMU/KVM and Podman use. Its optional KVM GUI also exports the local
 libvirt socket for Arch to converge. Arch realizes these values; Runner

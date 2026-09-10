@@ -12,9 +12,8 @@ let
     }).config;
 in
 assert lib.assertMsg (
-  result.ollama.vulkan.visibleDevices == null
-  ||
-    builtins.length result.ollama.vulkan.visibleDevices
-    == builtins.length (lib.unique result.ollama.vulkan.visibleDevices)
-) "Ollama Vulkan device IDs must be distinct";
+  result.llama.model.microBatchSize == null
+  || result.llama.model.batchSize == null
+  || result.llama.model.microBatchSize <= result.llama.model.batchSize
+) "llama.cpp micro-batch size must not exceed batch size";
 builtins.deepSeq result result

@@ -1,4 +1,4 @@
-{ pkgs, ... }:
+{ pkgs, llama-prepare, ... }:
 {
   system-firewall-integration = import ./system/tests/firewall-vm.nix { inherit pkgs; };
   system-settings-interface =
@@ -26,6 +26,26 @@
     }/ai/runtime.py
     touch "$out"
   '';
+  llama-prepare-interface =
+    pkgs.runCommand "llama-prepare-interface"
+      {
+        nativeBuildInputs = [
+          pkgs.python3
+          pkgs.util-linux
+        ];
+      }
+      ''
+        ${llama-prepare}/bin/llama-prepare --help | grep -Fxq \
+          'usage: llama-prepare [--build-only | --model-only]'
+        if ${llama-prepare}/bin/llama-prepare --model-only >out 2>err; then exit 1; fi
+        grep -Fq 'run llama-prepare as root' err
+        grep -Fq '#define MAX_REPETITION_THRESHOLD 2000' ${../../modules/ai/prepare.sh}
+        grep -Fq -- '-DVulkan_INCLUDE_DIR=/usr/include -DVulkan_LIBRARY=/usr/lib/libvulkan.so' \
+          ${../../modules/ai/prepare.sh}
+        grep -Fq '/run/lock/nix-config-llama-prepare.lock' ${../../modules/ai/prepare.sh}
+        python ${../../modules/ai/tests/test_prepare.py} ${../../modules/ai/prepare.sh}
+        touch "$out"
+      '';
   arch-switch-tests =
     pkgs.runCommand "arch-switch-tests"
       {

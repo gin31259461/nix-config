@@ -1,22 +1,23 @@
 {
   pkgs,
   config,
+  artifacts,
   hardware,
   tailscale,
 }:
 let
-  ollama = config.enable && config.ollama.enable;
-  vulkan = ollama && hardware.graphics == "amd" && config.ollama.vulkan.enable;
-  proxy = ollama && config.ollama.proxy.enable && tailscale;
+  llama = config.enable && config.llama.enable;
+  proxy = llama && config.llama.proxy.enable && tailscale;
 in
 {
-  inherit ollama vulkan proxy;
+  inherit llama proxy;
   manifest = pkgs.writeText "arch-ai.json" (
     builtins.toJSON {
-      inherit ollama vulkan proxy;
-      keepAlive = config.ollama.keepAlive;
-      visibleDevices = config.ollama.vulkan.visibleDevices;
-      httpsPort = config.ollama.proxy.httpsPort;
+      inherit llama proxy;
+      inherit (artifacts) source server;
+      model = artifacts.model;
+      localPort = artifacts.proxy.localPort;
+      inherit (config.llama.proxy) httpsPort;
     }
   );
 }

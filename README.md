@@ -40,8 +40,8 @@ include time synchronization, journal, console, logind and TRIM policy; review
 [adoption prerequisites](docs/system-settings.md) before deploying. The selected
 Wi-Fi hotspot adopts a prepared NetworkManager connection; see
 [hotspot preparation](docs/hotspot.md) for local credential setup and recovery.
-The native Ollama/Vulkan capability and optional tailnet proxy require explicit
-[AI service preparation](docs/ai.md), including review of the Ollama GPU ID and
+The inventoried native llama.cpp capability and optional tailnet proxy use explicit
+[AI service preparation](docs/ai.md), including the external model checksum and
 existing Tailscale Serve routes.
 
 ## Build and use
@@ -71,7 +71,7 @@ It never registers Runners or removes packages automatically. A kernel mismatch
 requires reboot and retry. See [deployment recovery](docs/deployment.md),
 [desktop/storage preparation](docs/desktop-session.md),
 [Noctalia preference exchange](docs/noctalia-config.md) and
-[Runner operations](docs/runners.md) for live workflows. Ollama, Caddy and Serve
+[Runner operations](docs/runners.md) for live workflows. llama.cpp, Caddy and Serve
 checks and recovery are documented in [AI service operations](docs/ai.md).
 
 `just arch-workstation` accepts composable `update` and `verbose` options; for

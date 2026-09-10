@@ -72,9 +72,6 @@
         modulePackages = runners.requiredPackages ++ virtualization.requiredPackages;
         systemSettings = archHost.systemSettings;
         moduleAurPackages = ai.aurPackages;
-        aiPackages = ai.requiredPackages;
-        aiVulkan = ai.ollama && archHost.hardware.graphics == "amd" && archHost.ai.ollama.vulkan.enable;
-        aiProxy = ai.ollama && archHost.ai.ollama.proxy.enable && capabilities.tailscale;
       };
       arch-switch = import ./platforms/arch/package.nix {
         inherit
@@ -90,6 +87,11 @@
         packages = nativePackages;
         hardware = archHost.hardware;
         aiConfig = archHost.ai;
+        aiArtifacts = ai.artifacts;
+      };
+      llama-prepare = import ./modules/ai/package.nix {
+        inherit pkgs;
+        artifacts = ai.artifacts;
       };
       home-switch = import ./lib/deployment/home/package.nix {
         inherit pkgs;
@@ -131,7 +133,7 @@
           deploymentName
           ;
       })
-      // (import ./platforms/arch/checks.nix { inherit pkgs arch-switch; })
+      // (import ./platforms/arch/checks.nix { inherit pkgs arch-switch llama-prepare; })
       // (import ./modules/home/checks.nix {
         inherit pkgs inputs;
         home = archHomes.${homeConfigurationName};
@@ -139,7 +141,7 @@
       // runners.checks;
 
       packages.${system} = {
-        inherit arch-switch home-switch;
+        inherit arch-switch home-switch llama-prepare;
         ${deploymentName} = archDeployment;
         default = arch-switch;
       }
@@ -147,6 +149,11 @@
       // runners.packages;
 
       apps.${system} = {
+        llama-prepare = {
+          type = "app";
+          program = "${llama-prepare}/bin/llama-prepare";
+          meta.description = "Explicitly prepare the pinned llama.cpp build and model";
+        };
         arch-switch = {
           type = "app";
           program = "${arch-switch}/bin/arch-switch";

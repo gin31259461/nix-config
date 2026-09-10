@@ -1,40 +1,67 @@
 { lib }:
 let
+  inventory = import ./artifacts.nix;
   enable = description: (lib.mkEnableOption description) // { default = true; };
+  port = lib.types.ints.between 1 65535;
 in
 {
-  enable = (lib.mkEnableOption "ai") // {
-    default = true;
-  };
-  codex.enable = lib.mkOption {
-    type = lib.types.bool;
-    default = true;
-  };
-  skillsPresets.enable = lib.mkOption {
-    type = lib.types.bool;
-    default = true;
-  };
-  ollama = {
-    enable = enable "Ollama";
-    keepAlive = lib.mkOption {
-      type = lib.types.ints.between (-1) 2147483647;
-      default = -1;
-      description = "Default model residency in seconds; -1 keeps loaded models resident.";
-    };
-    vulkan = {
-      enable = enable "the Ollama Vulkan backend";
-      visibleDevices = lib.mkOption {
-        type = lib.types.nullOr (lib.types.nonEmptyListOf lib.types.ints.unsigned);
+  enable = enable "ai";
+  codex.enable = enable "Codex";
+  skillsPresets.enable = enable "the repository skill presets";
+  llama = {
+    enable = enable "llama.cpp";
+    model = {
+      name = lib.mkOption {
+        type = lib.types.enum (builtins.attrNames inventory.models);
+        default = inventory.defaultModel;
+      };
+      device = lib.mkOption { type = lib.types.strMatching "(ROCm|Vulkan)[0-9]+"; };
+      contextSize = lib.mkOption {
+        type = lib.types.nullOr lib.types.ints.positive;
         default = null;
-        description = "Reviewed Ollama Vulkan device IDs; null requires selection before deployment.";
+      };
+      fitTarget = lib.mkOption {
+        type = lib.types.nullOr lib.types.ints.positive;
+        default = null;
+      };
+      cacheTypeK = lib.mkOption {
+        type = lib.types.nullOr (
+          lib.types.enum [
+            "f16"
+            "q8_0"
+            "q4_0"
+          ]
+        );
+        default = null;
+      };
+      cacheTypeV = lib.mkOption {
+        type = lib.types.nullOr (
+          lib.types.enum [
+            "f16"
+            "q8_0"
+            "q4_0"
+          ]
+        );
+        default = null;
+      };
+      batchSize = lib.mkOption {
+        type = lib.types.nullOr lib.types.ints.positive;
+        default = null;
+      };
+      microBatchSize = lib.mkOption {
+        type = lib.types.nullOr lib.types.ints.positive;
+        default = null;
+      };
+      parallel = lib.mkOption {
+        type = lib.types.nullOr lib.types.ints.positive;
+        default = null;
       };
     };
     proxy = {
-      enable = enable "the Caddy and Tailscale Serve proxy for Ollama";
+      enable = enable "the Caddy and Tailscale Serve proxy for llama.cpp";
       httpsPort = lib.mkOption {
-        type = lib.types.ints.between 1 65535;
+        type = port;
         default = 443;
-        description = "Tailnet HTTPS port used by Tailscale Serve.";
       };
     };
   };

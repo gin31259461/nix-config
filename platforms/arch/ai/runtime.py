@@ -1,13 +1,14 @@
-"""Converge Arch-owned Ollama, Caddy and Tailscale Serve policy."""
+"""Converge Arch-owned llama.cpp, Caddy and Tailscale Serve policy."""
 
 import json
 import os
 from pathlib import Path
 import subprocess
 import sys
+import time
 
 sys.path.insert(0, str(Path(__file__).parents[1] / "system"))
-from files import Conflict, Files, assignments  # noqa: E402
+from files import Conflict, Files  # noqa: E402
 
 
 PACKAGE_CADDY = """# The Caddyfile is an easy way to configure your Caddy web server.
@@ -87,7 +88,7 @@ class Native:
         except (OSError, subprocess.TimeoutExpired):
             raise Conflict(f"native {args[0]} unavailable or timed out") from None
         if check and result.returncode:
-            raise Conflict(f"native {args[0]} failed; pending action retained")
+            raise Conflict(f"native {args[0]} failed; pending action retained ${result.stderr.strip() or result.stdout.strip()}")
         return result
 
 
@@ -131,28 +132,97 @@ class AI:
             return current
         raise Conflict("existing Caddyfile requires explicit adoption")
 
+    def caddy_site(self):
+        d = self.desired
+        return CADDY_SITE.replace(":11435", f":{d['localPort']}").replace(
+            "127.0.0.1:11434", f"127.0.0.1:{d['server']['port']}"
+        )
+
+    def preset(self):
+        d = self.desired
+        model = d["model"]
+        return f"""version = 1
+
+[*]
+parallel = {model["parallel"]}
+cont-batching = true
+jinja = true
+
+[{model["id"]}]
+model = {model["path"]}
+device = {model["device"]}
+ctx-size = {model["contextSize"]}
+fit = true
+fit-target = {model["fitTarget"]}
+fit-ctx = {model["contextSize"]}
+flash-attn = on
+cache-type-k = {model["cacheTypeK"]}
+cache-type-v = {model["cacheTypeV"]}
+batch-size = {model["batchSize"]}
+ubatch-size = {model["microBatchSize"]}
+load-on-startup = true
+"""
+
+    def dropin(self):
+        d = self.desired
+        prefix, server = d["source"]["installPrefix"] + "/current", d["server"]
+        return f"""[Unit]
+After=network-online.target
+
+[Service]
+Environment=LD_LIBRARY_PATH={prefix}/lib:{prefix}/lib64
+ExecStart=
+ExecStart={prefix}/bin/llama-server --models-preset /etc/llama/server/models.ini --models-max {server["modelsMax"]} --host {server["host"]} --port {server["port"]} --no-webui
+SupplementaryGroups=render video
+Restart=on-failure
+RestartSec=3
+"""
+
     def preflight(self, installed=False):
         d, f = self.desired, self.files
-        if not d["ollama"]:
-            return
-        if d["vulkan"]:
-            devices = d.get("visibleDevices")
-            if not devices or len(devices) != len(set(devices)):
-                raise Conflict("reviewed Ollama Vulkan device IDs are required")
-            existing = assignments(f.read("/etc/ollama-vulkan.conf"))
-            if set(existing) - {
-                "OLLAMA_VULKAN",
-                "GGML_VK_VISIBLE_DEVICES",
-                "OLLAMA_KEEP_ALIVE",
-            }:
-                raise Conflict(
-                    "existing Ollama Vulkan configuration requires explicit adoption"
-                )
-        f.read("/etc/systemd/system/ollama.service.d/60-nix-config.conf")
-        f.pending("ai-ollama")
+        if not d["llama"]:
+            return False
+        if not Path(d["model"]["path"]).is_absolute():
+            raise Conflict("model path must be absolute")
+        install_prefix = d["source"]["installPrefix"]
+        current = f.path(install_prefix + "/current", symlink_leaf=True)
+        desired_link = (
+            f"revisions/{d['source']['revision']}-"
+            f"{d['source']['grammarRepetitionThreshold']}"
+        )
+        if not current.exists() and not current.is_symlink():
+            return False
+        if not current.is_symlink() or os.readlink(current) != desired_link:
+            raise Conflict(
+                "prepared llama-server selector does not match the declaration"
+            )
+        revision_prefix = install_prefix + "/" + desired_link
+        executable = f.path(revision_prefix + "/bin/llama-server")
+        receipt = f.read(revision_prefix + "/nix-config-build").strip()
+        model = f.path(d["model"]["path"])
+        if not executable.is_file() or not model.is_file() or not receipt:
+            return False
+        expected = (
+            f"{d['source']['revision']} {d['source']['grammarRepetitionThreshold']}"
+        )
+        if receipt != expected:
+            raise Conflict(
+                "prepared llama-server receipt does not match the declaration"
+            )
+        f.read("/etc/llama/server/models.ini")
+        f.read("/etc/systemd/system/llama-server.service.d/60-nix-config.conf")
+        if f.read("/etc/systemd/system/llama-server.service.d/60-local.conf"):
+            raise Conflict(
+                "legacy llama-server drop-in requires explicit operator adoption"
+            )
+        f.pending("ai-llama")
         if d["proxy"]:
             self.caddy_main()
-            f.read("/etc/caddy/conf.d/nix-config-ollama.caddy")
+            f.read("/etc/caddy/conf.d/nix-config-llama.caddy")
+            if f.read("/etc/caddy/conf.d/nix-config-ollama.caddy"):
+                raise Conflict(
+                    "legacy Ollama Caddy site requires explicit operator adoption"
+                )
             f.pending("ai-caddy")
             f.pending("ai-serve")
         if installed:
@@ -161,9 +231,10 @@ class AI:
                 required |= {"caddy", "stat", "systemd-tmpfiles", "tailscale"}
             if any(not self.native.available(command) for command in required):
                 raise Conflict("a required native AI command is missing")
-            self.require_unit("ollama.service")
+            self.require_unit("llama-server.service")
             if d["proxy"]:
                 self.require_unit("caddy.service")
+        return True
 
     def write(self, path, text, action):
         if self.files.matches(path, text):
@@ -189,46 +260,47 @@ class AI:
         ):
             raise Conflict("required AI service did not become ready")
 
+    def _curl_ready(self, port, retries=10, delay=2):
+        url = f"http://127.0.0.1:{port}/v1/models"
+        last_err = ""
+        for attempt in range(1, retries + 1):
+            try:
+                self.run("curl", "--fail", "--silent", "--show-error", url)
+                return
+            except Conflict as exc:
+                last_err = str(exc)
+                if attempt < retries:
+                    time.sleep(delay)
+        raise Conflict(f"curl failed after {retries} retries; last: {last_err}")
+
     def converge(self):
-        self.preflight(installed=True)
         d, f = self.desired, self.files
-        if not d["ollama"]:
+        if not d["llama"]:
             print("AI services unmanaged.")
             return
-        if d["vulkan"]:
-            env = (
-                "OLLAMA_VULKAN=1\n"
-                + "GGML_VK_VISIBLE_DEVICES="
-                + ",".join(map(str, d["visibleDevices"]))
-                + "\n\n# Recommended for low-latency completion after the first model load.\n"
-                + f"OLLAMA_KEEP_ALIVE={d['keepAlive']}\n"
-            )
-            self.write("/etc/ollama-vulkan.conf", env, "ai-ollama")
-            dropin = (
-                '[Service]\nEnvironment="OLLAMA_HOST=127.0.0.1:11434"\n'
-                "EnvironmentFile=/etc/ollama-vulkan.conf\nSupplementaryGroups=render\n"
-            )
-        else:
-            dropin = (
-                '[Service]\nEnvironment="OLLAMA_HOST=127.0.0.1:11434"\n'
-                f'Environment="OLLAMA_KEEP_ALIVE={d["keepAlive"]}"\n'
-                'Environment="OLLAMA_VULKAN=0"\n'
-            )
+        if not self.preflight(installed=True):
+            print("AI services skipped: selected model is not prepared.")
+            return
+        self.write("/etc/llama/server/models.ini", self.preset(), "ai-llama")
+        dropin = self.dropin()
         changed = self.write(
-            "/etc/systemd/system/ollama.service.d/60-nix-config.conf",
+            "/etc/systemd/system/llama-server.service.d/60-nix-config.conf",
             dropin,
-            "ai-ollama",
+            "ai-llama",
         )
-        pending = f.pending("ai-ollama")
-        if changed:
+        pending = f.pending("ai-llama")
+        if changed or pending:
             self.run("systemctl", "daemon-reload")
             self.actions += 1
-        self.ensure_service("ollama.service", "ai-ollama", restart=pending)
-        f.clear("ai-ollama")
+        self.ensure_service("llama-server.service", "ai-llama", restart=pending)
+        self._curl_ready(d['server']['port'])
+        f.clear("ai-llama")
         if d["proxy"]:
             self.write("/etc/caddy/Caddyfile", self.caddy_main(), "ai-caddy")
             self.write(
-                "/etc/caddy/conf.d/nix-config-ollama.caddy", CADDY_SITE, "ai-caddy"
+                "/etc/caddy/conf.d/nix-config-llama.caddy",
+                self.caddy_site(),
+                "ai-caddy",
             )
             pending = f.pending("ai-caddy")
             runtime_dir = self.run(
@@ -268,15 +340,9 @@ class AI:
                 )
                 self.actions += 1
             f.clear("ai-caddy")
-            self.run(
-                "curl",
-                "--fail",
-                "--silent",
-                "--show-error",
-                "http://127.0.0.1:11435/api/version",
-            )
+            self._curl_ready(d['localPort'])
             status = self.run("tailscale", "serve", "status", "--json").stdout
-            target = "http://127.0.0.1:11435"
+            target = f"http://127.0.0.1:{d['localPort']}"
             port = str(d["httpsPort"])
             if target not in status or port not in status:
                 if status.strip() not in ("", "{}", "null"):

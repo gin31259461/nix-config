@@ -12,6 +12,12 @@
   };
   deployment.username = "abnertu";
   hardware.initramfs.images = [ "/boot/initramfs-linux.img" ];
+  programs.ai.llama = {
+    model = {
+      device = "ROCm0";
+      contextSize = 4096;
+    };
+  };
   users.users.abnertu = {
     description = "Fixture login";
     homeDirectory = "/home/fixture";

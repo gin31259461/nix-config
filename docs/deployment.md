@@ -111,7 +111,7 @@ child switches, including the KVM GUI, default to true. The public namespaces
 are `programs.ai` and `virtualisation`; see [configuration](configuration.md)
 for override precedence and the full selection interface.
 
-- `programs.ai.enable` gates `programs.ai.codex.enable` (the AUR Codex package) and
+- `programs.ai.enable` gates `programs.ai.llama.enable`, `programs.ai.codex.enable` (the AUR Codex package) and
   `programs.ai.skillsPresets.enable` (the repository's existing skill presets).
   Home Manager links each skill directory as a unit for every declared login
   user's composition. Disabling presets removes their managed links on home

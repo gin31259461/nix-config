@@ -4,11 +4,22 @@
   inputs,
 }:
 let
+  aiDefaults = {
+    llama = {
+      model = {
+        device = "ROCm0";
+        contextSize = 4096;
+      };
+    };
+  };
   ai =
     raw:
     import ../modules/ai {
       inherit lib;
-      config = import ../modules/ai/interface.nix { inherit lib raw; };
+      config = import ../modules/ai/interface.nix {
+        inherit lib;
+        raw = lib.recursiveUpdate aiDefaults raw;
+      };
     };
   virtualization =
     raw:
@@ -22,6 +33,13 @@ let
       builtins.deepSeq (import (../modules + "/${name}/interface.nix") { inherit lib raw; }) true
     )).success;
   enabled = ai { enable = true; };
+  inventoryDefault = import ../modules/ai {
+    inherit lib;
+    config = import ../modules/ai/interface.nix {
+      inherit lib;
+      raw.llama.model.device = "ROCm0";
+    };
+  };
   disabled = ai { enable = false; };
   v = virtualization {
     enable = true;
@@ -59,16 +77,11 @@ let
     inherit (host) hardware;
     modulePackages = v.requiredPackages;
     moduleAurPackages = enabled.aurPackages;
-    aiPackages = enabled.requiredPackages;
-    aiVulkan = true;
-    aiProxy = true;
   };
   skills = lib.filterAttrs (name: _: lib.hasPrefix ".agents/skills/" name) home.config.home.file;
 in
 assert enabled.aurPackages == [ "openai-codex-bin" ];
-assert enabled.requiredPackages == [ "ollama" ];
 assert disabled.aurPackages == [ ] && disabled.homeModule.home.file == { };
-assert disabled.requiredPackages == [ ];
 assert
   (ai {
     enable = true;
@@ -141,23 +154,17 @@ assert lib.all (name: !(valid name { enable = "true"; }) && !(valid name { typo 
   "virtualization"
 ];
 assert !(valid "ai" { codex.enabel = true; });
-assert !(valid "ai" { ollama.keepAlive = -2; });
-assert !(valid "ai" { ollama.proxy.httpsPort = 0; });
-assert !(valid "ai" { ollama.vulkan.visibleDevices = [ ]; });
-assert
-  !(valid "ai" {
-    ollama.vulkan.visibleDevices = [
-      0
-      0
-    ];
-  });
+assert !(valid "ai" { llama.proxy.httpsPort = 0; });
+assert !(valid "ai" { llama.model.microBatchSize = 4096; });
+assert !(valid "ai" { llama.model.name = "unknown"; });
+assert !(valid "ai" { llama.source.revision = "main"; });
 assert !(valid "virtualization" { kvm.enabel = true; });
 assert builtins.elem "openai-codex-bin" native.aur;
-assert lib.all (name: builtins.elem name native.pacman) [
-  "ollama"
-  "ollama-vulkan"
-  "caddy"
-];
+assert enabled.artifacts.model.contextSize == 4096;
+assert enabled.artifacts.model.id == "Qwen3.5-35B-A3B-GGUF:MXFP4_MOE";
+assert inventoryDefault.artifacts.model.contextSize == 98304;
+assert !(builtins.elem "llama-cpp" native.pacman);
+assert !(builtins.elem "caddy" native.pacman);
 assert builtins.elem "qemu-desktop" native.pacman && builtins.elem "podman" native.pacman;
 assert
   lib.filterAttrs (name: _: lib.hasPrefix ".agents/skills/" name) homeDisabled.config.home.file
