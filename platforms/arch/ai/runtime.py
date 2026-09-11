@@ -157,12 +157,14 @@ class AI:
 
     def switcher_unit(self):
         switcher = self.desired["switcher"]
+        library_prefix = self.desired["source"]["installPrefix"] + "/current"
         return f"""[Unit]
 Description=Nix-config llama-swap model router
 After=network-online.target
 Wants=network-online.target
 
 [Service]
+Environment=LD_LIBRARY_PATH={library_prefix}/lib:{library_prefix}/lib64
 ExecStart={switcher["binary"]} --config {SWITCHER_CONFIG} --listen {switcher["listen"]}
 Restart=on-failure
 RestartSec=3

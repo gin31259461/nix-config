@@ -186,6 +186,10 @@ class AITests(unittest.TestCase):
             0.6,
         )
         unit = (self.root / "etc/systemd/system/llama-swap.service").read_text()
+        self.assertIn(
+            "Environment=LD_LIBRARY_PATH=/opt/llama/current/lib:/opt/llama/current/lib64",
+            unit,
+        )
         self.assertIn("--config /etc/llama-swap/config.yaml", unit)
         self.assertIn("--listen 127.0.0.1:11434", unit)
         self.assertIn("@api path /health /v1/*", runtime.CADDY_SITE)
