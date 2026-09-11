@@ -111,7 +111,7 @@ class AITests(unittest.TestCase):
                 "batchSize": 2048,
                 "microBatchSize": 512,
                 "parallel": 1,
-                "reasoningEffort": "medium",
+                "enableThinking": True,
                 "temperature": 1.0,
                 "topP": 0.95,
                 "topK": 20,
@@ -137,10 +137,7 @@ class AITests(unittest.TestCase):
             "LD_LIBRARY_PATH=/opt/llama/current/lib:/opt/llama/current/lib64",
             dropin,
         )
-        self.assertIn("--reasoning-effort medium", dropin)
-        self.assertIn(
-            '--chat-template-kwargs {\\"reasoning_effort\\":\\"medium\\"}', dropin
-        )
+        self.assertIn('--chat-template-kwargs {\\"enable_thinking\\":true}', dropin)
         self.assertTrue(any(c[:2] == ("caddy", "reload") for c in self.native.calls))
         self.assertFalse(any((self.root / "var/lib/nix-config/arch").iterdir()))
 

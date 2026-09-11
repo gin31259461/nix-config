@@ -168,16 +168,30 @@ load-on-startup = true
         d = self.desired
         prefix, server = d["source"]["installPrefix"] + "/current", d["server"]
         model = d["model"]
+        chat_template_kwargs = {
+            key: model[option]
+            for key, option in (
+                ("reasoning_effort", "reasoningEffort"),
+                ("enable_thinking", "enableThinking"),
+                ("preserve_thinking", "preserveThinking"),
+            )
+            if model.get(option) is not None
+        }
         chat_template_kwargs = json.dumps(
-            {"reasoning_effort": model["reasoningEffort"]}, separators=(",", ":")
+            chat_template_kwargs, separators=(",", ":")
         ).replace('"', '\\"')
+        reasoning_effort = (
+            f" --reasoning-effort {model['reasoningEffort']}"
+            if model.get("reasoningEffort") is not None
+            else ""
+        )
         return f"""[Unit]
 After=network-online.target
 
 [Service]
 Environment=LD_LIBRARY_PATH={prefix}/lib:{prefix}/lib64
 ExecStart=
-ExecStart={prefix}/bin/llama-server --models-preset /etc/llama/server/models.ini --models-max {server["modelsMax"]} --host {server["host"]} --port {server["port"]} --no-webui --temp {model["temperature"]} --top-p {model["topP"]} --top-k {model["topK"]} --min-p {model["minP"]} --presence-penalty {model["presencePenalty"]} --repeat-penalty {model["repetitionPenalty"]} --reasoning-effort {model["reasoningEffort"]} --chat-template-kwargs {chat_template_kwargs}
+ExecStart={prefix}/bin/llama-server --models-preset /etc/llama/server/models.ini --models-max {server["modelsMax"]} --host {server["host"]} --port {server["port"]} --no-webui --temp {model["temperature"]} --top-p {model["topP"]} --top-k {model["topK"]} --min-p {model["minP"]} --presence-penalty {model["presencePenalty"]} --repeat-penalty {model["repetitionPenalty"]}{reasoning_effort} --chat-template-kwargs {chat_template_kwargs}
 SupplementaryGroups=render video
 Restart=on-failure
 RestartSec=3

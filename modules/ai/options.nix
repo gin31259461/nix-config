@@ -68,6 +68,14 @@ in
         );
         default = null;
       };
+      enableThinking = lib.mkOption {
+        type = lib.types.nullOr lib.types.bool;
+        default = null;
+      };
+      preserveThinking = lib.mkOption {
+        type = lib.types.nullOr lib.types.bool;
+        default = null;
+      };
       temperature = lib.mkOption {
         type = lib.types.nullOr lib.types.float;
         default = null;
