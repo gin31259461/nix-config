@@ -16,7 +16,7 @@
       sha256 = "2fdd20997c4d88ee25f70f500c61f8b999378d92ab055f9d450fc70d617158d3";
     };
     runtime = {
-      contextSize = 65536;
+      contextSize = 131072;
       fitTarget = 6144;
       cacheTypeK = "q8_0";
       cacheTypeV = "q8_0";

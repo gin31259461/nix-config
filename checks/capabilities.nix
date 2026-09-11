@@ -33,11 +33,10 @@ let
       builtins.deepSeq (import (../modules + "/${name}/interface.nix") { inherit lib raw; }) true
     )).success;
   enabled = ai { enable = true; };
-  inventoryDefault = import ../modules/ai {
-    inherit lib;
-    config = import ../modules/ai/interface.nix {
-      inherit lib;
-      raw.llama.model.device = "ROCm0";
+  profiled = ai {
+    llama.profiles.coding = {
+      enableThinking = true;
+      temperature = 0.6;
     };
   };
   disabled = ai { enable = false; };
@@ -158,11 +157,17 @@ assert !(valid "ai" { llama.proxy.httpsPort = 0; });
 assert !(valid "ai" { llama.model.microBatchSize = 4096; });
 assert !(valid "ai" { llama.model.name = "unknown"; });
 assert !(valid "ai" { llama.source.revision = "main"; });
+assert
+  !(valid "ai" {
+    llama.profiles.invalid = {
+      enableThinking = true;
+      preserveThinking = true;
+    };
+  });
 assert !(valid "virtualization" { kvm.enabel = true; });
 assert builtins.elem "openai-codex-bin" native.aur;
 assert enabled.artifacts.model.contextSize == 4096;
-assert enabled.artifacts.model.id == "Qwen3.6-35B-A3B-GGUF:MXFP4_MOE";
-assert inventoryDefault.artifacts.model.contextSize == 65536;
+assert profiled.artifacts.profiles.coding.artifacts.temperature == 0.6;
 assert !(builtins.elem "llama-cpp" native.pacman);
 assert !(builtins.elem "caddy" native.pacman);
 assert builtins.elem "qemu-desktop" native.pacman && builtins.elem "podman" native.pacman;

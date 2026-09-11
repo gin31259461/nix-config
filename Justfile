@@ -24,7 +24,7 @@ check-arch:
 build deployment="arch-workstation":
     nix build --no-link --show-trace --print-build-logs ".#{{ deployment }}"
 
-# Prepare the selected pinned llama.cpp build and model.
+# Prepare the pinned llama.cpp build and all declared models.
 prepare-ai mode="":
     #!/usr/bin/env bash
     set -euo pipefail

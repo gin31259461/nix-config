@@ -49,7 +49,7 @@ skipped with a highlighted warning; a configured module with invalid or drifting
 state still fails.
 
 ```bash
-# Build pinned llama.cpp and install the selected model.
+# Build pinned llama.cpp and install all declared models.
 just prepare-ai
 just prepare-ai build
 just prepare-ai model

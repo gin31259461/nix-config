@@ -46,9 +46,19 @@ capability withdraws management but does not retire existing packages, files,
 services, registrations or application data.
 
 AI preparation remains explicit. The prepared llama.cpp selector, build receipt
-and model must match the declaration before service convergence. Caddy and
-llama-server remain loopback-only; unrelated Tailscale Serve configuration is
-not overwritten.
+and every declared model must match the declaration before service convergence.
+llama-swap, llama-server and Caddy remain loopback-only; unrelated Tailscale
+Serve configuration is not overwritten.
+
+AI tests must assert stable capability contracts, not incidental inventory
+values. Test schema validation, model selection resolving successfully,
+declaration overrides propagating into the normalized artifact, prepared asset
+and receipt matching, loopback/service policy, conflict handling, idempotence,
+and disabled-state preservation. Do not assert the identity of
+`defaultModel`, a specific model ID, or default model metadata such as context
+size unless that exact value is an intentional product policy. Synthetic values
+in isolated adapter fixtures are acceptable when they test serialization or
+runtime behavior; keep them independent from production artifact inventories.
 
 GitLab Runner remains outside workstation deployment. Each enabled instance owns
 one service account, subordinate ID ranges, rootless Podman runtime, manager and

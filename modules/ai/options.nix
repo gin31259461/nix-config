@@ -101,6 +101,63 @@ in
         default = null;
       };
     };
+    profiles = lib.mkOption {
+      type = lib.types.attrsOf (
+        lib.types.submodule {
+          options = {
+            model = lib.mkOption {
+              type = lib.types.nullOr (lib.types.enum (builtins.attrNames inventory.models));
+              default = null;
+            };
+            reasoningEffort = lib.mkOption {
+              type = lib.types.nullOr (
+                lib.types.enum [
+                  "minimal"
+                  "low"
+                  "medium"
+                  "high"
+                  "xhigh"
+                ]
+              );
+              default = null;
+            };
+            enableThinking = lib.mkOption {
+              type = lib.types.nullOr lib.types.bool;
+              default = null;
+            };
+            preserveThinking = lib.mkOption {
+              type = lib.types.nullOr lib.types.bool;
+              default = null;
+            };
+            temperature = lib.mkOption {
+              type = lib.types.nullOr lib.types.float;
+              default = null;
+            };
+            topP = lib.mkOption {
+              type = lib.types.nullOr lib.types.float;
+              default = null;
+            };
+            topK = lib.mkOption {
+              type = lib.types.nullOr (lib.types.ints.between 0 100000);
+              default = null;
+            };
+            minP = lib.mkOption {
+              type = lib.types.nullOr lib.types.float;
+              default = null;
+            };
+            presencePenalty = lib.mkOption {
+              type = lib.types.nullOr lib.types.float;
+              default = null;
+            };
+            repetitionPenalty = lib.mkOption {
+              type = lib.types.nullOr lib.types.float;
+              default = null;
+            };
+          };
+        }
+      );
+      default = { };
+    };
     proxy = {
       enable = enable "the Caddy and Tailscale Serve proxy for llama.cpp";
       httpsPort = lib.mkOption {

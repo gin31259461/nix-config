@@ -59,11 +59,18 @@ import /etc/caddy/conf.d/*
 CADDY_SITE = """:11435 {
 \tbind 127.0.0.1
 
-\treverse_proxy 127.0.0.1:11434 {
-\t\theader_up Host 127.0.0.1:11434
+\t@api path /health /v1/*
+\thandle @api {
+\t\treverse_proxy 127.0.0.1:11434 {
+\t\t\theader_up Host 127.0.0.1:11434
+\t\t}
 \t}
+
+\trespond 404
 }
 """
+SWITCHER_CONFIG = "/etc/llama-swap/config.yaml"
+SWITCHER_UNIT = "/etc/systemd/system/llama-swap.service"
 PACKAGE_CADDY_WITH_SITE = PACKAGE_CADDY.replace(
     "# Import additional caddy config files in /etc/caddy/conf.d/\n",
     CADDY_SITE + "\n# Import additional caddy config files in /etc/caddy/conf.d/\n",
@@ -139,6 +146,31 @@ class AI:
             "127.0.0.1:11434", f"127.0.0.1:{d['server']['port']}"
         )
 
+    def switcher_config(self):
+        switcher = self.desired["switcher"]
+        return {
+            "startPort": switcher["startPort"],
+            "includeAliasesInList": switcher["includeAliasesInList"],
+            "groups": switcher["groups"],
+            "models": switcher["models"],
+        }
+
+    def switcher_unit(self):
+        switcher = self.desired["switcher"]
+        return f"""[Unit]
+Description=Nix-config llama-swap model router
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+ExecStart={switcher["binary"]} --config {SWITCHER_CONFIG} --listen {switcher["listen"]}
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
+"""
+
     def preset(self):
         d = self.desired
         model = d["model"]
@@ -201,8 +233,8 @@ RestartSec=3
         d, f = self.desired, self.files
         if not d["llama"]:
             return False
-        if not Path(d["model"]["path"]).is_absolute():
-            raise Conflict("model path must be absolute")
+        if any(not Path(model["path"]).is_absolute() for model in d["models"].values()):
+            raise Conflict("model paths must be absolute")
         install_prefix = d["source"]["installPrefix"]
         current = f.path(install_prefix + "/current", symlink_leaf=True)
         desired_link = (
@@ -218,8 +250,12 @@ RestartSec=3
         revision_prefix = install_prefix + "/" + desired_link
         executable = f.path(revision_prefix + "/bin/llama-server")
         receipt = f.read(revision_prefix + "/nix-config-build").strip()
-        model = f.path(d["model"]["path"])
-        if not executable.is_file() or not model.is_file() or not receipt:
+        models = [f.path(model["path"]) for model in d["models"].values()]
+        if (
+            not executable.is_file()
+            or any(not model.is_file() for model in models)
+            or not receipt
+        ):
             return False
         expected = (
             f"{d['source']['revision']} {d['source']['grammarRepetitionThreshold']}"
@@ -228,8 +264,16 @@ RestartSec=3
             raise Conflict(
                 "prepared llama-server receipt does not match the declaration"
             )
-        f.read("/etc/llama/server/models.ini")
-        f.read("/etc/systemd/system/llama-server.service.d/60-nix-config.conf")
+        f.read(SWITCHER_CONFIG)
+        f.read(SWITCHER_UNIT)
+        legacy_preset = f.read("/etc/llama/server/models.ini")
+        legacy_dropin = f.read(
+            "/etc/systemd/system/llama-server.service.d/60-nix-config.conf"
+        )
+        if legacy_preset and legacy_preset != self.preset():
+            raise Conflict("legacy llama-server preset requires explicit adoption")
+        if legacy_dropin and legacy_dropin != self.dropin():
+            raise Conflict("legacy llama-server drop-in requires explicit adoption")
         if f.read("/etc/systemd/system/llama-server.service.d/60-local.conf"):
             raise Conflict(
                 "legacy llama-server drop-in requires explicit operator adoption"
@@ -250,7 +294,6 @@ RestartSec=3
                 required |= {"caddy", "stat", "systemd-tmpfiles", "tailscale"}
             if any(not self.native.available(command) for command in required):
                 raise Conflict("a required native AI command is missing")
-            self.require_unit("llama-server.service")
             if d["proxy"]:
                 self.require_unit("caddy.service")
         return True
@@ -279,8 +322,8 @@ RestartSec=3
         ):
             raise Conflict("required AI service did not become ready")
 
-    def _curl_ready(self, port, retries=10, delay=2):
-        url = f"http://127.0.0.1:{port}/v1/models"
+    def _curl_ready(self, port, endpoint="/v1/models", retries=10, delay=2):
+        url = f"http://127.0.0.1:{port}{endpoint}"
         last_err = ""
         for attempt in range(1, retries + 1):
             try:
@@ -300,18 +343,23 @@ RestartSec=3
         if not self.preflight(installed=True):
             print("AI services skipped: selected model is not prepared.")
             return
-        self.write("/etc/llama/server/models.ini", self.preset(), "ai-llama")
-        dropin = self.dropin()
-        changed = self.write(
-            "/etc/systemd/system/llama-server.service.d/60-nix-config.conf",
-            dropin,
-            "ai-llama",
-        )
+        config = json.dumps(self.switcher_config(), indent=2, sort_keys=True) + "\n"
+        config_changed = self.write(SWITCHER_CONFIG, config, "ai-llama")
+        unit_changed = self.write(SWITCHER_UNIT, self.switcher_unit(), "ai-llama")
         pending = f.pending("ai-llama")
-        if changed or pending:
+        if config_changed or unit_changed or pending:
             self.run("systemctl", "daemon-reload")
             self.actions += 1
-        self.ensure_service("llama-server.service", "ai-llama", restart=pending)
+        if f.read("/etc/llama/server/models.ini") or f.read(
+            "/etc/systemd/system/llama-server.service.d/60-nix-config.conf"
+        ):
+            self.run("systemctl", "disable", "--now", "llama-server.service")
+            self.actions += 1
+        self.ensure_service(
+            "llama-swap.service",
+            "ai-llama",
+            restart=pending or config_changed,
+        )
         self._curl_ready(d["server"]["port"])
         f.clear("ai-llama")
         if d["proxy"]:

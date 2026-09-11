@@ -45,8 +45,9 @@ controller reports that state as a highlighted skip and continues. Ownership
 conflicts, invalid receipts and runtime failures are errors, not skips.
 
 The AI module follows this contract: `llama-prepare` owns the external llama.cpp
-build and GGUF model preparation; the Arch AI adapter owns service, Caddy and
-Tailscale Serve convergence after those assets are ready.
+build and all declared GGUF model preparation; the Arch AI adapter owns the
+loopback llama-swap router, model profiles, Caddy and Tailscale Serve
+convergence after those assets are ready.
 
 GitLab Runner instances use their own `runnerctl` lifecycle and are intentionally
 outside workstation deployment. Reconcile prepares host/runtime state; register

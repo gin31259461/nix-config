@@ -70,25 +70,32 @@ if ((build)); then
   fi
 fi
 if ((model)); then
-  [[ ! -L $model_path ]] || { printf 'model path must not be a symlink\n' >&2; exit 1; }
-  current=''
-  if [[ -f $model_path ]]; then current=$(sha256sum "$model_path" | cut -d' ' -f1); fi
-  if [[ -n $current && $current != "$model_sha256" ]]; then
-    printf 'existing model checksum differs; preserve or relocate it before preparation\n' >&2
-    exit 1
-  fi
-  if [[ -z $current ]]; then
-    model_dir=$(dirname "$model_path")
-    model_stage="$model_dir/.nix-config-$model_file"
-    [[ ! -L $model_dir ]] || { printf 'model directory must not be a symlink\n' >&2; exit 1; }
-    install -d -m0755 -o0 -g0 "$model_dir"
-    [[ ! -e $model_stage && ! -L $model_stage ]] || { printf 'stale model preparation stage requires operator review\n' >&2; exit 1; }
-    install -m0600 -o0 -g0 /dev/null "$model_stage"
-    curl --fail --location --show-error --output "$model_stage" \
-      "https://huggingface.co/$model_repository/resolve/$model_revision/$model_file"
-    printf '%s  %s\n' "$model_sha256" "$model_stage" | sha256sum --check --status
-    chmod 0644 "$model_stage"
-    mv -T "$model_stage" "$model_path"
-  fi
+  for model_index in "${!model_paths[@]}"; do
+    model_path=${model_paths[$model_index]}
+    model_sha256=${model_sha256s[$model_index]}
+    model_file=${model_files[$model_index]}
+    model_repository=${model_repositories[$model_index]}
+    model_revision=${model_revisions[$model_index]}
+    [[ ! -L $model_path ]] || { printf 'model path must not be a symlink\n' >&2; exit 1; }
+    current=''
+    if [[ -f $model_path ]]; then current=$(sha256sum "$model_path" | cut -d' ' -f1); fi
+    if [[ -n $current && $current != "$model_sha256" ]]; then
+      printf 'existing model checksum differs; preserve or relocate it before preparation\n' >&2
+      exit 1
+    fi
+    if [[ -z $current ]]; then
+      model_dir=$(dirname "$model_path")
+      model_stage="$model_dir/.nix-config-$model_file"
+      [[ ! -L $model_dir ]] || { printf 'model directory must not be a symlink\n' >&2; exit 1; }
+      install -d -m0755 -o0 -g0 "$model_dir"
+      [[ ! -e $model_stage && ! -L $model_stage ]] || { printf 'stale model preparation stage requires operator review\n' >&2; exit 1; }
+      install -m0600 -o0 -g0 /dev/null "$model_stage"
+      curl --fail --location --show-error --output "$model_stage" \
+        "https://huggingface.co/$model_repository/resolve/$model_revision/$model_file"
+      printf '%s  %s\n' "$model_sha256" "$model_stage" | sha256sum --check --status
+      chmod 0644 "$model_stage"
+      mv -T "$model_stage" "$model_path"
+    fi
+  done
 fi
 printf 'llama.cpp preparation complete\n'

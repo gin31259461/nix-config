@@ -20,6 +20,7 @@ class PrepareTests(unittest.TestCase):
         self.root = Path(self.temp.name)
         self.payload = b"pinned model\n"
         self.model = self.root / "models/model.gguf"
+        self.second_model = self.root / "models/second-model.gguf"
         fake_bin = self.root / "bin"
         fake_bin.mkdir()
         curl = fake_bin / "curl"
@@ -53,11 +54,11 @@ source_repository=unused
 source_revision={"0" * 40}
 grammar_threshold=20000
 install_prefix={self.root / "opt"}
-model_repository=example/model
-model_revision={"1" * 40}
-model_file=model.gguf
-model_path={self.model}
-model_sha256={digest}
+model_repositories=(example/model example/second-model)
+model_revisions=({"1" * 40} {"1" * 40})
+model_files=(model.gguf second-model.gguf)
+model_paths=({self.model} {self.second_model})
+model_sha256s=({digest} {digest})
 """
         self.script = self.root / "prepare"
         self.script.write_text(preamble + text)
@@ -76,6 +77,7 @@ model_sha256={digest}
         result = self.invoke()
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(self.model.read_bytes(), self.payload)
+        self.assertEqual(self.second_model.read_bytes(), self.payload)
         self.assertEqual(self.model.stat().st_mode & 0o777, 0o644)
         result = self.invoke()
         self.assertEqual(result.returncode, 0, result.stderr)

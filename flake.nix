@@ -90,7 +90,7 @@
         aiArtifacts = ai.artifacts;
       };
       llama-prepare = import ./modules/ai/package.nix {
-        inherit pkgs;
+        inherit lib pkgs;
         artifacts = ai.artifacts;
       };
       home-switch = import ./lib/deployment/home/package.nix {

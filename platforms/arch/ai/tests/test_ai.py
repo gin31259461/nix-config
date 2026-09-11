@@ -23,7 +23,7 @@ class Native:
     def __init__(self):
         self.calls = []
         self.services = {
-            "llama-server.service": {
+            "llama-swap.service": {
                 "LoadState": "loaded",
                 "ActiveState": "inactive",
                 "UnitFileState": "disabled",
@@ -72,6 +72,7 @@ class AITests(unittest.TestCase):
         self.root = Path(self.temp.name)
         for name in (
             "etc/caddy/conf.d",
+            "etc/llama-swap",
             "etc/llama/server",
             "etc/systemd/system/llama-server.service.d",
             "var/lib/nix-config/arch",
@@ -119,25 +120,76 @@ class AITests(unittest.TestCase):
                 "presencePenalty": 0.0,
                 "repetitionPenalty": 1.0,
             },
+            "models": {
+                "qwen": {
+                    "id": "agent",
+                    "path": "/var/lib/llama/models/model.gguf",
+                }
+            },
+            "switcher": {
+                "binary": "/nix/store/llama-swap/bin/llama-swap",
+                "listen": "127.0.0.1:11434",
+                "startPort": 12434,
+                "includeAliasesInList": True,
+                "groups": {
+                    "default": {
+                        "swap": True,
+                        "exclusive": True,
+                        "members": ["agent"],
+                    }
+                },
+                "models": {
+                    "agent": {
+                        "cmd": "/opt/llama/current/bin/llama-server --model /var/lib/llama/models/model.gguf --port ${PORT}",
+                        "proxy": "http://127.0.0.1:${PORT}",
+                        "checkEndpoint": "/health",
+                        "aliases": ["agent", "agent:coding"],
+                        "filters": {
+                            "setParamsByID": {
+                                "agent": {
+                                    "temperature": 1.0,
+                                    "top_p": 0.95,
+                                    "top_k": 20,
+                                    "min_p": 0.0,
+                                    "presence_penalty": 0.0,
+                                    "repetition_penalty": 1.0,
+                                },
+                                "agent:coding": {
+                                    "temperature": 0.6,
+                                    "top_p": 0.95,
+                                    "top_k": 20,
+                                    "min_p": 0.0,
+                                    "presence_penalty": 0.0,
+                                    "repetition_penalty": 1.0,
+                                    "chat_template_kwargs": {"enable_thinking": True},
+                                },
+                            }
+                        },
+                    }
+                },
+            },
         }
 
     def ai(self):
         return runtime.AI(self.desired, self.files, self.native)
 
-    def test_converges_single_model_runtime_and_proxy(self):
+    def test_converges_model_router_and_proxy(self):
         self.ai().converge()
-        preset = (self.root / "etc/llama/server/models.ini").read_text()
-        self.assertIn("[agent]", preset)
-        self.assertIn("ctx-size = 98304", preset)
-        dropin = (
-            self.root / "etc/systemd/system/llama-server.service.d/60-nix-config.conf"
-        ).read_text()
-        self.assertIn("/opt/llama/current/bin/llama-server", dropin)
-        self.assertIn(
-            "LD_LIBRARY_PATH=/opt/llama/current/lib:/opt/llama/current/lib64",
-            dropin,
+        config = json.loads((self.root / "etc/llama-swap/config.yaml").read_text())
+        self.assertEqual(
+            config["models"]["agent"]["aliases"], ["agent", "agent:coding"]
         )
-        self.assertIn('--chat-template-kwargs {\\"enable_thinking\\":true}', dropin)
+        self.assertEqual(
+            config["models"]["agent"]["filters"]["setParamsByID"]["agent:coding"][
+                "temperature"
+            ],
+            0.6,
+        )
+        unit = (self.root / "etc/systemd/system/llama-swap.service").read_text()
+        self.assertIn("--config /etc/llama-swap/config.yaml", unit)
+        self.assertIn("--listen 127.0.0.1:11434", unit)
+        self.assertIn("@api path /health /v1/*", runtime.CADDY_SITE)
+        self.assertIn("respond 404", runtime.CADDY_SITE)
         self.assertTrue(any(c[:2] == ("caddy", "reload") for c in self.native.calls))
         self.assertFalse(any((self.root / "var/lib/nix-config/arch").iterdir()))
 
@@ -170,9 +222,7 @@ class AITests(unittest.TestCase):
     def test_pending_restarts_then_clears(self):
         self.files.mark("ai-llama")
         self.ai().converge()
-        self.assertIn(
-            ("systemctl", "restart", "llama-server.service"), self.native.calls
-        )
+        self.assertIn(("systemctl", "restart", "llama-swap.service"), self.native.calls)
         self.assertFalse(self.files.pending("ai-llama"))
         self.assertIn(("systemctl", "daemon-reload"), self.native.calls)
 
