@@ -167,13 +167,17 @@ load-on-startup = true
     def dropin(self):
         d = self.desired
         prefix, server = d["source"]["installPrefix"] + "/current", d["server"]
+        model = d["model"]
+        chat_template_kwargs = json.dumps(
+            {"reasoning_effort": model["reasoningEffort"]}, separators=(",", ":")
+        ).replace('"', '\\"')
         return f"""[Unit]
 After=network-online.target
 
 [Service]
 Environment=LD_LIBRARY_PATH={prefix}/lib:{prefix}/lib64
 ExecStart=
-ExecStart={prefix}/bin/llama-server --models-preset /etc/llama/server/models.ini --models-max {server["modelsMax"]} --host {server["host"]} --port {server["port"]} --no-webui
+ExecStart={prefix}/bin/llama-server --models-preset /etc/llama/server/models.ini --models-max {server["modelsMax"]} --host {server["host"]} --port {server["port"]} --no-webui --temp {model["temperature"]} --top-p {model["topP"]} --top-k {model["topK"]} --min-p {model["minP"]} --presence-penalty {model["presencePenalty"]} --repeat-penalty {model["repetitionPenalty"]} --reasoning-effort {model["reasoningEffort"]} --chat-template-kwargs {chat_template_kwargs}
 SupplementaryGroups=render video
 Restart=on-failure
 RestartSec=3

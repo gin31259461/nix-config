@@ -56,6 +56,42 @@ in
         type = lib.types.nullOr lib.types.ints.positive;
         default = null;
       };
+      reasoningEffort = lib.mkOption {
+        type = lib.types.nullOr (
+          lib.types.enum [
+            "minimal"
+            "low"
+            "medium"
+            "high"
+            "xhigh"
+          ]
+        );
+        default = null;
+      };
+      temperature = lib.mkOption {
+        type = lib.types.nullOr lib.types.float;
+        default = null;
+      };
+      topP = lib.mkOption {
+        type = lib.types.nullOr lib.types.float;
+        default = null;
+      };
+      topK = lib.mkOption {
+        type = lib.types.nullOr (lib.types.ints.between 0 100000);
+        default = null;
+      };
+      minP = lib.mkOption {
+        type = lib.types.nullOr lib.types.float;
+        default = null;
+      };
+      presencePenalty = lib.mkOption {
+        type = lib.types.nullOr lib.types.float;
+        default = null;
+      };
+      repetitionPenalty = lib.mkOption {
+        type = lib.types.nullOr lib.types.float;
+        default = null;
+      };
     };
     proxy = {
       enable = enable "the Caddy and Tailscale Serve proxy for llama.cpp";

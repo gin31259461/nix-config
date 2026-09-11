@@ -5,7 +5,7 @@
     grammarRepetitionThreshold = 20000;
     installPrefix = "/opt/llama-cpp-opencode";
   };
-  defaultModel = "qwen3.5-35b-a3b-mxfp4";
+  defaultModel = "qwen3.8-27b-ud-q3-k-xl";
   models."qwen3.8-27b-ud-q3-k-xl" = {
     artifact = {
       id = "Qwen3.8-27B-GGUF:UD-Q3_K_XL";
@@ -23,25 +23,13 @@
       batchSize = 2048;
       microBatchSize = 512;
       parallel = 1;
-    };
-  };
-  models."qwen3.5-35b-a3b-mxfp4" = {
-    artifact = {
-      id = "Qwen3.5-35B-A3B-GGUF:MXFP4_MOE";
-      repository = "unsloth/Qwen3.5-35B-A3B-GGUF";
-      revision = "bc014a17be43adabd7066b7a86075ff935c6a4e2";
-      file = "Qwen3.5-35B-A3B-MXFP4_MOE.gguf";
-      path = "/var/lib/llama/models/Qwen3.5-35B-A3B-MXFP4_MOE.gguf";
-      sha256 = "0f135a59159030f4710477abc6f9922d2f13552c85bff736deaaef71023cd770";
-    };
-    runtime = {
-      contextSize = 98304;
-      fitTarget = 1024;
-      cacheTypeK = "q8_0";
-      cacheTypeV = "q8_0";
-      batchSize = 2048;
-      microBatchSize = 512;
-      parallel = 1;
+      reasoningEffort = "medium";
+      temperature = 1.0;
+      topP = 0.95;
+      topK = 20;
+      minP = 0.0;
+      presencePenalty = 0.0;
+      repetitionPenalty = 1.0;
     };
   };
   server = {

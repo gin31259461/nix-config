@@ -161,7 +161,7 @@ assert !(valid "ai" { llama.source.revision = "main"; });
 assert !(valid "virtualization" { kvm.enabel = true; });
 assert builtins.elem "openai-codex-bin" native.aur;
 assert enabled.artifacts.model.contextSize == 4096;
-assert enabled.artifacts.model.id == "Qwen3.5-35B-A3B-GGUF:MXFP4_MOE";
+assert enabled.artifacts.model.id == "Qwen3.8-27B-GGUF:UD-Q3_K_XL";
 assert inventoryDefault.artifacts.model.contextSize == 98304;
 assert !(builtins.elem "llama-cpp" native.pacman);
 assert !(builtins.elem "caddy" native.pacman);
