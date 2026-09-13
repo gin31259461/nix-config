@@ -6,6 +6,8 @@ Declarative Arch Linux workstation configuration built with Nix and Home Manager
 Arch owns native packages, system files, services, kernel integration and host
 policy. Home Manager owns portable user packages, static files and user services.
 
+![Desktop preview](docs/assets/preview.png)
+
 ## Use
 
 The selected host is [configuration.nix](configuration.nix). It imports
