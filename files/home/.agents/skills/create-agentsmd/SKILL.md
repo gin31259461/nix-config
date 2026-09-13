@@ -1,183 +1,101 @@
 ---
 name: create-agentsmd
-description: Create, rewrite, restructure, or audit scoped AGENTS.md coding instructions from repository evidence. Use when a root or nested project needs accurate ownership boundaries, side-effect guardrails, development and testing workflows, security rules, or clearer separation between agent instructions and README, domain, or migration documentation.
+description: Create, rewrite, refresh, or audit scoped AGENTS.md instructions from repository evidence, preserving valid constraints and the user's requested style.
 ---
 
 # Create AGENTS instructions
 
-Produce a compact operational contract that helps coding agents change the
-repository safely and correctly without repeating its user documentation.
-Include only instructions that affect agent decisions.
+Write a compact operational contract containing rules that change an agent's
+decisions. Preserve valid project-specific constraints and the repository's
+established instruction style.
 
-## Choose the operation mode
+## Interpret scope and intent
 
-Interpret the user's requested operation before editing:
+Create instructions when missing. Rewrite by reassessing the full instruction
+set and composing a coherent current document; the word "rewrite" does not
+require new headings or a different layout. Restructure when requested or when
+the existing organization hides important constraints. Refresh focused material
+for narrower requests. Audit without editing unless changes are authorized.
 
-- **Create**: build a new `AGENTS.md` from repository evidence.
-- **Rewrite**: replace the existing instruction set with a newly derived,
-  coherent `AGENTS.md`. Treat the existing file as evidence, not as the default
-  structural template.
-- **Refresh**: preserve the existing structure when it remains effective, while
-  correcting stale, incomplete, or unclear instructions.
-- **Audit**: inspect and report issues unless the user also asks for edits.
+When restoring style, use prior versions to recover tone and organization while
+retaining current contracts. Do not restore historical files wholesale and
+thereby remove valid new rules or bring back retired commands.
 
-Treat explicit verbs such as `rewrite`, `regenerate`, `rebuild`, or
-`restructure` as **Rewrite** mode. Do not downgrade them to a conservative
-refresh.
+Follow explicit user preferences. Do not expand a documentation task into
+implementation, deployment or changes to unrelated agent configuration.
 
-In **Rewrite** mode:
+## Read the owning evidence
 
-1. Derive the target scope, instruction categories, and ordering from current
-   repository evidence and this skill before composing the new file.
-2. Preserve verified project-specific rules, but do not preserve wording,
-   headings, section order, or layout merely because they already exist.
-3. Remove obsolete, duplicated, generic, or misplaced instructions rather than
-   editing around them.
-4. Produce a coherent replacement document instead of a sequence of local
-   patches to the previous file.
-5. Respect all applicable parent `AGENTS.md` instructions and retain
-   repository-specific constraints that are still valid.
+Read applicable parent and scoped AGENTS files, Git status, README, composition
+documents and relevant build, configuration, CI and test source. Identify
+generated, sensitive and externally owned paths.
 
-## Determine scope first
+For each important existing instruction, determine whether to retain, clarify,
+move or remove it. Distinguish:
 
-1. Read all `AGENTS.md` files that apply from the filesystem or repository root
-   to the target directory. The nearest file has the most specific scope.
-2. Inspect the README, domain documentation, manifests, build files, task
-   runners, CI, tests, configuration, and scripts relevant to that scope.
-3. Check Git status and identify generated, sensitive, vendored, submodule, or
-   externally owned paths.
-4. Determine the repository's architecture, ownership seams, side effects, and
-   supported workflows from evidence.
-5. Preserve accurate project-specific rules from an existing `AGENTS.md`.
-   In Rewrite mode, preserve the verified rules themselves, not the old file's
-   structure, wording, headings, or ordering.
+- explicit user or repository policy, which source behavior may currently violate;
+- implementation facts supported by current code;
+- proposed design choices that have not been implemented.
 
-Create a root `AGENTS.md` by default. Add or rewrite a nested file only when a
-subtree has materially different commands, ownership, safety constraints, or
-language conventions. Do not create nested files merely because the repository
-is a monorepo.
+Do not weaken a valid requirement because the code violates it. Report the
+discrepancy. Do not promote a preference or proposed abstraction into a universal
+constraint. If a rule's purpose is unclear, investigate before removing it.
 
-When rewriting an existing scoped `AGENTS.md`, first determine which rules
-belong in that scope versus a parent or nested file. Move, remove, or condense
-instructions when the current placement is wrong. Do not retain a section in
-the target file solely because it existed there before.
+Create nested instructions only where ownership, safety or workflows materially
+differ and the task covers that scope. Avoid duplicating parent rules.
 
-## Keep companion documents distinct
+## Preserve a useful instruction style
 
-Use this division of responsibility:
+Keep effective headings, ownership tables, command blocks, terminology and
+imperative tone. Reorganize when there is a concrete readability or scope reason.
+Use the established title, or "# AGENTS Instructions" for a new document.
 
-| Document | Responsibility |
-| --- | --- |
-| `README.md` | User/developer entry point and current public behavior |
-| `AGENTS.md` | Coding-agent ownership, safety, editing, and validation rules |
-| Domain documentation | Architecture and operational relationships |
-| Migration guide | A version-bounded transition that is not yet complete |
-| Source/config/scripts | Authoritative inventories and executable policy |
+Be concise without deleting operational meaning. In particular, preserve
+qualifications and exceptions around optional skips, diagnostics, secrets,
+disabled-state behavior, data retention and required validation when those
+contracts exist in the repository.
 
-Keep critical agent rules self-contained even when another document explains
-the background. Link to the companion document for detail instead of copying a
-long tutorial, architecture narrative, migration sequence, or inventory.
+Keep agent constraints self-contained. Link to architecture and runbooks for
+background; do not replace a critical rule with a vague link.
 
-## Build an adaptive instruction set
+## Write actionable constraints
 
-Use `# AGENTS Instructions` as the root title unless an established repository
-convention explicitly requires another title. Select only sections justified by
-the repository. In Rewrite mode, derive the section set and ordering anew; the
-previous file's headings are not defaults. Common candidates are:
+Include only categories justified by evidence:
 
-- project overview;
-- ownership seam;
-- high-signal repository layout;
-- core commands;
-- side-effect rules;
-- configuration or domain rules;
-- platform or package ownership;
-- development workflow;
-- testing instructions;
-- code style and security; and
-- documentation update rules.
+- ownership of configuration, packages, files, accounts and services;
+- public interface validation, defaults and override semantics;
+- generated sources, runtime data and external source ownership;
+- side effects, explicit preparation and failure handling;
+- protected data and non-logging requirements;
+- meaningful testing contracts and exact validation commands;
+- documentation obligations when public behavior changes.
 
-Do not add placeholder or boilerplate sections. Omit setup, deployment,
-database, coverage, pull-request, debugging, or release instructions when the
-repository does not define them.
+Explain which commands are source validation and which affect live systems.
+Use isolated fixtures or fake commands for testing side effects where available.
+Respect authorization already supplied by the user; avoid blanket approval
+requirements for ordinary reversible edits.
 
-## Make ownership actionable
+Keep authoritative inventories in source. State their owner rather than
+duplicating every package or service. Do not turn incidental production values
+or private implementation shape into mandatory test assertions.
 
-State the boundaries an agent cannot safely infer:
+Separate responsibilities: README introduces the project, runbooks describe
+operator procedures, composition documents explain architecture, and AGENTS
+governs changes. Do not create historical narratives or new companion files
+unless the repository and task require them.
 
-- which module or repository owns each important behavior or policy;
-- which file is the source of truth for changing inventories;
-- when shared code is appropriate and when behavior must remain owner-specific;
-- which generated or externally owned files must not be edited;
-- how monorepo packages, submodules, or bare worktrees must be handled; and
-- which documentation must change with a public contract.
+## Verify completeness and correctness
 
-Prefer rules such as "service inventory belongs in this script" over a copied
-list of services that can drift.
+Check every path and command against source. Reconcile parent and nested rules.
+Review the finished instructions against the original constraint inventory:
+each material rule must survive, be deliberately clarified or have an
+evidence-backed reason for removal. Preserve stronger user policy even when
+implementation work remains.
 
-## Define safety and authorization boundaries
+Run applicable Markdown checks and git diff --check. Validate prose without live
+deployment, registration, package installation or cleanup. Read README and
+AGENTS together to catch contradictions while keeping their roles distinct.
 
-- Separate read-only validation from commands that mutate machines, services,
-  package databases, remotes, cloud resources, or user data.
-- Require explicit user authorization for live or destructive actions when the
-  repository has such operations.
-- Name sensitive paths or data classes only as precisely as needed to prevent
-  exposure; instruct agents not to print or track secrets.
-- Require fake runners, temporary directories, fixtures, or dry-run mechanisms
-  for risky behavior when the repository provides them.
-- Preserve unrelated dirty worktree changes and forbid destructive recovery
-  commands unless explicitly authorized.
-- Record repository-specific tool and editing constraints that materially
-  affect safe work.
-
-Do not copy generic safety prose that adds no repository-specific decision.
-
-## Document real workflows
-
-- Use exact commands from manifests, Makefiles, task runners, CI, or scripts.
-- Explain when focused checks are sufficient and when the complete validation
-  suite is required.
-- Mark commands that depend on deployed configuration or external services.
-- Do not test instructions by running live deployment, bootstrap, setup,
-  cleanup, package installation, or destructive commands.
-- Keep current commands in `AGENTS.md`; put unfinished migrations in a
-  versioned migration guide.
-
-For tests, protect stable contracts, schema invariants, destructive safety, and
-non-trivial orchestration. Do not prescribe coverage-only tests for trivial
-wrappers, getters, or private implementation shape unless the repository has a
-documented requirement. When ownership moves, replace obsolete tests rather
-than retaining parallel coverage at both owners.
-
-## Write concise instructions
-
-- Use imperative, specific language.
-- Explain why only when it changes how an agent should act.
-- Prefer compact bullets and exact code blocks over broad tutorials.
-- Include high-signal paths, not a complete directory listing.
-- Avoid personality prompts, ecosystem marketing, generic AI advice, and
-  claims that are not verified from the repository.
-- Avoid duplicating package, service, route, or configuration inventories whose
-  authoritative source is executable.
-- Preserve stable rules; remove completed plans and retired architecture.
-
-## Validate the result
-
-1. Verify every command, path, ownership statement, and tool name against the
-   repository.
-2. Confirm the instructions do not conflict with an applicable parent or
-   nested `AGENTS.md`.
-3. Run the repository's Markdown lint command when available.
-4. Check links, placeholders, fenced blocks, tables, and `git diff --check`.
-5. Confirm no unrelated or sensitive file was staged.
-6. Re-read the README and AGENTS files together: keep only purposeful overlap
-   and ensure each remains usable for its intended audience.
-7. Re-check the finished file against every applicable rule in this skill.
-8. In Rewrite mode, confirm the result is a coherent replacement derived from
-   current repository evidence, not a patched version of the previous
-   `AGENTS.md`.
-9. In Rewrite mode, confirm headings, ordering, and scope placement were chosen
-   intentionally rather than inherited mechanically from the old file.
-
-Finish with a concise summary of the scope, important guardrails, validation
-performed, and any unresolved repository fact.
+Report changed scope, important retained or revised constraints and validation.
+Do not claim implementation work was completed merely because instructions now
+describe the intended design. Commit or push only within authorized scope.
