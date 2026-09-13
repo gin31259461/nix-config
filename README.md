@@ -4,7 +4,8 @@
 [![Arch Linux](https://img.shields.io/badge/platform-Arch_Linux-1793D1?logo=archlinux)](https://archlinux.org/)
 [![Home Manager](https://img.shields.io/badge/Home_Manager-26.05-5277C3)](https://github.com/nix-community/home-manager/tree/release-26.05)
 
-Declarative Arch Linux workstation configuration built with Nix and Home Manager.
+Build and deploy a declarative workstation with Nix and Home Manager.
+
 Arch adapters own native packages, system files, services, kernel integration and
 host runtime policy. Home Manager owns portable user packages, files and user
 services. `configuration.nix` is the single configuration entry point.
