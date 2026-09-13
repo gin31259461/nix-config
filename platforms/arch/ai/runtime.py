@@ -2,13 +2,13 @@
 
 import json
 import os
-import subprocess
 import sys
 import time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parents[1] / "system"))
 from files import Conflict, Files  # noqa: E402
+from native import Native  # noqa: E402
 
 PACKAGE_CADDY = """# The Caddyfile is an easy way to configure your Caddy web server.
 #
@@ -75,29 +75,6 @@ PACKAGE_CADDY_WITH_SITE = PACKAGE_CADDY.replace(
     "# Import additional caddy config files in /etc/caddy/conf.d/\n",
     CADDY_SITE + "\n# Import additional caddy config files in /etc/caddy/conf.d/\n",
 )
-
-
-class Native:
-    def available(self, command):
-        return os.access("/usr/bin/" + command, os.X_OK)
-
-    def run(self, *args, check=True):
-        try:
-            result = subprocess.run(
-                ["/usr/bin/" + args[0], *args[1:]],
-                capture_output=True,
-                text=True,
-                timeout=300,
-                env={"PATH": "/usr/bin", "LC_ALL": "C"},
-                cwd="/",
-            )
-        except (OSError, subprocess.TimeoutExpired):
-            raise Conflict(f"native {args[0]} unavailable or timed out") from None
-        if check and result.returncode:
-            raise Conflict(
-                f"native {args[0]} failed; pending action retained ${result.stderr.strip() or result.stdout.strip()}"
-            )
-        return result
 
 
 class AI:
@@ -258,6 +235,8 @@ RestartSec=3
             or any(not model.is_file() for model in models)
             or not receipt
         ):
+            if installed:
+                raise Conflict("prepared llama.cpp assets are incomplete")
             return False
         expected = (
             f"{d['source']['revision']} {d['source']['grammarRepetitionThreshold']}"

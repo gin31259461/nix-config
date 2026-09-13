@@ -2,6 +2,7 @@
 result
 result-*
 __pycache__/
+.venv/
 *.py[cod]
 registry.json
 *.local

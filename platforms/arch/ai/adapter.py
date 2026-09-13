@@ -10,7 +10,6 @@ import traceback
 
 import runtime
 from files import Conflict
-from native import Native
 
 OPTIONAL_NOT_READY = 20
 
@@ -29,7 +28,6 @@ def main() -> int:
         raise Conflict("private AI adapter must be invoked by arch-switch")
     if _verbose():
         os.environ["NIX_CONFIG_VERBOSE"] = "1"
-    runtime.Native = Native
     ai = runtime.AI(json.loads(Path(sys.argv[1]).read_text()))
     phase = sys.argv[2]
     if phase == "preflight":

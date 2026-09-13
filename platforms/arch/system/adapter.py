@@ -10,7 +10,6 @@ import traceback
 
 import runtime
 from files import Conflict
-from native import Native
 
 
 def _verbose() -> bool:
@@ -27,7 +26,6 @@ def main() -> int:
         raise Conflict("private adapter must be invoked by arch-switch")
     if _verbose():
         os.environ["NIX_CONFIG_VERBOSE"] = "1"
-    runtime.Native = Native
     system = runtime.System(json.loads(Path(sys.argv[1]).read_text()))
     if sys.argv[2] == "preflight":
         system.preflight()

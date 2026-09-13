@@ -1,0 +1,11 @@
+[project]
+name = "nix-config-tools"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = ["tomli-w"]
+
+[tool.ruff]
+line-length = 88
+
+[tool.ruff.lint]
+select = ["F"]

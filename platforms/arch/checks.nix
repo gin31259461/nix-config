@@ -21,6 +21,7 @@
         root = ./.;
         fileset = pkgs.lib.fileset.unions [
           ./ai/runtime.py
+          ./system/native.py
           ./system/files.py
         ];
       }

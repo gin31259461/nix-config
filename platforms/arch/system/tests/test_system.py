@@ -514,16 +514,16 @@ class SystemTests(unittest.TestCase):
         self.system.converge()
         self.assertNotIn(("systemctl", "restart", "fstrim.timer"), self.native.calls)
 
-    def test_native_errors_never_expose_output(self):
+    def test_native_errors_preserve_output(self):
         with patch(
-            "runtime.subprocess.run",
+            "native.subprocess.run",
             return_value=SimpleNamespace(
                 returncode=1, stdout="private fixture", stderr="private fixture"
             ),
         ) as run:
             with self.assertRaises(Conflict) as caught:
                 Native().run("ufw", "status", "verbose")
-            self.assertNotIn("private fixture", str(caught.exception))
+            self.assertIn("private fixture", str(caught.exception))
             self.assertEqual(
                 run.call_args.kwargs["env"], {"PATH": "/usr/bin", "LC_ALL": "C"}
             )

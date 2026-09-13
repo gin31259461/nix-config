@@ -8,34 +8,12 @@ import hashlib
 import json
 import os
 from pathlib import Path
-import subprocess
 import sys
 
 from files import Conflict, Files, locale_gen, replace_keys
 from firewall import Firewall
 from hotspot import Hotspot
-
-
-class Native:
-    @staticmethod
-    def available(command):
-        return os.access("/usr/bin/" + command, os.X_OK)
-
-    def run(self, *args, check=True):
-        try:
-            result = subprocess.run(
-                ["/usr/bin/" + args[0], *args[1:]],
-                capture_output=True,
-                text=True,
-                timeout=300,
-                env={"PATH": "/usr/bin", "LC_ALL": "C"},
-                cwd="/",
-            )
-        except (OSError, subprocess.TimeoutExpired):
-            raise Conflict(f"native {args[0]} unavailable or timed out") from None
-        if check and result.returncode:
-            raise Conflict(f"native {args[0]} failed; pending action retained")
-        return result
+from native import Native
 
 
 class System:

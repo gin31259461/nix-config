@@ -115,7 +115,17 @@
     in
     {
       homeConfigurations = archHomes;
-      configurations.arch = configuration.config;
+      # This is a queryable normalized configuration, not a NixOS system.
+      lib.configurations.arch = configuration.config;
+      lib.runnerctlEnabled = runners.packages != { };
+
+      devShells.${system}.default = pkgs.mkShell {
+        packages = [
+          (pkgs.python3.withPackages (pythonPackages: [ pythonPackages.tomli-w ]))
+          pkgs.ruff
+          pkgs.just
+        ];
+      };
 
       checks.${system} = {
         configuration = import ./checks/configuration.nix { inherit lib pkgs inputs; };

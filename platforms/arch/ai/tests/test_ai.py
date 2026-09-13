@@ -216,10 +216,11 @@ class AITests(unittest.TestCase):
         self.assertTrue(marker.exists())
         self.assertEqual(self.native.calls, [])
 
-    def test_missing_prepared_assets_skip_without_mutation(self):
+    def test_missing_prepared_assets_fail_after_selector_exists(self):
         (self.root / "opt/llama/current/bin/llama-server").unlink()
         result = self.ai()
-        result.converge()
+        with self.assertRaisesRegex(runtime.Conflict, "assets are incomplete"):
+            result.converge()
         self.assertEqual(result.updates, 0)
         self.assertEqual(self.native.calls, [])
 

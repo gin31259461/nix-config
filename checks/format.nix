@@ -5,6 +5,7 @@ let
     fileset = lib.fileset.unions [
       ../configuration.nix
       ../flake.nix
+      ../pyproject.toml
       ../lib
       ../hosts
       ../homes

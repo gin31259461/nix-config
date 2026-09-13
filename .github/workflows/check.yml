@@ -34,7 +34,11 @@ jobs:
         run: nix flake check --no-update-lock-file --print-build-logs
 
       - name: Build deployment artifacts without activation
-        run: nix build --no-link --no-update-lock-file .#arch-workstation .#arch-switch .#runnerctl
+        run: |
+          nix build --no-link --no-update-lock-file .#arch-workstation .#arch-switch
+          if [[ "$(nix eval --raw --no-update-lock-file .#lib.runnerctlEnabled)" == "true" ]]; then
+            nix build --no-link --no-update-lock-file .#runnerctl
+          fi
 
       - name: Ensure validation left the checkout unchanged
         run: git diff --exit-code
