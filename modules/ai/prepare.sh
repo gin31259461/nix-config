@@ -88,13 +88,30 @@ if ((model)); then
       model_stage="$model_dir/.nix-config-$model_file"
       [[ ! -L $model_dir ]] || { printf 'model directory must not be a symlink\n' >&2; exit 1; }
       install -d -m0755 -o0 -g0 "$model_dir"
+      download_dir="$model_stage.download"
+      cache_dir="$download_dir/cache"
       [[ ! -e $model_stage && ! -L $model_stage ]] || { printf 'stale model preparation stage requires operator review\n' >&2; exit 1; }
-      install -m0600 -o0 -g0 /dev/null "$model_stage"
-      curl --fail --location --show-error --output "$model_stage" \
-        "https://huggingface.co/$model_repository/resolve/$model_revision/$model_file"
-      printf '%s  %s\n' "$model_sha256" "$model_stage" | sha256sum --check --status
-      chmod 0644 "$model_stage"
-      mv -T "$model_stage" "$model_path"
+      if [[ -e $download_dir || -L $download_dir ]]; then
+        [[ -d $download_dir && ! -L $download_dir ]] || { printf 'model download stage must be a directory\n' >&2; exit 1; }
+        printf '%s\n%s\n%s\n%s\n' "$model_repository" "$model_revision" "$model_file" "$model_sha256" | cmp -s - "$download_dir/nix-config-identity" || {
+          printf 'model download stage has a different declaration\n' >&2
+          exit 1
+        }
+      else
+        install -d -m0700 -o0 -g0 "$download_dir"
+        printf '%s\n%s\n%s\n%s\n' "$model_repository" "$model_revision" "$model_file" "$model_sha256" >"$download_dir/nix-config-identity"
+        chmod 0600 "$download_dir/nix-config-identity"
+      fi
+      hf download "$model_repository" "$model_file" \
+        --revision "$model_revision" \
+        --local-dir "$download_dir" \
+        --cache-dir "$cache_dir"
+      downloaded="$download_dir/$model_file"
+      [[ -f $downloaded && ! -L $downloaded ]] || { printf 'Hugging Face download did not produce the declared file\n' >&2; exit 1; }
+      printf '%s  %s\n' "$model_sha256" "$downloaded" | sha256sum --check --status
+      chmod 0644 "$downloaded"
+      mv -T "$downloaded" "$model_path"
+      rm -rf -- "$download_dir"
     fi
   done
 fi

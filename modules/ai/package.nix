@@ -8,8 +8,8 @@ pkgs.writeShellApplication {
   runtimeInputs = with pkgs; [
     cmake
     coreutils
-    curl
     git
+    python3Packages.huggingface-hub
     gnused
     ninja
     util-linux

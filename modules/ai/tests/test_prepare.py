@@ -23,13 +23,13 @@ class PrepareTests(unittest.TestCase):
         self.second_model = self.root / "models/second-model.gguf"
         fake_bin = self.root / "bin"
         fake_bin.mkdir()
-        curl = fake_bin / "curl"
-        curl.write_text(
+        hf = fake_bin / "hf"
+        hf.write_text(
             f"#!{shutil.which('sh')}\n"
-            'while [ "$1" != --output ]; do shift; done\n'
-            "shift; printf 'pinned model\\n' >\"$1\"\n"
+            'file=$3; while [ "$1" != --local-dir ]; do shift; done\n'
+            "shift; printf 'pinned model\\n' >\"$1/$file\"\n"
         )
-        curl.chmod(0o755)
+        hf.chmod(0o755)
         text = SOURCE.read_text()
         text = text.replace(
             "((EUID == 0)) || { printf \"run llama-prepare as root (sudo nix --extra-experimental-features 'nix-command flakes' run .#llama-prepare)\\n\" >&2; exit 1; }",
