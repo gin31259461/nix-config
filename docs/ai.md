@@ -38,8 +38,12 @@ sudo nix --extra-experimental-features 'nix-command flakes' run .#llama-prepare 
 
 Preparation builds the pinned llama.cpp revision, applies the reviewed grammar
 threshold change, installs it under the declared revision directory, atomically
-updates the `current` selector, downloads every declared GGUF and verifies each
-SHA-256. It requires the native C++/ROCm/Vulkan development toolchain.
+updates the `current` selector, and downloads every declared GGUF with the
+Nix-provided Hugging Face `hf download` command. Each model is downloaded into
+an identity-checked staging directory, verified with its declared SHA-256, and
+published atomically. An interrupted download can be retried for the same
+declaration; an unknown or mismatched staging directory requires operator
+review. The build requires the native C++/ROCm/Vulkan development toolchain.
 
 Preparation is idempotent for matching owned state. An existing conflicting
 revision, selector, staging path or model checksum is an error and requires
