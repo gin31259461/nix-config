@@ -28,6 +28,12 @@
     }/ai/runtime.py
     touch "$out"
   '';
+  personal-agent-tests =
+    pkgs.runCommand "personal-agent-tests" { nativeBuildInputs = [ pkgs.python3 ]; }
+      ''
+        python ${./personal-agent/tests/test_personal_agent.py} ${./personal-agent/adapter.py}
+        touch "$out"
+      '';
   llama-prepare-interface =
     pkgs.runCommand "llama-prepare-interface"
       {

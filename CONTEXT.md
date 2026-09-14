@@ -53,6 +53,11 @@ GitLab Runner instances use their own `runnerctl` lifecycle and are intentionall
 outside workstation deployment. Reconcile prepares host/runtime state; register
 initializes the GitLab registration; verify checks the resulting instance.
 
+The Personal Agent application is a pinned external flake package. Its optional
+Arch capability owns the account, state directory and systemd unit while fixed
+runtime configuration under `/etc/personal-agent` remains outside Git and the Nix
+store.
+
 ## Ownership
 
 Arch owns native package installation, `/etc` policy, system services, kernel and

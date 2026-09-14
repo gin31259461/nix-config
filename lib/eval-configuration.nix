@@ -40,6 +40,7 @@ let
         _: value: cfg.services.gitlabRunner.enable && value.enable
       ) cfg.services.gitlabRunner.instances
     );
+    personalAgent = cfg.services.personalAgent.enable;
     users = lib.mapAttrs (
       _: user:
       (builtins.removeAttrs user [ "home" ])

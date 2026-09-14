@@ -38,6 +38,7 @@ class ArchSwitchTests(unittest.TestCase):
         for command in (
             "id sudo pacman pacman-conf yay install mv rm touch mkdir mktemp "
             "systemctl sysctl gpasswd getcap setcap mkinitcpio modprobe curl bsdtar"
+            " getent groupadd useradd chown chmod stat"
         ).split():
             executable = self.root / "bin" / command
             executable.write_text(
@@ -71,6 +72,9 @@ class ArchSwitchTests(unittest.TestCase):
                     "ai_python=/fixture/python",
                     "ai_adapter=/fixture/ai-adapter",
                     "ai_manifest=/fixture/ai-manifest",
+                    "personal_agent_python=/fixture/python",
+                    "personal_agent_adapter=/fixture/personal-agent-adapter",
+                    "personal_agent_manifest=/fixture/personal-agent-manifest",
                     "initramfs_modules=(usbhid amdgpu)",
                     "initramfs_images=(/boot/initramfs-linux.img)",
                     "user_services=(openrazer-daemon.service app-dev.lizardbyte.app.Sunshine.service)",

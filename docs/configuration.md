@@ -45,6 +45,7 @@ values into the private Host and adapter interfaces.
 | `networking` | Hostname, NetworkManager, hotspot and firewall |
 | `i18n`, `time`, `console` | Locale, timezone and virtual console |
 | `services` | Time sync, journal, logind, TRIM, power, Tailscale and GitLab Runner |
+| `services.personalAgent` | Pinned Personal Agent package and native system service |
 | `hardware` | Graphics, Bluetooth, OpenRazer and initramfs intent |
 | `programs.ai` | llama.cpp, Codex and shared AI skill presets |
 | `programs` | Sunshine, Vesktop and Vicinae |

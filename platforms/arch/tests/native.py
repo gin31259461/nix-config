@@ -37,10 +37,15 @@ if command == "python":
     assert args[:2] in (
         ["/fixture/adapter", "/fixture/manifest"],
         ["/fixture/ai-adapter", "/fixture/ai-manifest"],
+        ["/fixture/personal-agent-adapter", "/fixture/personal-agent-manifest"],
     )
     assert args[2] in ("preflight", "converge")
     assert len(args) == 3 or args[3:] == ["--verbose"]
     if args[0] == "/fixture/ai-adapter" and state.get("ai_not_ready"):
+        sys.exit(20)
+    if args[0] == "/fixture/personal-agent-adapter" and state.get(
+        "personal_agent_not_ready"
+    ):
         sys.exit(20)
 elif command == "id":
     print(

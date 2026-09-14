@@ -45,7 +45,7 @@ has_group wheel || fail 'deployment user is not in required administrator group:
 
 # Check every native dependency before any mutation. Nix supplies text utilities.
 required_commands=(id sudo pacman pacman-conf yay install mv rm touch mkdir mktemp
-  systemctl sysctl gpasswd modprobe)
+  systemctl sysctl gpasswd modprobe getent groupadd useradd chown chmod)
 if ((${manage_sunshine:-1})); then required_commands+=(getcap setcap); fi
 if ((${manage_initramfs:-1})); then required_commands+=(mkinitcpio); fi
 for command in "${required_commands[@]}"; do
@@ -110,6 +110,12 @@ if ((purge)); then
   done
   [[ ! -e $fs_root/etc/pacman.conf ]] || sed -i "/^Include = \/etc\/pacman.d\/nix-config-lizardbyte.conf$/d" "$fs_root/etc/pacman.conf"
   [[ ! -e $root_state ]] || root rm -rf -- "$root_state"
+  if [[ -e $fs_root/etc/systemd/system/personal-agent.service ]]; then
+    native systemctl is-enabled --quiet personal-agent.service &&
+      root systemctl disable --now personal-agent.service || true
+    root rm -f -- "$fs_root/etc/systemd/system/personal-agent.service"
+    root systemctl daemon-reload
+  fi
   printf 'Arch deployment state purged; package and user data were preserved.\n'
   exit 0
 fi
@@ -151,6 +157,11 @@ ai_settings() {
   mapfile -d '' -t args < <(adapter_args "$ai_manifest" "$1")
   native sudo "$ai_python" "$ai_adapter" "${args[@]}"
 }
+personal_agent_settings() {
+  local args=()
+  mapfile -d '' -t args < <(adapter_args "$personal_agent_manifest" "$1")
+  native sudo "$personal_agent_python" "$personal_agent_adapter" "${args[@]}"
+}
 # Read-only ownership preflight precedes package/configuration writes. A second
 # pass after updates checks newly installed native tools and configuration.
 system_settings preflight
@@ -164,6 +175,21 @@ else
     optional_skip 'ai' "llama.cpp build/model is not prepared; run 'just prepare-ai'"
   else
     exit "$ai_status"
+  fi
+fi
+personal_agent_skipped=0
+if ((ai_skipped)); then
+  personal_agent_skipped=1
+  optional_skip 'personal-agent' 'local inference is not ready'
+elif personal_agent_settings preflight; then
+  :
+else
+  personal_agent_status=$?
+  if ((personal_agent_status == 20)); then
+    personal_agent_skipped=1
+    optional_skip 'personal-agent' 'runtime configuration is not prepared'
+  else
+    exit "$personal_agent_status"
   fi
 fi
 if ((update_system)); then resolve_inventory; fi
@@ -284,6 +310,18 @@ if ((!ai_skipped)); then
       optional_skip 'ai' "prepared assets disappeared during deployment; rerun 'just prepare-ai'"
     else
       exit "$ai_status"
+    fi
+  fi
+fi
+if ((!personal_agent_skipped)); then
+  if personal_agent_settings converge; then
+    :
+  else
+    personal_agent_status=$?
+    if ((personal_agent_status == 20)); then
+      optional_skip 'personal-agent' 'runtime configuration disappeared during deployment'
+    else
+      exit "$personal_agent_status"
     fi
   fi
 fi

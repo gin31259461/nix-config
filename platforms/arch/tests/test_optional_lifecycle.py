@@ -43,6 +43,28 @@ class OptionalLifecycleTests(unittest.TestCase):
         self.assertTrue(adapter_calls)
         self.assertTrue(all(call[-1] == "--verbose" for call in adapter_calls))
 
+    def test_unprepared_personal_agent_is_skipped(self):
+        self.state["personal_agent_not_ready"] = True
+        self.save()
+        result = self.invoke()
+        self.assertIn("SKIP optional module personal-agent:", result.stderr)
+        calls = [
+            call
+            for call in self.commands()
+            if call[:2] == ["python", "/fixture/personal-agent-adapter"]
+        ]
+        self.assertEqual(
+            calls,
+            [
+                [
+                    "python",
+                    "/fixture/personal-agent-adapter",
+                    "/fixture/personal-agent-manifest",
+                    "preflight",
+                ]
+            ],
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -72,6 +72,9 @@ module ...` message records that decision. All other optional-module errors are
 fatal.
 
 GitLab Runner reconciliation and registration are not part of this workflow.
+Personal Agent convergence is part of this workflow only when its external
+runtime configuration is ready; first-time absence is reported as an optional
+skip.
 See [runners](runners.md).
 
 ## Failure and recovery

@@ -121,6 +121,9 @@ in
     powerProfilesDaemon.enable = enable "power-profiles-daemon";
     tailscale.enable = enable "Tailscale";
     gitlabRunner = import ../modules/gitlab-runner/options.nix { inherit lib; };
+    personalAgent.enable = (lib.mkEnableOption "the Personal Agent system service") // {
+      default = true;
+    };
   };
   programs = {
     ai = import ../modules/ai/options.nix { inherit lib; };

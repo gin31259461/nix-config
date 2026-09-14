@@ -58,6 +58,11 @@ conflicts and runtime failures stop deployment. Runner reconciliation,
 registration and verification use separate commands in the
 [Runner runbook](docs/runners.md). Keep tokens outside Git, Nix and logs.
 
+The pinned Personal Agent package is converged as an optional native service when
+its external runtime configuration is ready. See the
+[Personal Agent runbook](docs/personal-agent.md); Discord and Notion identifiers,
+tokens and SQLite state remain outside Git and the Nix store.
+
 ## Configuration
 
 Edit [configuration.nix](configuration.nix) to override the selected Host.
@@ -100,6 +105,7 @@ for capability switches and disable semantics.
 | [Noctalia configuration](docs/noctalia-config.md) | Capturing, deploying and recovering reviewed UI preferences. |
 | [AI service](docs/ai.md) | Preparing llama.cpp and models, then deploying loopback services. |
 | [GitLab Runners](docs/runners.md) | Preparing, registering and verifying isolated Runner instances. |
+| [Personal Agent](docs/personal-agent.md) | Runtime configuration, pinned package updates and service operations. |
 
 ## Developers
 

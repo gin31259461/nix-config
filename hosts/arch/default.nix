@@ -51,4 +51,5 @@
   services.gitlabRunner.instances = lib.mapAttrs (
     _: value: lib.mapAttrsRecursive (_: lib.mkDefault) value
   ) (import ./gitlab-runners.nix);
+  services.personalAgent.enable = lib.mkDefault true;
 }

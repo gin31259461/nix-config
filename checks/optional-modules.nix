@@ -13,6 +13,7 @@ let
       }).host
       // {
         gitlabRunners = { };
+        personalAgent = false;
         users =
           lib.mapAttrs (_: user: builtins.removeAttrs user [ "homeConfig" ])
             (import ../lib/eval-configuration.nix {

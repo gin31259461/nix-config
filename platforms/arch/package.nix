@@ -9,6 +9,8 @@
   systemSettings ? null,
   aiConfig ? null,
   aiArtifacts ? null,
+  personalAgentPackage ? null,
+  personalAgentEnabled ? false,
   moduleGroups ? [ ],
   moduleSystemUnits ? [ ],
 }:
@@ -22,6 +24,15 @@ let
         config = aiConfig;
         artifacts = aiArtifacts;
         tailscale = capabilities.tailscale;
+      };
+  personalAgent =
+    if personalAgentPackage == null then
+      null
+    else
+      import ./personal-agent {
+        inherit pkgs;
+        package = personalAgentPackage;
+        enabled = personalAgentEnabled;
       };
 in
 pkgs.writeShellApplication {
@@ -72,6 +83,14 @@ pkgs.writeShellApplication {
         pkgs.writeText "unmanaged-ai.json" (builtins.toJSON { llama = false; })
       else
         ai.manifest
+    }
+    readonly personal_agent_python=${pkgs.python3}/bin/python3
+    readonly personal_agent_adapter=${./personal-agent/adapter.py}
+    readonly personal_agent_manifest=${
+      if personalAgent == null then
+        pkgs.writeText "unmanaged-personal-agent.json" (builtins.toJSON { enabled = false; })
+      else
+        personalAgent.manifest
     }
     readonly fs_root=""
     readonly native_bin=/usr/bin

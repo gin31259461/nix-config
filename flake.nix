@@ -17,6 +17,11 @@
       url = "github:Orbit-Lua/hypr";
       flake = false;
     };
+
+    personal-agent = {
+      url = "github:gin31259461/personal-agent";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
   outputs =
@@ -48,6 +53,7 @@
       homeConfigurationName = "${deployment.username}@${archHost.name}";
       system = archHost.system;
       pkgs = nixpkgs.legacyPackages.${system};
+      personalAgentPackage = inputs.personal-agent.packages.${system}.personal-agent;
       runners = import ./modules/gitlab-runner {
         inherit lib pkgs;
         rawInstances = archHost.gitlabRunners;
@@ -88,6 +94,8 @@
         hardware = archHost.hardware;
         aiConfig = archHost.ai;
         aiArtifacts = ai.artifacts;
+        inherit personalAgentPackage;
+        personalAgentEnabled = archHost.personalAgent;
       };
       llama-prepare = import ./modules/ai/package.nix {
         inherit lib pkgs;

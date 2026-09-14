@@ -72,6 +72,7 @@ assert
 assert evaluate (
   builtins.removeAttrs raw [
     "gitlabRunners"
+    "personalAgent"
     "systemSettings"
   ]
 );

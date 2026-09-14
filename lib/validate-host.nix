@@ -19,6 +19,7 @@ let
     "deployment"
     "users"
     "gitlabRunners"
+    "personalAgent"
     "hardware"
     "ai"
     "virtualization"
@@ -119,5 +120,6 @@ builtins.deepSeq users (
       raw = host.systemSettings or { };
     };
     gitlabRunners = host.gitlabRunners or { };
+    personalAgent = host.personalAgent or false;
   }
 )
