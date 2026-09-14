@@ -1,12 +1,10 @@
 """Explicit, reviewed preference exchange with Noctalia v5 (not secret sync)."""
 
 import argparse
-from contextlib import contextmanager
 import fcntl
 import hashlib
 import json
 import os
-from pathlib import Path
 import re
 import signal
 import stat
@@ -14,9 +12,10 @@ import subprocess
 import sys
 import tempfile
 import tomllib
+from contextlib import contextmanager
+from pathlib import Path
 
 import tomli_w
-
 
 # Whole sections are owned together. Unknown/new sections require code review.
 SECTIONS = frozenset(
