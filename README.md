@@ -8,6 +8,8 @@ Declarative configuration for one Arch workstation. Nix evaluates and builds the
 configuration; Arch adapters converge native state; Home Manager owns the user
 environment.
 
+![Arch workstation preview](docs/assets/preview.png)
+
 ## Operators
 
 ```bash
