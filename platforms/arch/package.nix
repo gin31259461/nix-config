@@ -24,99 +24,105 @@ let
         artifacts = aiArtifacts;
         tailscale = capabilities.tailscale;
       };
+  backend = pkgs.writeShellApplication {
+    name = "arch-switch-backend";
+    runtimeInputs = with pkgs; [
+      coreutils
+      diffutils
+      findutils
+      gawk
+      gnugrep
+      gnused
+    ];
+    text = ''
+      readonly system_python=${pythonRuntime}/bin/python
+      readonly system_adapter=${
+        lib.fileset.toSource {
+          root = ./system;
+          fileset = lib.fileset.unions [
+            ./system/adapter.py
+            ./system/model.py
+            ./system/runtime.py
+            ./system/native.py
+            ./system/files.py
+            ./system/firewall.py
+            ./system/hotspot.py
+          ];
+        }
+      }/adapter.py
+      readonly system_manifest=${
+        if systemSettings == null then
+          pkgs.writeText "unmanaged-system.json" "{}"
+        else
+          systemSettings.manifest
+      }
+      readonly ai_python=${pythonRuntime}/bin/python
+      readonly ai_adapter=${
+        lib.fileset.toSource {
+          root = ./.;
+          fileset = lib.fileset.unions [
+            ./ai/adapter.py
+            ./ai/runtime.py
+            ./system/native.py
+            ./system/files.py
+          ];
+        }
+      }/ai/adapter.py
+      readonly ai_manifest=${
+        if ai == null then
+          pkgs.writeText "unmanaged-ai.json" (builtins.toJSON { llama = false; })
+        else
+          ai.manifest
+      }
+      readonly fs_root=""
+      readonly native_bin=/usr/bin
+      readonly managed_identity=644:0:0
+      readonly files=${./files}
+      readonly curl_bin=${pkgs.curl}/bin/curl
+      readonly tar_bin=${pkgs.libarchive}/bin/bsdtar
+      readonly flock_bin=${pkgs.util-linux}/bin/flock
+      readonly manage_network=${if capabilities.networking then "1" else "0"}
+      readonly manage_tailscale=${if capabilities.tailscale then "1" else "0"}
+      readonly manage_desktop=${if capabilities.desktop.enable then "1" else "0"}
+      readonly manage_autologin=${
+        if capabilities.desktop.enable && capabilities.desktop.autologin.enable then "1" else "0"
+      }
+      readonly manage_sunshine=${
+        if capabilities.desktop.enable && capabilities.programs.sunshine.enable then "1" else "0"
+      }
+      readonly manage_initramfs=${if capabilities.initramfs then "1" else "0"}
+      readonly expected_user=${lib.escapeShellArg username}
+      pacman_packages=(${lib.escapeShellArgs packages.pacman})
+      lizardbyte_package_names=(${lib.escapeShellArgs packages.lizardbyte})
+      lizardbyte_packages=(${lib.escapeShellArgs (map (name: "lizardbyte/${name}") packages.lizardbyte)})
+      aur_packages=(${lib.escapeShellArgs packages.aur})
+      required_groups=(${
+        lib.escapeShellArgs (
+          lib.unique (deploymentUser.groups ++ moduleGroups ++ lib.optional deploymentUser.admin "wheel")
+        )
+      })
+      system_units=(${
+        lib.escapeShellArgs (
+          lib.unique ((import ./services.nix { inherit lib capabilities; }) ++ moduleSystemUnits)
+        )
+      })
+      initramfs_modules=(${lib.escapeShellArgs (lib.optionals capabilities.initramfs hardware.initramfsModules)})
+      initramfs_images=(${lib.escapeShellArgs (lib.optionals capabilities.initramfs hardware.initramfsImages)})
+      user_services=(${
+        lib.escapeShellArgs (
+          lib.optional hardware.openrazer "openrazer-daemon.service"
+          ++ lib.optional (
+            capabilities.desktop.enable && capabilities.programs.sunshine.enable
+          ) "app-dev.lizardbyte.app.Sunshine.service"
+        )
+      })
+    ''
+    + builtins.readFile ./arch-switch.sh;
+  };
 in
 pkgs.writeShellApplication {
   name = "arch-switch";
-  runtimeInputs = with pkgs; [
-    coreutils
-    diffutils
-    findutils
-    gawk
-    gnugrep
-    gnused
-  ];
   text = ''
-    readonly system_python=${pythonRuntime}/bin/python
-    readonly system_adapter=${
-      lib.fileset.toSource {
-        root = ./system;
-        fileset = lib.fileset.unions [
-          ./system/adapter.py
-          ./system/model.py
-          ./system/runtime.py
-          ./system/native.py
-          ./system/files.py
-          ./system/firewall.py
-          ./system/hotspot.py
-        ];
-      }
-    }/adapter.py
-    readonly system_manifest=${
-      if systemSettings == null then
-        pkgs.writeText "unmanaged-system.json" "{}"
-      else
-        systemSettings.manifest
-    }
-    readonly ai_python=${pythonRuntime}/bin/python
-    readonly ai_adapter=${
-      lib.fileset.toSource {
-        root = ./.;
-        fileset = lib.fileset.unions [
-          ./ai/adapter.py
-          ./ai/runtime.py
-          ./system/native.py
-          ./system/files.py
-        ];
-      }
-    }/ai/adapter.py
-    readonly ai_manifest=${
-      if ai == null then
-        pkgs.writeText "unmanaged-ai.json" (builtins.toJSON { llama = false; })
-      else
-        ai.manifest
-    }
-    readonly fs_root=""
-    readonly native_bin=/usr/bin
-    readonly managed_identity=644:0:0
-    readonly files=${./files}
-    readonly curl_bin=${pkgs.curl}/bin/curl
-    readonly tar_bin=${pkgs.libarchive}/bin/bsdtar
-    readonly flock_bin=${pkgs.util-linux}/bin/flock
-    readonly manage_network=${if capabilities.networking then "1" else "0"}
-    readonly manage_tailscale=${if capabilities.tailscale then "1" else "0"}
-    readonly manage_desktop=${if capabilities.desktop.enable then "1" else "0"}
-    readonly manage_autologin=${
-      if capabilities.desktop.enable && capabilities.desktop.autologin.enable then "1" else "0"
-    }
-    readonly manage_sunshine=${
-      if capabilities.desktop.enable && capabilities.programs.sunshine.enable then "1" else "0"
-    }
-    readonly manage_initramfs=${if capabilities.initramfs then "1" else "0"}
-    readonly expected_user=${lib.escapeShellArg username}
-    pacman_packages=(${lib.escapeShellArgs packages.pacman})
-    lizardbyte_package_names=(${lib.escapeShellArgs packages.lizardbyte})
-    lizardbyte_packages=(${lib.escapeShellArgs (map (name: "lizardbyte/${name}") packages.lizardbyte)})
-    aur_packages=(${lib.escapeShellArgs packages.aur})
-    required_groups=(${
-      lib.escapeShellArgs (
-        lib.unique (deploymentUser.groups ++ moduleGroups ++ lib.optional deploymentUser.admin "wheel")
-      )
-    })
-    system_units=(${
-      lib.escapeShellArgs (
-        lib.unique ((import ./services.nix { inherit lib capabilities; }) ++ moduleSystemUnits)
-      )
-    })
-    initramfs_modules=(${lib.escapeShellArgs (lib.optionals capabilities.initramfs hardware.initramfsModules)})
-    initramfs_images=(${lib.escapeShellArgs (lib.optionals capabilities.initramfs hardware.initramfsImages)})
-    user_services=(${
-      lib.escapeShellArgs (
-        lib.optional hardware.openrazer "openrazer-daemon.service"
-        ++ lib.optional (
-          capabilities.desktop.enable && capabilities.programs.sunshine.enable
-        ) "app-dev.lizardbyte.app.Sunshine.service"
-      )
-    })
-  ''
-  + builtins.readFile ./arch-switch.sh;
+    exec ${pythonRuntime}/bin/python ${./coordinator.py} ${backend}/bin/arch-switch-backend "$@"
+  '';
 }
