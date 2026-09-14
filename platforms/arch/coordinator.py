@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 import os
-from pathlib import Path
 import sys
+from pathlib import Path
 
 USAGE = "usage: arch-switch [--check | --update] [--verbose]"
 
