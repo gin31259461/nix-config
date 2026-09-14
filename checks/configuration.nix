@@ -64,6 +64,7 @@ let
     })
   ];
   headless = evaluate [ { desktop.enable = false; } ];
+  autologin = evaluate [ { desktop.autologin.enable = true; } ];
   headlessHome = (import ../lib/mk-home-configuration.nix { inherit inputs; }) {
     inherit (headless.host)
       system
@@ -104,7 +105,9 @@ let
       )
     else
       [ ];
-  allSwitches = enablePaths [ ] base.config;
+  allSwitches = builtins.filter (
+    path: lib.getAttrFromPath path base.config
+  ) (enablePaths [ ] base.config);
   switchesWork = lib.all (
     path:
     let
@@ -124,9 +127,7 @@ let
         ))
       ];
     in
-    lib.getAttrFromPath path base.config
-    && !(lib.getAttrFromPath path result.config)
-    && builtins.deepSeq result.host true
+    !(lib.getAttrFromPath path result.config) && builtins.deepSeq result.host true
   ) allSwitches;
   oneRunner = evaluate [ { services.gitlabRunner.instances.frontend.enable = false; } ];
   merged = evaluate [
@@ -177,6 +178,9 @@ assert hotspotParentOff.host.systemSettings.hotspot == null;
 assert base.host.ai.llama.model.contextSize == 4096;
 assert base.host.ai.llama.proxy.httpsPort == 443;
 assert disabled.host.ai.llama.enable;
+assert !base.config.desktop.autologin.enable;
+assert autologin.config.desktop.autologin.enable;
+assert autologin.capabilities.desktop.autologin.enable;
 # Check the composed initialization, including Home Manager's own definitions.
 assert lib.assertMsg (lib.hasInfix "powerlevel10k.zsh-theme" home.config.programs.zsh.initContent)
   "zsh initialization lost p10k";
@@ -240,6 +244,7 @@ assert lib.all (module: !(valid module)) [
   { networking.firewal.enable = true; }
   { services.fstrim.enable = "yes"; }
   { networking.hostName = "../bad"; }
+  { desktop.autologin.enable = "yes"; }
   {
     networking.firewall.rules = [
       {
