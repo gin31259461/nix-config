@@ -133,7 +133,9 @@ class Firewall:
             value = json.loads(text)
         except ValueError:
             raise Conflict("invalid firewall ownership receipt") from None
-        if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
+        if not isinstance(value, list) or not all(
+            isinstance(item, str) for item in value
+        ):
             raise Conflict("invalid firewall ownership receipt")
         return set(value)
 
