@@ -4,6 +4,20 @@ UWSM starts Hyprland and owns the graphical session. Arch supplies native deskto
 executables; Home Manager supplies user configuration and user-service policy.
 Keep one startup owner for each application.
 
+## Login policy
+
+TTY autologin is a separate privileged policy and is disabled by default. Enable
+it only when the physical-security tradeoff is intentional:
+
+```nix
+desktop.autologin.enable = true;
+```
+
+When disabled, deployment does not create an autologin override. During migration
+from older revisions, `arch-switch` removes the historical tty1 override only
+when its content exactly matches the generated nix-config artifact. A customized
+operator override is never deleted merely because this option is disabled.
+
 ## Managed applications
 
 Desktop capabilities are selected through `desktop.enable`, program switches and
