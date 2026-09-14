@@ -1,15 +1,17 @@
 """Private process, locking and atomic-file operations."""
 
 from __future__ import annotations
-from contextlib import contextmanager
-from dataclasses import dataclass
+
 import fcntl
 import os
-from pathlib import Path
+import secrets
 import stat
 import subprocess
-import secrets
-from typing import Callable
+from collections.abc import Callable
+from contextlib import contextmanager
+from dataclasses import dataclass
+from pathlib import Path
+
 from runner_model import RunnerError, ranges_overlap
 
 
