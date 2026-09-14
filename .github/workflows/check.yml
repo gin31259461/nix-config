@@ -14,8 +14,80 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  check:
-    name: Nix checks and builds
+  secrets:
+    name: Secret scan
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Check out source
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Scan Git history and working tree
+        uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7 # v2
+
+  validate:
+    name: ${{ matrix.name }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Static source validation
+            targets: >-
+              .#checks.x86_64-linux.source-format
+              .#checks.x86_64-linux.workflow
+              .#checks.x86_64-linux.home-source-assets
+          - name: Typed interfaces
+            targets: >-
+              .#checks.x86_64-linux.configuration
+              .#checks.x86_64-linux.capabilities
+              .#checks.x86_64-linux.optional-modules
+              .#checks.x86_64-linux.host-interface
+              .#checks.x86_64-linux.system-settings-interface
+              .#checks.x86_64-linux.home-projection-interface
+              .#checks.x86_64-linux.arch-switch-interface
+          - name: Runtime adapters
+            targets: >-
+              .#checks.x86_64-linux.deployment-ordering
+              .#checks.x86_64-linux.system-settings-tests
+              .#checks.x86_64-linux.ai-services-tests
+              .#checks.x86_64-linux.arch-switch-tests
+              .#checks.x86_64-linux.system-firewall-integration
+              .#checks.x86_64-linux.overview-refresh
+              .#checks.x86_64-linux.noctalia-config
+              .#checks.x86_64-linux.noctalia-storage
+              .#checks.x86_64-linux.graphical-session-ordering
+              .#checks.x86_64-linux.home-projection
+              .#checks.x86_64-linux.justfile
+          - name: Home build
+            targets: >-
+              .#checks.x86_64-linux.arch-home
+              .#checks.x86_64-linux.arch-graphical-session
+    steps:
+      - name: Check out source
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@b85815f71a6de0ddee80b8a80a98d43f4bcc66c7 # v31
+        with:
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+
+      - name: Build validation domain
+        run: nix build --no-link --no-update-lock-file --print-build-logs ${{ matrix.targets }}
+
+      - name: Ensure validation left the checkout unchanged
+        run: git diff --exit-code
+
+  full:
+    name: Full flake and deployment build
+    needs: [secrets, validate]
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     steps:
