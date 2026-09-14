@@ -10,6 +10,8 @@ let
   enum = types.enum;
   bounded = low: high: types.ints.between low high;
   token = types.strMatching "[a-zA-Z0-9_+-]+";
+  interfaceName = types.strMatching "[a-zA-Z0-9][a-zA-Z0-9_.-]{0,14}";
+  firewallSource = types.strMatching "[a-zA-Z0-9:.]+(/[0-9]{1,3})?";
   localeName = enum [
     "en_US.UTF-8"
     "zh_TW.UTF-8"
@@ -72,8 +74,8 @@ in
   hotspot = nullable (section {
     connection = mkOption { type = types.strMatching "[a-zA-Z0-9][a-zA-Z0-9 _.-]*"; };
     ssid = mkOption { type = types.strMatching "[a-zA-Z0-9][a-zA-Z0-9 _.-]{0,31}"; };
-    interface = mkOption { type = types.strMatching "[a-zA-Z0-9][a-zA-Z0-9_.-]{0,14}"; };
-    uplink = mkOption { type = types.strMatching "[a-zA-Z0-9][a-zA-Z0-9_.-]{0,14}"; };
+    interface = mkOption { type = interfaceName; };
+    uplink = mkOption { type = interfaceName; };
     band = mkOption {
       type = enum [
         "a"
@@ -126,6 +128,19 @@ in
     };
     rules = mkOption {
       type = types.listOf (section {
+        owner = mkOption {
+          type = types.strMatching "[a-zA-Z0-9][a-zA-Z0-9_.-]{0,47}";
+          default = "nix-config";
+          description = "Stable identity used to prove ownership before destructive retirement.";
+        };
+        state = mkOption {
+          type = enum [
+            "present"
+            "absent"
+          ];
+          default = "present";
+          description = "Whether this owned UFW rule must exist or be explicitly retired.";
+        };
         protocol = mkOption {
           type = enum [
             "tcp"
@@ -134,6 +149,8 @@ in
         };
         fromPort = mkOption { type = port; };
         toPort = nullable port;
+        source = nullable firewallSource;
+        interface = nullable interfaceName;
       });
       default = [ ];
     };
