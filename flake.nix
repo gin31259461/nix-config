@@ -8,8 +8,8 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
-    neovim-config = {
-      url = "github:Orbit-Lua/orbitvim";
+    nvim-config = {
+      url = "github:gin31259461/nvim-config";
       flake = false;
     };
 

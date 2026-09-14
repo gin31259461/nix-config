@@ -7,11 +7,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1787377438,
-        "narHash": "sha256-Sxu1NLTD/Ern6hFGLlZmtKCSct3YQXZI/lls8RE1XeM=",
+        "lastModified": 1789267039,
+        "narHash": "sha256-LWiBv9yAYFi2LPbUhDGHPGKYskJQjj2fw12OlyO1uQo=",
         "owner": "nix-community",
         "repo": "home-manager",
-        "rev": "65258d5c65a250189fde2e35f490d15e064c4c62",
+        "rev": "ec172013fa62135f58fb58dd17ae9651e8f39727",
         "type": "github"
       },
       "original": {
@@ -37,29 +37,13 @@
         "type": "github"
       }
     },
-    "neovim-config": {
-      "flake": false,
-      "locked": {
-        "lastModified": 1789011786,
-        "narHash": "sha256-D92KgLRwlPg40lBqEdrAEk6+60IcBLG3/aLIsJKzGZ8=",
-        "owner": "Orbit-Lua",
-        "repo": "orbitvim",
-        "rev": "51a9f46fa81534fd2c1fa48c3c6665a252992d94",
-        "type": "github"
-      },
-      "original": {
-        "owner": "Orbit-Lua",
-        "repo": "orbitvim",
-        "type": "github"
-      }
-    },
     "nixpkgs": {
       "locked": {
-        "lastModified": 1788405554,
-        "narHash": "sha256-r2f1oUwixlgq9zOdYLqJLfS/lWBT60/IITjhTKI59JU=",
+        "lastModified": 1789344334,
+        "narHash": "sha256-vdhpDJ3Lr24lkZ+fDCjmBRRtw9/vcSzkqGJOJyF5h2U=",
         "owner": "NixOS",
         "repo": "nixpkgs",
-        "rev": "a5cc6f2c37bf518436dc8d1c288ccd0c43c2f4c4",
+        "rev": "c3eea5b2156db11c7eeeada3dc737711255b253e",
         "type": "github"
       },
       "original": {
@@ -69,12 +53,28 @@
         "type": "github"
       }
     },
+    "nvim-config": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1789377882,
+        "narHash": "sha256-EIWLAmLdw8mB6Mko8YF+5K+YPP9k+Ewa+D7xSsb3mcQ=",
+        "owner": "gin31259461",
+        "repo": "nvim-config",
+        "rev": "8e255eb5a5af283ed6da8c94b1e3a8dac5df447a",
+        "type": "github"
+      },
+      "original": {
+        "owner": "gin31259461",
+        "repo": "nvim-config",
+        "type": "github"
+      }
+    },
     "root": {
       "inputs": {
         "home-manager": "home-manager",
         "hypr-config": "hypr-config",
-        "neovim-config": "neovim-config",
-        "nixpkgs": "nixpkgs"
+        "nixpkgs": "nixpkgs",
+        "nvim-config": "nvim-config"
       }
     }
   },

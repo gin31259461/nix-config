@@ -2,7 +2,7 @@
 {
   imports = [ ./projection-safety.nix ];
   xdg.configFile."nvim" = {
-    source = inputs.neovim-config;
+    source = inputs.nvim-config;
   };
 
   home.packages = with pkgs; [
