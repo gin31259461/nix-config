@@ -6,7 +6,6 @@ import re
 from files import Conflict, assignments
 from hotspot import converge_firewall
 
-
 RECEIPT = "/var/lib/nix-config/arch/system-firewall-rules.json"
 
 
