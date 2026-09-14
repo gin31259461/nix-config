@@ -76,6 +76,7 @@ if ((model)); then
     model_file=${model_files[$model_index]}
     model_repository=${model_repositories[$model_index]}
     model_revision=${model_revisions[$model_index]}
+    model_receipt="$model_path.nix-config-receipt"
     [[ ! -L $model_path ]] || { printf 'model path must not be a symlink\n' >&2; exit 1; }
     current=''
     if [[ -f $model_path ]]; then current=$(sha256sum "$model_path" | cut -d' ' -f1); fi
@@ -113,6 +114,14 @@ if ((model)); then
       mv -T "$downloaded" "$model_path"
       rm -rf -- "$download_dir"
     fi
+    model_fingerprint=$(stat -Lc '%d:%i:%s:%Y:%Z' "$model_path")
+    receipt_stage="$model_receipt.stage"
+    [[ ! -L $model_receipt && ! -L $receipt_stage ]] || { printf 'model receipt path must not be a symlink\n' >&2; exit 1; }
+    printf '%s\n%s\n%s\n%s\n%s\n' \
+      "$model_repository" "$model_revision" "$model_file" "$model_sha256" "$model_fingerprint" >"$receipt_stage"
+    chmod 0644 "$receipt_stage"
+    chown 0:0 "$receipt_stage"
+    mv -Tf "$receipt_stage" "$model_receipt"
   done
 fi
 printf 'llama.cpp preparation complete\n'

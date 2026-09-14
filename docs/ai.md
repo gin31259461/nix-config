@@ -45,6 +45,13 @@ published atomically. An interrupted download can be retried for the same
 declaration; an unknown or mismatched staging directory requires operator
 review. The build requires the native C++/ROCm/Vulkan development toolchain.
 
+After full SHA-256 verification, preparation writes a root-owned receipt beside
+each model. Routine deployment compares that receipt with the declared artifact
+and the model's device, inode, size and timestamps. It therefore detects model
+replacement or modification without rereading the complete GGUF on every run.
+Run `just prepare-ai model` to perform an explicit full checksum verification and
+refresh matching receipts.
+
 Preparation is idempotent for matching owned state. An existing conflicting
 revision, selector, staging path or model checksum is an error and requires
 operator review.

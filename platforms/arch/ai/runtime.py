@@ -1,7 +1,6 @@
 """Converge Arch-owned llama.cpp, Caddy and Tailscale Serve policy."""
 
 import json
-import hashlib
 import os
 import sys
 import time
@@ -88,6 +87,30 @@ class AI:
 
     def run(self, *args, **kwargs):
         return self.native.run(*args, **kwargs)
+
+    @staticmethod
+    def model_receipt(model, declaration):
+        info = model.stat()
+        fingerprint = ":".join(
+            str(value)
+            for value in (
+                info.st_dev,
+                info.st_ino,
+                info.st_size,
+                int(info.st_mtime),
+                int(info.st_ctime),
+            )
+        )
+        return "\n".join(
+            [
+                declaration["repository"],
+                declaration["revision"],
+                declaration["file"],
+                declaration["sha256"],
+                fingerprint,
+                "",
+            ]
+        )
 
     def unit(self, name):
         output = self.run(
@@ -251,9 +274,11 @@ RestartSec=3
                 "prepared llama-server receipt does not match the declaration"
             )
         for model, declaration in zip(models, d["models"].values()):
-            digest = hashlib.sha256(model.read_bytes()).hexdigest()
-            if digest != declaration["sha256"]:
-                raise Conflict("prepared model checksum does not match the declaration")
+            receipt_path = declaration["path"] + ".nix-config-receipt"
+            if not f.metadata_matches(receipt_path) or f.read(
+                receipt_path
+            ) != self.model_receipt(model, declaration):
+                raise Conflict("prepared model receipt does not match the declaration")
         f.read(SWITCHER_CONFIG)
         f.read(SWITCHER_UNIT)
         legacy_preset = f.read("/etc/llama/server/models.ini")
@@ -325,12 +350,12 @@ RestartSec=3
                     time.sleep(delay)
         raise Conflict(f"curl failed after {retries} retries; last: {last_err}")
 
-    def converge(self):
+    def converge(self, preflighted=False):
         d, f = self.desired, self.files
         if not d["llama"]:
             print("AI services unmanaged.")
             return
-        if not self.preflight(installed=True):
+        if not preflighted and not self.preflight(installed=True):
             print("AI services skipped: selected model is not prepared.")
             return
         config = json.dumps(self.switcher_config(), indent=2, sort_keys=True) + "\n"
@@ -343,8 +368,12 @@ RestartSec=3
         if f.read("/etc/llama/server/models.ini") or f.read(
             "/etc/systemd/system/llama-server.service.d/60-nix-config.conf"
         ):
-            self.run("systemctl", "disable", "--now", "llama-server.service")
-            self.actions += 1
+            legacy_state = self.unit("llama-server.service")
+            if legacy_state.get("ActiveState") == "active" or legacy_state.get(
+                "UnitFileState"
+            ) in ("enabled", "enabled-runtime"):
+                self.run("systemctl", "disable", "--now", "llama-server.service")
+                self.actions += 1
         self.ensure_service(
             "llama-swap.service",
             "ai-llama",

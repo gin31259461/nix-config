@@ -124,6 +124,9 @@ class AITests(unittest.TestCase):
             "models": {
                 "qwen": {
                     "id": "agent",
+                    "repository": "fixture/model",
+                    "revision": "deadbeef",
+                    "file": "model.gguf",
                     "path": "/var/lib/llama/models/model.gguf",
                     "sha256": hashlib.sha256(b"model").hexdigest(),
                 }
@@ -171,6 +174,11 @@ class AITests(unittest.TestCase):
                 },
             },
         }
+        model = self.root / "var/lib/llama/models/model.gguf"
+        receipt = self.root / "var/lib/llama/models/model.gguf.nix-config-receipt"
+        receipt.write_text(
+            runtime.AI.model_receipt(model, self.desired["models"]["qwen"])
+        )
 
     def ai(self):
         return runtime.AI(self.desired, self.files, self.native)
@@ -225,6 +233,12 @@ class AITests(unittest.TestCase):
             result.converge()
         self.assertEqual(result.updates, 0)
         self.assertEqual(self.native.calls, [])
+
+    def test_model_metadata_drift_invalidates_preparation_receipt(self):
+        model = self.root / "var/lib/llama/models/model.gguf"
+        model.write_text("changed")
+        with self.assertRaisesRegex(runtime.Conflict, "model receipt"):
+            self.ai().preflight(installed=True)
 
     def test_pending_restarts_then_clears(self):
         self.files.mark("ai-llama")

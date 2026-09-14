@@ -35,7 +35,7 @@ def main() -> int:
     else:
         ready = ai.preflight(installed=True)
         if ready:
-            ai.converge()
+            ai.converge(preflighted=True)
     if ai.desired.get("llama") and not ready:
         return OPTIONAL_NOT_READY
     return 0

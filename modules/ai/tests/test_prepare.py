@@ -48,6 +48,7 @@ class PrepareTests(unittest.TestCase):
             "true",
         )
         text = text.replace(" -o0 -g0", "")
+        text = text.replace('chown 0:0 "$receipt_stage"', "true")
         digest = hashlib.sha256(self.payload).hexdigest()
         preamble = f"""set -euo pipefail
 source_repository=unused
@@ -79,6 +80,7 @@ model_sha256s=({digest} {digest})
         self.assertEqual(self.model.read_bytes(), self.payload)
         self.assertEqual(self.second_model.read_bytes(), self.payload)
         self.assertEqual(self.model.stat().st_mode & 0o777, 0o644)
+        self.assertTrue(Path(str(self.model) + ".nix-config-receipt").is_file())
         result = self.invoke()
         self.assertEqual(result.returncode, 0, result.stderr)
 
