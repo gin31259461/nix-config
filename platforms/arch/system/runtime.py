@@ -7,8 +7,8 @@ native runner directly; production accepts no root/command overrides.
 import hashlib
 import json
 import os
-from pathlib import Path
 import sys
+from pathlib import Path
 
 from files import Conflict, Files, locale_gen, replace_keys
 from firewall import Firewall
