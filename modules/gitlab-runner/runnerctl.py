@@ -5,39 +5,39 @@
 from __future__ import annotations
 
 import argparse
-from datetime import datetime
-import tomllib
 import grp
 import json
 import os
-from pathlib import Path
 import pwd
 import re
 import stat
 import subprocess
 import sys
 import time
-from typing import Any, Callable
+import tomllib
+from collections.abc import Callable
+from datetime import datetime
+from pathlib import Path
+from typing import Any
 
-
-from runner_model import (
-    RunnerError,
-    validate_instances,
-    gitlab_hostname,
-    render_registration_template,
-    render_config,
-    render_service,
-    manager_matches,
-)
 from host_io import (
     HostPaths,
-    run,
     atomic_write,
+    ensure_directory,
     ensure_subordinate_range,
     operation_lock,
-    ensure_directory,
     read_managed,
     remove_managed_file,
+    run,
+)
+from runner_model import (
+    RunnerError,
+    gitlab_hostname,
+    manager_matches,
+    render_config,
+    render_registration_template,
+    render_service,
+    validate_instances,
 )
 
 
@@ -73,7 +73,7 @@ def ensure_account(
     account = instance["account"]
     try:
         entry = pwd.getpwnam(account["user"])
-    except KeyError:
+    except KeyError as account_error:
         try:
             owner = pwd.getpwuid(account["uid"])
         except KeyError:
@@ -81,7 +81,7 @@ def ensure_account(
         if owner is not None:
             raise RunnerError(
                 f"UID {account['uid']} is already owned by {owner.pw_name}"
-            )
+            ) from account_error
         run(
             [
                 platform["useradd"],
@@ -381,10 +381,12 @@ def reconcile(
     instance: dict[str, Any],
     platform: dict[str, str],
     *,
-    paths: HostPaths = HostPaths(),
+    paths: HostPaths | None = None,
 ) -> bool:
     require_root()
     check_prerequisites(instance, platform)
+    if paths is None:
+        paths = HostPaths()
 
     entry = ensure_account(instance, platform)
     account = instance["account"]
