@@ -64,6 +64,7 @@
         ];
       }
       ''
+        python ${./tests}/test_coordinator.py ${./coordinator.py}
         python ${./tests}/test_arch_switch.py ${./.}/arch-switch.sh
         python ${./tests}/test_optional_lifecycle.py ${./.}/arch-switch.sh
         touch "$out"
