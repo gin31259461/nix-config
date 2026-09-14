@@ -105,9 +105,9 @@ let
       )
     else
       [ ];
-  allSwitches = builtins.filter (
-    path: lib.getAttrFromPath path base.config
-  ) (enablePaths [ ] base.config);
+  allSwitches = builtins.filter (path: lib.getAttrFromPath path base.config) (
+    enablePaths [ ] base.config
+  );
   switchesWork = lib.all (
     path:
     let
