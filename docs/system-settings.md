@@ -20,7 +20,37 @@ these system files or services.
 | `networking.hotspot` | Prepared NetworkManager AP settings |
 
 Disabled capabilities contribute no desired runtime action and do not undo
-previously managed state.
+previously managed state. Destructive retirement is always separate from merely
+withdrawing management.
+
+## Firewall ownership and scope
+
+Firewall rules accept a stable `owner`, an optional ingress `interface`, an
+optional `source`, and an explicit lifecycle `state` (`present` or `absent`).
+Keep rules as narrowly scoped as the service contract permits. For example:
+
+```nix
+networking.firewall.rules = [
+  {
+    owner = "example-lan-service";
+    protocol = "tcp";
+    fromPort = 8443;
+    interface = "enp14s0";
+    source = "192.168.1.0/24";
+  }
+];
+```
+
+Existing matching operator rules can satisfy a `present` declaration, but they
+are not automatically claimed. The adapter records a root-owned receipt only for
+rules it actually creates. `state = "absent"` may delete only a rule for which
+that receipt exists; it never interprets `enable = false` or declaration removal
+as permission to delete arbitrary UFW state.
+
+The current host rules intentionally retain their historical global reach because
+the repository does not encode enough service topology to infer a safe source or
+interface. Scope those rules only after deciding which network each service is
+supposed to accept traffic from.
 
 ## Preflight
 
