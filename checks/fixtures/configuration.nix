@@ -1,7 +1,7 @@
 # Independent source fixture: do not import the operator's configuration entry.
 { lib, ... }:
 {
-  networking.hostName = lib.mkDefault "fixture";
+  networking.hostname.name = lib.mkDefault "fixture";
   networking.hotspot = lib.mapAttrs (_: lib.mkDefault) {
     connection = "fixture-ap";
     ssid = "Fixture";

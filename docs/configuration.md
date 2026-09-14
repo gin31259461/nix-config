@@ -22,9 +22,16 @@ combinations fail evaluation. Import order is not an override mechanism.
 ## Inspect resolved values
 
 ```bash
-nix eval .#lib.configurations.arch.networking.hostName
+nix eval .#lib.configurations.arch.networking.hostname.name
 nix eval .#lib.configurations.arch.services.fstrim.enable
 nix eval --json .#lib.configurations.arch.networking.firewall
+
+Host identity is grouped under `networking.hostname`:
+
+```nix
+networking.hostname.name = "arch";
+networking.hostname.enable = true;
+```
 ```
 
 The public schema is defined by `lib/configuration-options.nix` and feature-owned

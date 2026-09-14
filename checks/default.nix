@@ -28,9 +28,9 @@
         touch "$out"
       '';
   arch-switch-interface = pkgs.runCommand "arch-switch-interface-check" { } ''
-    ${arch-switch}/bin/arch-switch --help | ${pkgs.gnugrep}/bin/grep -Fxq 'usage: arch-switch [--check | --update] [--verbose]'
+    ${arch-switch}/bin/arch-switch --help | ${pkgs.gnugrep}/bin/grep -Fxq 'usage: arch-switch [--check | --update | --purge] [--verbose]'
     if ${arch-switch}/bin/arch-switch --check --update >/dev/null 2>&1; then exit 1; fi
-    ${archDeployment}/bin/${deploymentName} --help | ${pkgs.gnugrep}/bin/grep -Fxq 'usage: ${deploymentName} [--update] [--verbose]'
+    ${archDeployment}/bin/${deploymentName} --help | ${pkgs.gnugrep}/bin/grep -Fxq 'usage: ${deploymentName} [--update] [--purge] [--verbose]'
     touch "$out"
   '';
   justfile =

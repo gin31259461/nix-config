@@ -1,5 +1,6 @@
 # Read-only preflight before Home Manager changes either external input path.
-for target in "$home_dir/.config/nvim" "$home_dir/.config/hypr"; do
+for name in "${projection_targets[@]}"; do
+  target="$config_home/$name"
   for directory in "$target" "$(realpath -m "$target")"; do
     while :; do
       if [[ -e $directory/.git || -L $directory/.git ]]; then

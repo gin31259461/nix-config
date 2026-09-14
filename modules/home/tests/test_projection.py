@@ -30,7 +30,12 @@ class ProjectionTests(unittest.TestCase):
                     path.touch()
                 before = sorted(str(path.relative_to(root)) for path in root.rglob("*"))
                 result = subprocess.run(
-                    ["bash", "-euc", f"home_dir={shlex.quote(directory)}\n" + SCRIPT],
+                    [
+                        "bash",
+                        "-euc",
+                        f"home_dir={shlex.quote(directory)}\nconfig_home={shlex.quote(directory + '/.config')}\nprojection_targets=(nvim hypr)\n"
+                        + SCRIPT,
+                    ],
                     capture_output=True,
                 )
                 self.assertEqual(result.returncode, 1 if obstruction else 0)
@@ -49,7 +54,12 @@ class ProjectionTests(unittest.TestCase):
                 root / "source", target_is_directory=True
             )
             result = subprocess.run(
-                ["bash", "-euc", f"home_dir={shlex.quote(directory)}\n" + SCRIPT],
+                [
+                    "bash",
+                    "-euc",
+                    f"home_dir={shlex.quote(directory)}\nconfig_home={shlex.quote(directory + '/.config')}\nprojection_targets=(nvim hypr)\n"
+                    + SCRIPT,
+                ],
                 capture_output=True,
             )
             self.assertEqual(result.returncode, 1)

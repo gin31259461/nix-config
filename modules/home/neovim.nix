@@ -1,6 +1,11 @@
 { inputs, pkgs, ... }:
 {
-  imports = [ ./projection-safety.nix ];
+  imports = [
+    (import ./projection-safety.nix {
+      targets = [ "nvim" ];
+      activationName = "checkNvimProjection";
+    })
+  ];
   xdg.configFile."nvim" = {
     source = inputs.nvim-config;
   };

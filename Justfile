@@ -58,15 +58,16 @@ verify-runner instance:
 status-runner instance:
     sudo nix --extra-experimental-features 'nix-command flakes' run --show-trace --print-build-logs .#runnerctl -- status {{ quote(instance) }}
 
-# Build and activate the Arch workstation; combine update and verbose as needed.
+# Build and activate the Arch workstation; combine update, purge and verbose as needed.
 arch-workstation option1="" option2="":
     #!/usr/bin/env bash
     set -euo pipefail
-    readonly usage='usage: just arch-workstation [update] [verbose]'
+    readonly usage='usage: just arch-workstation [update] [purge] [verbose]'
     options=({{ quote(option1) }} {{ quote(option2) }})
     deployment_args=()
     nix_args=(--show-trace --print-build-logs)
     update_seen=0
+    purge_seen=0
     verbose_seen=0
     for option in "${options[@]}"; do
       case "$option" in
@@ -74,6 +75,11 @@ arch-workstation option1="" option2="":
         update)
           (( update_seen == 0 )) || { printf '%s\n' "$usage" >&2; exit 2; }
           update_seen=1
+          ;;
+        purge)
+          (( purge_seen == 0 && update_seen == 0 )) || { printf '%s\n' "$usage" >&2; exit 2; }
+          deployment_args+=(--purge)
+          purge_seen=1
           ;;
         verbose)
           (( verbose_seen == 0 )) || { printf '%s\n' "$usage" >&2; exit 2; }

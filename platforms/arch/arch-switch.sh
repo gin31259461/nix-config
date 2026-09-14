@@ -1,6 +1,6 @@
 # Private implementation. package.nix supplies all paths and declared values.
 # The test harness supplies an isolated filesystem and fake native commands.
-usage() { printf 'usage: arch-switch [--check | --update] [--verbose]\n'; }
+usage() { printf 'usage: arch-switch [--check | --update | --purge] [--verbose]\n'; }
 native() { "$native_bin/$1" "${@:2}"; }
 root() { native sudo "$native_bin/$1" "${@:2}"; }
 fail() {
@@ -13,11 +13,13 @@ optional_skip() {
 
 check_only=0
 update_system=0
+purge=0
 verbose=0
 for argument in "$@"; do
   case "$argument" in
     --check) check_only=1 ;;
     --update) update_system=1 ;;
+    --purge) purge=1 ;;
     --verbose) verbose=1 ;;
     --help)
       usage
@@ -29,7 +31,7 @@ for argument in "$@"; do
       ;;
   esac
 done
-if ((check_only && update_system)); then
+if ((check_only && (update_system || purge))); then
   usage >&2
   exit 2
 fi
@@ -89,6 +91,28 @@ runtime_dir="$fs_root/run/user/$(native id -u)"
 [[ -d $runtime_dir && ! -L $runtime_dir ]] || fail 'login runtime directory is unavailable'
 exec {lock_fd}>"$runtime_dir/nix-config-arch.lock"
 "$flock_bin" -n "$lock_fd" || fail 'another arch-switch is running' 75
+
+if ((purge)); then
+  [[ $update_system == 0 ]] || fail '--purge cannot be combined with --update' 2
+  root_state="$fs_root/var/lib/nix-config/arch"
+  native sudo -v
+  for service in "${system_units[@]}"; do
+    native systemctl is-enabled --quiet "$service" && root systemctl disable --now "$service" || true
+  done
+  for path in \
+    "$fs_root/etc/NetworkManager/conf.d/main.conf" \
+    "$fs_root/etc/NetworkManager/conf.d/99-tailscale.conf" \
+    "$fs_root/etc/modules-load.d/nix-config-podman.conf" \
+    "$fs_root/etc/sysctl.d/99-nix-config.conf" \
+    "$fs_root/etc/systemd/system/getty@tty1.service.d/override.conf" \
+    "$fs_root/etc/pacman.d/nix-config-lizardbyte.conf"; do
+    [[ ! -e $path ]] || root rm -f -- "$path"
+  done
+  [[ ! -e $fs_root/etc/pacman.conf ]] || sed -i "/^Include = \/etc\/pacman.d\/nix-config-lizardbyte.conf$/d" "$fs_root/etc/pacman.conf"
+  [[ ! -e $root_state ]] || root rm -rf -- "$root_state"
+  printf 'Arch deployment state purged; package and user data were preserved.\n'
+  exit 0
+fi
 
 missing_packages=()
 for package in "${pacman_packages[@]}" "${lizardbyte_package_names[@]}" "${aur_packages[@]}"; do

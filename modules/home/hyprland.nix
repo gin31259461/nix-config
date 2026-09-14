@@ -6,7 +6,12 @@ let
   uwsm = "/usr/bin/uwsm";
 in
 {
-  imports = [ ./projection-safety.nix ];
+  imports = [
+    (import ./projection-safety.nix {
+      targets = [ "hypr" ];
+      activationName = "checkHyprProjection";
+    })
+  ];
   xdg.configFile."hypr" = {
     source = inputs.hypr-config;
     recursive = true;

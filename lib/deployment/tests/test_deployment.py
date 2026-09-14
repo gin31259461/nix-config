@@ -20,6 +20,7 @@ class DeploymentTests(unittest.TestCase):
             (3, []),
             (75, ["--update"]),
             (0, ["--verbose"]),
+            (0, ["--purge"]),
             (0, ["-b", "backup"]),
             (0, ["--flake", "other"]),
             (0, ["--dry-run"]),
@@ -43,7 +44,7 @@ class DeploymentTests(unittest.TestCase):
                 result = subprocess.run(
                     ["bash", "-c", script, "deploy", *args], capture_output=True
                 )
-                rejected = args and args[0] not in ("--update", "--verbose")
+                rejected = args and args[0] not in ("--update", "--verbose", "--purge")
                 self.assertEqual(result.returncode, 2 if rejected else status)
                 calls = (
                     (root / "calls").read_text().splitlines()
@@ -51,7 +52,12 @@ class DeploymentTests(unittest.TestCase):
                     else []
                 )
                 self.assertEqual(
-                    calls, [] if rejected else ["arch"] if status else ["arch", "home"]
+                    calls,
+                    []
+                    if rejected
+                    else ["arch"]
+                    if status or args == ["--purge"]
+                    else ["arch", "home"],
                 )
 
     def test_home_activates_exact_generation_with_profile_managing_driver(self):

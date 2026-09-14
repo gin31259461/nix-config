@@ -11,7 +11,7 @@ let
   selected = values: builtins.attrNames (lib.filterAttrs (_: value: value.enable) values);
   setting = value: if value.enable then builtins.removeAttrs value [ "enable" ] else null;
   raw = {
-    name = cfg.networking.hostName;
+    name = cfg.networking.hostname.name;
     system = cfg.nixpkgs.hostPlatform;
     platform = cfg.deployment.platform;
     deployment = builtins.removeAttrs cfg.deployment [ "platform" ];

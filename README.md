@@ -1,114 +1,53 @@
 # nix-config
 
-[![Check](https://github.com/gin31259461/nix-config/actions/workflows/check.yml/badge.svg)](https://github.com/gin31259461/nix-config/actions/workflows/check.yml)
+[![Checks](https://github.com/gin31259461/nix-config/actions/workflows/check.yml/badge.svg)](https://github.com/gin31259461/nix-config/actions/workflows/check.yml)
 [![Arch Linux](https://img.shields.io/badge/platform-Arch_Linux-1793D1?logo=archlinux)](https://archlinux.org/)
-[![Home Manager](https://img.shields.io/badge/Home_Manager-26.05-5277C3)](https://github.com/nix-community/home-manager/tree/release-26.05)
+[![Nix](https://img.shields.io/badge/Nix-flakes-5277C3)](https://nixos.org/)
 
-Build and deploy a declarative workstation with Nix and Home Manager.
+Declarative configuration for one Arch workstation. Nix evaluates and builds the
+configuration; Arch adapters converge native state; Home Manager owns the user
+environment.
 
-Arch adapters own native packages, system files, services, kernel integration and
-host runtime policy. Home Manager owns portable user packages, files and user
-services. `configuration.nix` is the single configuration entry point.
-
-![Desktop preview](docs/assets/preview.png)
-
-## Configure
-
-Keep the Host import and override only the values you need:
-
-```nix
-{ ... }:
-{
-  imports = [ ./hosts/arch ];
-
-  networking.firewall.enable = false;
-  services.fstrim.enable = false;
-  virtualisation.kvm.gui.enable = false;
-}
-```
-
-Host defaults use `lib.mkDefault`; ordinary definitions in `configuration.nix`
-win. Unknown options and invalid values fail evaluation. See
-[configuration](docs/configuration.md) and [composition](CONTEXT.md).
-
-## Validate
+## Operators
 
 ```bash
 just check-fast
 just check
 just build
-```
-
-`just check` runs the complete flake checks with Nix traces and build logs. Source
-checks use isolated fixtures and do not mutate the workstation.
-
-## Prepare optional modules
-
-Optional modules that require external or local initialization are prepared
-explicitly. An enabled optional deployment module that has never been prepared is
-skipped with a highlighted warning; a configured module with invalid or drifting
-state still fails.
-
-```bash
-# Build pinned llama.cpp and install all declared models.
-just prepare-ai
-just prepare-ai build
-just prepare-ai model
-
-# GitLab Runner lifecycle.
-just prepare-runner frontend
-GITLAB_RUNNER_TOKEN=glrt-... just initialize-runner frontend
-just verify-runner frontend
-just status-runner frontend
-```
-
-Runner operations remain separate from workstation deployment. See
-[AI operations](docs/ai.md) and [Runner operations](docs/runners.md).
-
-## Deploy
-
-```bash
-# Routine convergence.
 just arch-workstation
-
-# Install/upgrade missing Arch and AUR packages, then converge.
 just arch-workstation update
-
-# Full Nix and adapter diagnostics.
 just arch-workstation verbose
-just arch-workstation update verbose
+just arch-workstation purge
 ```
 
-Deployment always uses `--show-trace --print-build-logs` for Nix operations.
-`verbose` additionally enables Nix `--verbose`, prints each privileged adapter
-native command and preserves its complete stdout/stderr. Native command failures
-also include both streams without verbose mode.
+AI preparation is explicit (`just prepare-ai`). Runner reconciliation and
+registration are separate; tokens never enter Nix or Git. See the runbooks in
+`docs/`.
 
-For a direct Nix invocation, app arguments cannot retroactively change Nix's own
-evaluation logging. Use both sides explicitly when full diagnostics are needed:
+## Configuration
 
-```bash
-nix run --show-trace --print-build-logs --verbose .#arch-workstation -- --verbose
+`configuration.nix` imports the selected Host. Host defaults live under
+`hosts/arch`; ordinary definitions override them. The public namespace is typed:
+
+```nix
+networking.hostname.name = "arch";
+networking.hostname.enable = true;
+networking.firewall.enable = true;
+networking.hotspot.enable = false;
+hardware.initramfs.enable = true;
+services.gitlabRunner.instances.frontend.enable = true;
 ```
 
-Routine deployment does not install missing packages; it exits 3 and tells the
-operator to rerun with `update`. A running-kernel mismatch exits 75 and requires a
-reboot. Pending actions are retained across failures and retried on the next run.
-See [deployment](docs/deployment.md).
+See [docs/configuration.md](docs/configuration.md) and [CONTEXT.md](CONTEXT.md).
 
-## Repository layout
+## Developers
 
-| Path | Responsibility |
-| --- | --- |
-| `configuration.nix` | Selected Host entry and local overrides |
-| `hosts/` | Machine defaults, identity, hardware and instances |
-| `lib/` | Typed configuration evaluation and deployment composition |
-| `platforms/arch/` | Arch packages, services and privileged adapters |
-| `modules/` | Feature-owned interfaces and implementations |
-| `profiles/` | Reusable Home Manager bundles |
-| `homes/` | User-specific Home Manager values |
-| `checks/` | Source and integration checks |
-| `docs/` | Current operator procedures |
+Keep one owner per package, account, file and service. Add isolated fixtures for
+changed contracts, then run `just check-fast`, `just check`, `just build`, the
+Home Manager activation build and `git diff --check`. Checks use temporary paths,
+fake native commands and VMs; they never mutate the workstation.
 
-Developer constraints are in [AGENTS.md](AGENTS.md). The current ownership and
-composition vocabulary is defined in [CONTEXT.md](CONTEXT.md).
+`lib/` evaluates and composes, `hosts/` declares machine values,
+`platforms/arch/` implements privileged adapters, `modules/` owns capabilities,
+`profiles/` and `homes/` compose Home Manager, `checks/` validates contracts,
+and `docs/` contains current operator procedures.

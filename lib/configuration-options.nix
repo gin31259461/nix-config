@@ -63,11 +63,13 @@ let
 in
 {
   networking = {
-    hostName = mkOption {
-      type = types.str;
-      description = "Host identity and deployment output prefix.";
+    hostname = {
+      enable = enable "native hostname management";
+      name = mkOption {
+        type = types.strMatching "[a-zA-Z0-9][a-zA-Z0-9.-]*";
+        description = "Host identity and deployment output prefix.";
+      };
     };
-    hostname.enable = enable "native hostname management";
     networkmanager.enable = enable "NetworkManager";
     hotspot = systemSection system.hotspot { };
     firewall = systemSection system.firewall { };

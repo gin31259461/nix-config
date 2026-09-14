@@ -54,7 +54,7 @@ let
   };
   override = evaluate [
     ({ lib, ... }: {
-      networking.hostName = "overridden";
+      networking.hostname.name = "overridden";
       time.timeZone = "UTC";
       networking.firewall.rules = lib.mkForce [ ];
       users.users.abnertu.home = {
@@ -239,7 +239,7 @@ assert !(builtins.hasAttr "noctalia/config.toml" home.config.xdg.configFile);
 assert lib.all (module: !(valid module)) [
   { networking.firewal.enable = true; }
   { services.fstrim.enable = "yes"; }
-  { networking.hostName = "../bad"; }
+  { networking.hostname.name = "../bad"; }
   {
     networking.firewall.rules = [
       {

@@ -1,7 +1,7 @@
 { config, lib, ... }:
 {
   imports = [ ./system.nix ];
-  networking.hostName = lib.mkDefault "arch";
+  networking.hostname.name = lib.mkDefault "arch";
   deployment.username = lib.mkDefault "abnertu";
   hardware = lib.mapAttrsRecursive (_: lib.mkDefault) (import ./hardware.nix);
   programs.ai.llama = lib.mapAttrsRecursive (_: lib.mkDefault) {

@@ -2,6 +2,7 @@
 
 import importlib.util
 import json
+import hashlib
 import os
 from pathlib import Path
 import sys
@@ -124,6 +125,7 @@ class AITests(unittest.TestCase):
                 "qwen": {
                     "id": "agent",
                     "path": "/var/lib/llama/models/model.gguf",
+                    "sha256": hashlib.sha256(b"model").hexdigest(),
                 }
             },
             "switcher": {

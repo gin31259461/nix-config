@@ -1,6 +1,7 @@
 """Converge Arch-owned llama.cpp, Caddy and Tailscale Serve policy."""
 
 import json
+import hashlib
 import os
 import sys
 import time
@@ -221,6 +222,8 @@ RestartSec=3
             f"{d['source']['grammarRepetitionThreshold']}"
         )
         if not current.exists() and not current.is_symlink():
+            if installed and f.path(install_prefix).exists():
+                raise Conflict("prepared llama-server selector is missing")
             return False
         if not current.is_symlink() or os.readlink(current) != desired_link:
             raise Conflict(
@@ -237,6 +240,8 @@ RestartSec=3
         ):
             if installed:
                 raise Conflict("prepared llama.cpp assets are incomplete")
+            if current.is_symlink():
+                raise Conflict("prepared llama.cpp assets are incomplete")
             return False
         expected = (
             f"{d['source']['revision']} {d['source']['grammarRepetitionThreshold']}"
@@ -245,6 +250,10 @@ RestartSec=3
             raise Conflict(
                 "prepared llama-server receipt does not match the declaration"
             )
+        for model, declaration in zip(models, d["models"].values()):
+            digest = hashlib.sha256(model.read_bytes()).hexdigest()
+            if digest != declaration["sha256"]:
+                raise Conflict("prepared model checksum does not match the declaration")
         f.read(SWITCHER_CONFIG)
         f.read(SWITCHER_UNIT)
         legacy_preset = f.read("/etc/llama/server/models.ini")

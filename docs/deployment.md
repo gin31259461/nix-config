@@ -23,11 +23,20 @@ just arch-workstation update
 # Complete Nix and adapter diagnostics.
 just arch-workstation verbose
 just arch-workstation update verbose
+
+# Explicitly remove managed Arch files, units and pending state.
+just arch-workstation purge
 ```
 
 Routine deployment never installs missing packages. It exits 3 and lists the
 missing packages. `update` permits the full pacman upgrade followed by AUR
 convergence.
+
+`purge` is an explicit Arch cleanup. It disables managed system units, removes
+managed configuration files and pending state, and removes the managed
+repository include. It does not uninstall packages, delete accounts, unregister
+Runners, or remove mutable application data. Home Manager state is intentionally
+handled by its normal generation lifecycle.
 
 `just arch-workstation` always enables Nix `--show-trace` and
 `--print-build-logs`. `verbose` additionally enables Nix `--verbose` and passes
