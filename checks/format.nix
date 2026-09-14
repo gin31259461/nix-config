@@ -25,10 +25,15 @@ pkgs.runCommand "source-format-check"
       pkgs.pyright
       pkgs.shellcheck
       pkgs.findutils
+      pkgs.diffutils
     ];
   }
   ''
-    find ${source} -name '*.nix' -print0 | xargs -0 nixfmt --check
+    formatted="$TMPDIR/formatted"
+    cp -R ${source} "$formatted"
+    chmod -R u+w "$formatted"
+    find "$formatted" -name '*.nix' -print0 | xargs -0 nixfmt
+    diff -ru ${source} "$formatted"
     cd ${source}
     ruff check --no-cache .
     ruff format --no-cache --check .
