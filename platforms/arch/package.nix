@@ -42,6 +42,7 @@ pkgs.writeShellApplication {
         root = ./system;
         fileset = lib.fileset.unions [
           ./system/adapter.py
+          ./system/model.py
           ./system/runtime.py
           ./system/native.py
           ./system/files.py
