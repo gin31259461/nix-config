@@ -168,6 +168,18 @@ ensure_file() {
   changed_files=$((changed_files + 1))
   printf 'updated %s\n' "${target#"$fs_root"}"
 }
+retire_exact_file() {
+  local expected=$1 target=$2 action=${3:-}
+  [[ ! -L $target ]] || fail "managed file is a symlink: $target"
+  [[ -f $target ]] || return 0
+  # Destructive cleanup is allowed only when ownership is proven by exact
+  # content equality with the previously generated managed artifact.
+  cmp -s "$expected" "$target" || return 0
+  if [[ -n $action ]]; then root touch "$root_state/$action.pending"; fi
+  root rm -- "$target"
+  changed_files=$((changed_files + 1))
+  printf 'retired %s\n' "${target#"$fs_root"}"
+}
 if ((${#lizardbyte_package_names[@]})); then
   ensure_file "$files/pacman-lizardbyte.conf" "$repo_file"
   if ! grep -Fxq "$repo_include" "$fs_root/etc/pacman.conf"; then
@@ -197,9 +209,12 @@ if ((${manage_network:-1})); then
 fi
 ensure_file "$files/container-network-modules.conf" "$fs_root/etc/modules-load.d/nix-config-podman.conf"
 ensure_file "$files/sysctl.conf" "$fs_root/etc/sysctl.d/99-nix-config.conf"
-if ((${manage_desktop:-1})); then
-  sed "s/@USER@/$login_user/g" "$files/tty1-autologin.conf" >"$work_dir/autologin.conf"
-  ensure_file "$work_dir/autologin.conf" "$fs_root/etc/systemd/system/getty@tty1.service.d/override.conf" units
+autologin_target="$fs_root/etc/systemd/system/getty@tty1.service.d/override.conf"
+sed "s/@USER@/$login_user/g" "$files/tty1-autologin.conf" >"$work_dir/autologin.conf"
+if ((${manage_autologin:-0})); then
+  ensure_file "$work_dir/autologin.conf" "$autologin_target" units
+else
+  retire_exact_file "$work_dir/autologin.conf" "$autologin_target" units
 fi
 
 if ((${manage_initramfs:-1})); then
@@ -236,7 +251,7 @@ for group in "${required_groups[@]}"; do
   fi
 done
 
-if (( ${manage_desktop:-1} )) && [[ -e $root_state/units.pending ]]; then
+if [[ -e $root_state/units.pending ]]; then
   root systemctl daemon-reload
   root rm -- "$root_state/units.pending"
   actions=$((actions + 1))
