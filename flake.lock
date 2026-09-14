@@ -37,22 +37,6 @@
         "type": "github"
       }
     },
-    "neovim-config": {
-      "flake": false,
-      "locked": {
-        "lastModified": 1789011786,
-        "narHash": "sha256-D92KgLRwlPg40lBqEdrAEk6+60IcBLG3/aLIsJKzGZ8=",
-        "owner": "Orbit-Lua",
-        "repo": "orbitvim",
-        "rev": "51a9f46fa81534fd2c1fa48c3c6665a252992d94",
-        "type": "github"
-      },
-      "original": {
-        "owner": "Orbit-Lua",
-        "repo": "orbitvim",
-        "type": "github"
-      }
-    },
     "nixpkgs": {
       "locked": {
         "lastModified": 1788405554,
@@ -66,6 +50,22 @@
         "owner": "NixOS",
         "ref": "nixos-26.05",
         "repo": "nixpkgs",
+        "type": "github"
+      }
+    },
+    "nvim-config": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1789011786,
+        "narHash": "sha256-D92KgLRwlPg40lBqEdrAEk6+60IcBLG3/aLIsJKzGZ8=",
+        "owner": "gin31259461",
+        "repo": "nvim-config",
+        "rev": "51a9f46fa81534fd2c1fa48c3c6665a252992d94",
+        "type": "github"
+      },
+      "original": {
+        "owner": "gin31259461",
+        "repo": "nvim-config",
         "type": "github"
       }
     },
@@ -119,8 +119,8 @@
       "inputs": {
         "home-manager": "home-manager",
         "hypr-config": "hypr-config",
-        "neovim-config": "neovim-config",
         "nixpkgs": "nixpkgs",
+        "nvim-config": "nvim-config",
         "pyproject-build-systems": "pyproject-build-systems",
         "pyproject-nix": "pyproject-nix",
         "uv2nix": "uv2nix"
