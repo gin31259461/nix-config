@@ -1,33 +1,96 @@
-# Agent instructions
+# AGENTS Instructions
 
-Read [CONTEXT.md](CONTEXT.md) before changing composition. `configuration.nix`
-is the selected Host entry. Public options are typed and owned; Host baselines
-use `lib.mkDefault`; user overrides use ordinary definitions. Never use import
-order as precedence or accept unknown fields.
+Read [CONTEXT.md](CONTEXT.md) before changing composition. Work in this checkout
+and read scoped instructions before editing their files. Keep package and
+service inventories in their owning source, not in agent instructions.
 
-Ownership is exclusive: `lib/` evaluates and composes, `hosts/` selects identity
-and hardware, `platforms/arch/` owns native packages and services,
-`modules/` owns capabilities, and `profiles/`/`homes/` own Home Manager state.
-Service accounts never receive a human home composition.
+## Composition and ownership
 
-Core deployment failures stop immediately. Optional readiness may skip only when
-preparation has never completed; invalid receipts, checksum drift, conflicts,
-command failures and runtime drift are errors. Verbose mode reaches Nix and
-privileged adapters with complete diagnostics. Routine runs never install
-packages; only `--update` performs pacman/AUR convergence. Preserve kernel gates,
-locks, pending markers and idempotence. Explicit `--purge` removes managed Arch
-state while preserving packages and mutable application data.
+`configuration.nix` imports the selected Host. Define typed public options in
+`lib/configuration-options.nix` or the owning capability interface and normalize
+them through `lib/eval-configuration.nix`. Reject unknown fields, invalid types
+and invalid combinations. Host baselines use `lib.mkDefault`; user overrides use
+ordinary definitions. Never use import order as precedence.
 
-AI preparation must match the declared source selector, receipt and every model
-identity/checksum before services converge. llama-swap, llama-server and Caddy
-remain loopback-only. Runner instances remain outside workstation deployment;
-tokens never enter Git, derivations or unredacted logs.
+Keep ownership exclusive: `lib/` evaluates and composes; `hosts/` selects identity,
+users, hardware and capability defaults; `platforms/arch/` owns native packages
+and system services; `modules/` owns capabilities; `profiles/` and `homes/` own
+Home Manager composition. Give each package, account, file and service one owner.
+Keep profile and home-module registries explicit rather than discovering modules
+from directory contents.
+
+Human accounts must exist before deployment. Service accounts belong to their
+modules and never receive a human home composition. Do not bump Home Manager
+`stateVersion` during routine updates.
+
+## Deployment contracts
+
+Build the Home Manager activation package into the deployment artifact. Complete
+Arch convergence before activating that exact generation; do not reevaluate or
+substitute a different home at runtime. The stages do not share a rollback
+transaction.
+
+Core failures stop immediately. Optional readiness may return the dedicated
+`not ready` status only when required preparation has never completed; report
+that state as a highlighted skip. Invalid receipts, checksum drift, ownership
+conflicts, command failures and runtime drift are errors, never skips.
+
+Routine runs never install packages; only `--update` performs pacman/AUR
+convergence. Preserve kernel gates, locks, pending markers and idempotence.
+Record pending actions before mutation and clear them only after success. Do not
+rewrite unchanged files, restart healthy services or discard recovery markers
+to make a retry pass. Verbose mode must reach Nix, Home Manager and privileged
+adapters. Preserve complete command failure diagnostics, including stdout,
+stderr and partial timeout output, while redacting secrets.
+
+Disabling an Arch declaration withdraws management without authorizing package
+removal, service retirement, account or registration deletion, or data cleanup.
+Home Manager uses its normal generation lifecycle. Explicit `--purge` removes
+managed Arch deployment state while preserving packages, accounts, Runner
+registrations and mutable application data; it skips Home Manager activation.
+Do not add automatic cleanup, directory backups, garbage collection or Runner
+purge to workstation deployment.
+
+AI preparation must verify the declared source selector, build receipt and every
+model identity/checksum before services converge. Keep prepared binaries and
+models outside the Nix store. llama-swap, llama-server and Caddy remain
+loopback-only. Runner reconciliation, registration and verification remain a
+separate lifecycle outside workstation deployment.
+
+## Protected state and desktop
 
 Never read or print credentials, private keys, KeePassXC databases, Runner tokens,
-Noctalia keys or mutable application data. Keep UWSM as the Hyprland entry point,
-one startup owner per application, and project source trees outside managed paths.
+Noctalia keys or mutable application data. Keep secrets and mutable runtime state
+outside Git and Nix derivations; tokens must never appear in command arguments
+or unredacted logs. Use synthetic fixtures when investigating these paths.
 
-Use temporary paths, fake native commands and isolated VMs. Prefer contract tests
-over inventory assertions. Run `just check-fast`, `just check`, `just build`, the
-Home Manager activation build and `git diff --check` for composition or adapter
-changes. Keep README as the entry point and docs limited to current procedures.
+Keep UWSM as the Hyprland entry point and one startup owner per application.
+Keep project source trees outside managed paths, including Hyprland and Neovim
+runtime configuration. Adopt their published revisions through intentional
+flake lock updates.
+
+## Validation and documentation
+
+Use temporary paths, fake native commands and isolated VMs. Prefer tests of
+behavioral contracts over assertions that merely repeat production inventories.
+For composition or adapter changes, run:
+
+```bash
+just check-fast
+just check
+just build
+nix build --no-link --show-trace --print-build-logs \
+  '.#homeConfigurations."abnertu@arch".activationPackage'
+git diff --check
+```
+
+These commands validate and build source without activation. Deployment,
+preparation, registration, package installation and service operations affect
+live state and require that state to be within the user's task. Do not use them
+to validate documentation. For documentation-only edits, check Markdown,
+relative links and `git diff --check`.
+
+Keep [README.md](./README.md) as the entry point, [CONTEXT.md](CONTEXT.md) as the
+composition model, and `docs/` limited to current operator procedures. Update
+the relevant documentation when public behavior changes; keep agent constraints
+here instead of duplicating runbooks.
