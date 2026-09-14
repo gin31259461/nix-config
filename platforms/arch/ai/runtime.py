@@ -7,8 +7,8 @@ import time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parents[1] / "system"))
-from files import Conflict, Files  # noqa: E402
-from native import Native  # noqa: E402
+from files import Conflict, Files
+from native import Native
 
 PACKAGE_CADDY = """# The Caddyfile is an easy way to configure your Caddy web server.
 #
