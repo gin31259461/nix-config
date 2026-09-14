@@ -7,9 +7,11 @@ import os
 from pathlib import Path
 import sys
 import traceback
+from typing import cast
 
 import runtime
 from files import Conflict
+from model import SystemManifest
 
 
 def _verbose() -> bool:
@@ -26,7 +28,8 @@ def main() -> int:
         raise Conflict("private adapter must be invoked by arch-switch")
     if _verbose():
         os.environ["NIX_CONFIG_VERBOSE"] = "1"
-    system = runtime.System(json.loads(Path(sys.argv[1]).read_text()))
+    desired = cast(SystemManifest, json.loads(Path(sys.argv[1]).read_text()))
+    system = runtime.System(desired)
     if sys.argv[2] == "preflight":
         system.preflight()
     else:
