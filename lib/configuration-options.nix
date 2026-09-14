@@ -11,6 +11,16 @@ let
     lib.genAttrs names (name: {
       enable = enable name;
     });
+  loginName = types.strMatching "[a-z][a-z0-9_-]*";
+  loginHome = types.strMatching "/home/[a-zA-Z0-9_-]+(/[a-zA-Z0-9_-]+)*";
+  stateVersion = types.strMatching "[0-9]{2}[.][0-9]{2}";
+  token = types.strMatching "[a-zA-Z0-9_+-]+";
+  bootImage = types.addCheck types.str (
+    value:
+    lib.hasPrefix "/boot/" value
+    && !lib.hasInfix ".." value
+    && builtins.match "/boot/[a-zA-Z0-9_+.-]+(/[a-zA-Z0-9_+.-]+)*" value != null
+  );
   system = import ./system-settings-options.nix { inherit lib; };
   # Reuse the owning interface's types rather than admitting arbitrary settings.
   systemSection =
@@ -43,15 +53,15 @@ let
         description = "Login account description.";
       };
       homeDirectory = mkOption {
-        type = types.str;
+        type = loginHome;
         description = "Existing login home under /home.";
       };
       stateVersion = mkOption {
-        type = types.str;
+        type = stateVersion;
         description = "Home Manager compatibility version; do not bump routinely.";
       };
       admin = option types.bool false "Whether this login account is an administrator.";
-      groups = option (types.listOf types.str) [ ] "Additional native login groups.";
+      groups = option (types.listOf loginName) [ ] "Additional native login groups.";
       profiles = switches (builtins.attrNames (import ../profiles));
       modules = switches (builtins.attrNames (import ../modules/home));
       homeModules = option (types.listOf types.path) [ ] "Explicit user Home Manager module paths.";
@@ -64,7 +74,7 @@ in
 {
   networking = {
     hostName = mkOption {
-      type = types.str;
+      type = loginName;
       description = "Host identity and deployment output prefix.";
     };
     hostname.enable = enable "native hostname management";
@@ -76,7 +86,7 @@ in
   deployment = {
     platform = option (types.enum [ "arch" ]) "arch" "Native realization platform.";
     username = mkOption {
-      type = types.str;
+      type = loginName;
       description = "Existing administrator to deploy.";
     };
     profile = option (types.enum (
@@ -92,9 +102,9 @@ in
     bluetooth.enable = enable "Bluetooth";
     initramfs = {
       enable = enable "managed initramfs module addition";
-      modules = option (types.listOf types.str) [ ] "Host's explicit early modules.";
+      modules = option (types.listOf token) [ ] "Host's explicit early modules.";
       images = mkOption {
-        type = types.nonEmptyListOf types.str;
+        type = types.nonEmptyListOf bootImage;
         description = "Expected native /boot initramfs images.";
       };
     };
