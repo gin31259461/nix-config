@@ -7,9 +7,11 @@ let
   resolve =
     registry: kind: name:
     if builtins.hasAttr name registry then registry.${name} else throw "unknown ${kind}: ${name}";
-  selectedProfiles = names: builtins.filter (
-    name: capabilities == null || capabilities.desktop.enable || name != "workstation"
-  ) names;
+  selectedProfiles =
+    names:
+    builtins.filter (
+      name: capabilities == null || capabilities.desktop.enable || name != "workstation"
+    ) names;
 in
 {
   profileModules = names: map (resolve profiles "profile") (selectedProfiles names);
