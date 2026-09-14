@@ -39,7 +39,7 @@ def receipt_key(rule):
         {
             "fromPort": rule["fromPort"],
             "interface": rule.get("interface"),
-            "owner": rule["owner"],
+            "owner": rule.get("owner", "nix-config"),
             "protocol": rule["protocol"],
             "source": rule.get("source"),
             "toPort": rule["toPort"],
