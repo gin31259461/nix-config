@@ -31,6 +31,10 @@ Host defaults use `lib.mkDefault`; ordinary definitions in `configuration.nix`
 win. Unknown options and invalid values fail evaluation. See
 [configuration](docs/configuration.md) and [composition](CONTEXT.md).
 
+TTY autologin is an independent privileged policy and defaults off. See
+[desktop session](docs/desktop-session.md). Firewall ownership, scope and explicit
+retirement are documented in [system settings](docs/system-settings.md).
+
 ## Validate
 
 ```bash
@@ -40,7 +44,12 @@ just build
 ```
 
 `just check` runs the complete flake checks with Nix traces and build logs. Source
-checks use isolated fixtures and do not mutate the workstation.
+checks use isolated fixtures and do not mutate the workstation. CI also separates
+static, typed-interface, runtime-adapter and Home build failures before running the
+full flake/deployment gate, and scans Git history for secrets.
+
+Python dependencies are resolved by uv and realized by uv2nix/Nix rather than a
+mutable deployment virtual environment. See [Python toolchain](docs/python-toolchain.md).
 
 ## Prepare optional modules
 
@@ -111,4 +120,6 @@ See [deployment](docs/deployment.md).
 | `docs/` | Current operator procedures |
 
 Developer constraints are in [AGENTS.md](AGENTS.md). The current ownership and
-composition vocabulary is defined in [CONTEXT.md](CONTEXT.md).
+composition vocabulary is defined in [CONTEXT.md](CONTEXT.md). Vendored source
+requirements and known historical gaps are documented in
+[vendor provenance](docs/vendor-provenance.md).
