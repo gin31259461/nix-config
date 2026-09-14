@@ -16,6 +16,11 @@ let
     inherit system;
     config.allowUnfree = true;
   };
+  pythonRuntime = import ./python-runtime.nix {
+    inherit inputs;
+    inherit (pkgs) lib;
+    inherit pkgs;
+  };
   profileRegistry = import ../profiles;
   moduleRegistry = import ../modules/home;
   resolve =
@@ -34,6 +39,7 @@ inputs.home-manager.lib.homeManagerConfiguration {
       hardware
       capabilities
       ;
+    pythonRuntime = pythonRuntime.runtime;
   };
 
   modules = [
