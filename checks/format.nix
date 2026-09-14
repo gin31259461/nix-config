@@ -35,9 +35,6 @@ pkgs.runCommand "source-format-check"
     find ${source} -name '*.nix' -print0 | xargs -0 nixfmt --check
     cd ${source}
     ruff check --no-cache .
-    ruff format --no-cache --check .
-    shellcheck -x -e SC2154 platforms/arch/arch-switch.sh
-    pyright
-    ${pythonRuntime}/bin/python -c 'import tomli_w'
-    touch "$out"
+    ruff format --no-cache --diff platforms/arch/system/firewall.py
+    exit 1
   ''
