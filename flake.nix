@@ -26,8 +26,8 @@
       inputs.uv2nix.follows = "uv2nix";
     };
 
-    neovim-config = {
-      url = "github:Orbit-Lua/orbitvim";
+    nvim-config = {
+      url = "github:gin31259461/nvim-config";
       flake = false;
     };
 
