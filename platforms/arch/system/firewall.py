@@ -1,12 +1,13 @@
-"""UFW convergence with explicit rule ownership and non-destructive adoption."""
+"""UFW convergence with scoped rules and explicit destructive ownership receipts."""
 
+import json
 import re
 
 from files import Conflict, assignments
 from hotspot import converge_firewall
 
 
-MANAGED_PREFIX = "nix-config:"
+RECEIPT = "/var/lib/nix-config/arch/system-firewall-rules.json"
 
 
 def rule_port(rule):
@@ -33,33 +34,37 @@ def rule_key(rule, v6):
     )
 
 
-def rule_comment(rule):
-    return MANAGED_PREFIX + rule["owner"]
+def receipt_key(rule):
+    return json.dumps(
+        {
+            "fromPort": rule["fromPort"],
+            "interface": rule.get("interface"),
+            "owner": rule["owner"],
+            "protocol": rule["protocol"],
+            "source": rule.get("source"),
+            "toPort": rule["toPort"],
+        },
+        sort_keys=True,
+        separators=(",", ":"),
+    )
 
 
 def ufw_rule_args(rule):
+    # Preserve the compact native syntax for globally scoped rules. Scoped rules
+    # use UFW's explicit from/to form so the rendered policy is reviewable.
+    if not rule.get("interface") and not rule.get("source"):
+        return ["allow", "in", rule_port(rule) + "/" + rule["protocol"]]
     args = ["allow", "in"]
     if rule.get("interface"):
         args.extend(["on", rule["interface"]])
     if rule.get("source"):
         args.extend(["from", rule["source"]])
-    args.extend(
-        [
-            "to",
-            "any",
-            "port",
-            rule_port(rule),
-            "proto",
-            rule["protocol"],
-            "comment",
-            rule_comment(rule),
-        ]
-    )
+    args.extend(["to", "any", "port", rule_port(rule), "proto", rule["protocol"]])
     return args
 
 
 def _parse_rule_line(line):
-    body, marker, comment = line.partition("#")
+    body = line.split("#", 1)[0]
     match = re.fullmatch(
         r"(\d+(?::\d+)?)/(tcp|udp)(?: on ([A-Za-z0-9_.-]+))?\s*(\(v6\))?\s+ALLOW IN\s+(.+?)\s*",
         body,
@@ -73,17 +78,12 @@ def _parse_rule_line(line):
         source = source[: -len(" (v6)")].rstrip()
     if source == "Anywhere":
         source = None
-    owner = None
-    if marker:
-        comment = comment.strip()
-        if comment.startswith(MANAGED_PREFIX):
-            owner = comment[len(MANAGED_PREFIX) :]
-    return (port, protocol, bool(target_v6) or source_v6, interface, source, owner)
+    return (port, protocol, bool(target_v6) or source_v6, interface, source)
 
 
 def status(text):
     if text.strip() == "Status: inactive":
-        return {"active": False, "rules": set(), "managed": set()}
+        return {"active": False, "rules": set()}
     if not text.startswith("Status: active\n"):
         raise Conflict("unrecognized UFW status")
     policy = re.search(
@@ -96,14 +96,10 @@ def status(text):
     if not policy or not logging or not profiles:
         raise Conflict("incomplete UFW status")
     rules = set()
-    managed = set()
     for line in text.splitlines():
         parsed = _parse_rule_line(line)
         if parsed:
-            key = parsed[:5]
-            rules.add(key)
-            if parsed[5] is not None:
-                managed.add((*key, parsed[5]))
+            rules.add(parsed)
         elif re.search(r"\b(DENY|REJECT|LIMIT)\b", line):
             # Do not silently append an ineffective allow after another owner's deny.
             raise Conflict(
@@ -112,7 +108,6 @@ def status(text):
     return {
         "active": True,
         "rules": rules,
-        "managed": managed,
         "policy": policy.groups(),
         "logging": logging[2] or "off",
         "profiles": profiles[1],
@@ -130,6 +125,21 @@ class Firewall:
 
     def snapshot(self):
         return status(self.run("ufw", "status", "verbose").stdout)
+
+    def receipts(self):
+        text = self.files.read(RECEIPT)
+        if not text:
+            return set()
+        try:
+            value = json.loads(text)
+        except ValueError:
+            raise Conflict("invalid firewall ownership receipt") from None
+        if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
+            raise Conflict("invalid firewall ownership receipt")
+        return set(value)
+
+    def write_receipts(self, receipts):
+        self.files.write(RECEIPT, json.dumps(sorted(receipts), indent=2) + "\n", 0o600)
 
     def preflight(self, installed):
         defaults = assignments(self.files.read("/etc/default/ufw"))
@@ -149,6 +159,7 @@ class Firewall:
                     )
         elif installed:
             raise Conflict("UFW defaults are unavailable")
+        self.receipts()
         for name in (
             "ufw.conf",
             "user.rules",
@@ -218,24 +229,29 @@ class Firewall:
     def converge(self):
         f, d = self.files, self.desired
         state = self.snapshot()
+        receipts = self.receipts()
         pending = f.pending("firewall")
 
-        # Existing unowned matching rules are adopted non-destructively. Deletion
-        # is allowed only for rules carrying the stable nix-config ownership comment.
+        # Matching operator rules can satisfy a declaration, but only a rule this
+        # adapter actually created receives a receipt and may later be retired.
         for rule in d["rules"]:
             keys = {rule_key(rule, v6) for v6 in rule_families(rule)}
-            owned = {(*key, rule["owner"]) for key in keys}
+            receipt = receipt_key(rule)
             if rule.get("state", "present") == "absent":
-                if owned & state["managed"]:
+                if receipt in receipts:
                     f.mark("firewall")
                     self.run("ufw", "--force", "delete", *ufw_rule_args(rule))
                     self.system.actions += 1
+                    receipts.remove(receipt)
+                    self.write_receipts(receipts)
                     state = self.snapshot()
                 continue
             if not keys <= state["rules"]:
                 f.mark("firewall")
                 self.run("ufw", *ufw_rule_args(rule))
                 self.system.actions += 1
+                receipts.add(receipt)
+                self.write_receipts(receipts)
                 state = self.snapshot()
 
         present = self.present_rules(d["rules"])
@@ -269,12 +285,6 @@ class Firewall:
         expected = {
             rule_key(rule, v6) for rule in present for v6 in rule_families(rule)
         }
-        retired = {
-            (*rule_key(rule, v6), rule["owner"])
-            for rule in d["rules"]
-            if rule.get("state", "present") == "absent"
-            for v6 in rule_families(rule)
-        }
         if (
             not final["active"]
             or not self.kernel_policy()
@@ -282,7 +292,6 @@ class Firewall:
             or final["logging"] != d["logging"]
             or final["profiles"] != "skip"
             or not expected <= final["rules"]
-            or retired & final["managed"]
             or any(
                 not self.kernel_rule(rule, v6)
                 for rule in present
