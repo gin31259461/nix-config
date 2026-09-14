@@ -36,7 +36,7 @@ pkgs.runCommand "source-format-check"
     cd ${source}
     ruff check --no-cache .
     ruff format --no-cache --check .
-    shellcheck -x -e SC2154 platforms/arch/arch-switch.sh
+    shellcheck -s bash -x -e SC2154 platforms/arch/arch-switch.sh
     pyright
     ${pythonRuntime}/bin/python -c 'import tomli_w'
     touch "$out"
