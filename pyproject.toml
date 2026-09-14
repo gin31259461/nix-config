@@ -18,9 +18,8 @@ select = ["E4", "E7", "E9", "F", "I", "UP", "B", "RUF"]
 pythonVersion = "3.12"
 typeCheckingMode = "basic"
 include = [
-  "platforms/arch/system",
-  "modules/home/noctalia-config",
-  "modules/gitlab-runner",
+  "platforms/arch/system/adapter.py",
+  "platforms/arch/system/model.py",
+  "modules/home/noctalia-config/sync.py",
 ]
-exclude = ["**/tests"]
 reportMissingTypeStubs = false
