@@ -1,11 +1,11 @@
 """Private file ownership and parsing for the Arch system adapter."""
 
 import os
-from pathlib import Path
 import re
 import shlex
 import stat
 import tempfile
+from pathlib import Path
 
 
 class Conflict(Exception):
