@@ -2,6 +2,7 @@
   pkgs,
   home,
   inputs,
+  pythonRuntime,
 }:
 let
   lib = pkgs.lib;
@@ -49,9 +50,9 @@ let
 in
 {
   overview-refresh = import ./overview/checks.nix { inherit pkgs; };
-  noctalia-config = import ./noctalia-config/checks.nix { inherit pkgs; };
+  noctalia-config = import ./noctalia-config/checks.nix { inherit pkgs pythonRuntime; };
   noctalia-storage =
-    pkgs.runCommand "noctalia-storage-check" { nativeBuildInputs = [ pkgs.python3 ]; }
+    pkgs.runCommand "noctalia-storage-check" { nativeBuildInputs = [ pythonRuntime ]; }
       ''
         python ${./tests/test_noctalia_storage.py} ${./prepare-noctalia-storage.py}
         touch "$out"
@@ -60,7 +61,7 @@ in
     pkgs.runCommand "graphical-session-ordering"
       {
         nativeBuildInputs = [
-          pkgs.python3
+          pythonRuntime
           pkgs.bash
           pkgs.coreutils
         ];
@@ -85,7 +86,7 @@ in
     pkgs.runCommand "home-projection-check"
       {
         nativeBuildInputs = [
-          pkgs.python3
+          pythonRuntime
           pkgs.bash
           pkgs.coreutils
         ];
