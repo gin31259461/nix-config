@@ -130,6 +130,7 @@ in
   ];
   desktop = {
     enable = enable "the graphical home composition";
+    autologin.enable = option types.bool false "Whether tty1 logs the deployment user in automatically.";
   }
   // switches [
     "hyprpolkitagent"

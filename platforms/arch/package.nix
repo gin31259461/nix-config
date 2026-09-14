@@ -5,6 +5,7 @@
   username,
   packages,
   hardware,
+  pythonRuntime ? pkgs.python3,
   capabilities ? import ../../lib/default-capabilities.nix,
   systemSettings ? null,
   aiConfig ? null,
@@ -35,7 +36,7 @@ pkgs.writeShellApplication {
     gnused
   ];
   text = ''
-    readonly system_python=${pkgs.python3}/bin/python3
+    readonly system_python=${pythonRuntime}/bin/python
     readonly system_adapter=${
       lib.fileset.toSource {
         root = ./system;
@@ -55,7 +56,7 @@ pkgs.writeShellApplication {
       else
         systemSettings.manifest
     }
-    readonly ai_python=${pkgs.python3}/bin/python3
+    readonly ai_python=${pythonRuntime}/bin/python
     readonly ai_adapter=${
       lib.fileset.toSource {
         root = ./.;
@@ -83,6 +84,9 @@ pkgs.writeShellApplication {
     readonly manage_network=${if capabilities.networking then "1" else "0"}
     readonly manage_tailscale=${if capabilities.tailscale then "1" else "0"}
     readonly manage_desktop=${if capabilities.desktop.enable then "1" else "0"}
+    readonly manage_autologin=${
+      if capabilities.desktop.enable && capabilities.desktop.autologin.enable then "1" else "0"
+    }
     readonly manage_sunshine=${
       if capabilities.desktop.enable && capabilities.programs.sunshine.enable then "1" else "0"
     }

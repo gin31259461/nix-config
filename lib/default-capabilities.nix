@@ -1,6 +1,7 @@
 {
   desktop = {
     enable = true;
+    autologin.enable = false;
     hyprpolkitagent.enable = true;
     overview.enable = true;
     tailscaleTray.enable = true;

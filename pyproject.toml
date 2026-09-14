@@ -1,11 +1,26 @@
 [project]
 name = "nix-config-tools"
 version = "0.1.0"
-requires-python = ">=3.12"
+requires-python = ">=3.12,<3.13"
 dependencies = ["tomli-w"]
 
+[tool.uv]
+package = false
+
 [tool.ruff]
+target-version = "py312"
 line-length = 88
 
 [tool.ruff.lint]
-select = ["F"]
+select = ["E4", "E7", "E9", "F", "I", "UP", "B", "RUF"]
+
+[tool.pyright]
+pythonVersion = "3.12"
+typeCheckingMode = "basic"
+include = [
+  "platforms/arch/system",
+  "modules/home/noctalia-config",
+  "modules/gitlab-runner",
+]
+exclude = ["**/tests"]
+reportMissingTypeStubs = false

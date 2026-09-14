@@ -8,6 +8,24 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
+    pyproject-nix = {
+      url = "github:pyproject-nix/pyproject.nix";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+
+    uv2nix = {
+      url = "github:pyproject-nix/uv2nix";
+      inputs.nixpkgs.follows = "nixpkgs";
+      inputs.pyproject-nix.follows = "pyproject-nix";
+    };
+
+    pyproject-build-systems = {
+      url = "github:pyproject-nix/build-system-pkgs";
+      inputs.nixpkgs.follows = "nixpkgs";
+      inputs.pyproject-nix.follows = "pyproject-nix";
+      inputs.uv2nix.follows = "uv2nix";
+    };
+
     neovim-config = {
       url = "github:Orbit-Lua/orbitvim";
       flake = false;
@@ -48,6 +66,7 @@
       homeConfigurationName = "${deployment.username}@${archHost.name}";
       system = archHost.system;
       pkgs = nixpkgs.legacyPackages.${system};
+      pythonRuntime = import ./lib/python-runtime.nix { inherit lib pkgs inputs; };
       runners = import ./modules/gitlab-runner {
         inherit lib pkgs;
         rawInstances = archHost.gitlabRunners;
@@ -81,6 +100,7 @@
           capabilities
           systemSettings
           ;
+        pythonRuntime = pythonRuntime.runtime;
         moduleGroups = virtualization.loginGroups;
         moduleSystemUnits = virtualization.systemUnits;
         username = deployment.username;
@@ -100,6 +120,7 @@
       noctaliaEnabled = builtins.elem "noctalia-config" deploymentUser.modules;
       noctalia-config = import ./modules/home/noctalia-config/package.nix {
         inherit pkgs;
+        pythonRuntime = pythonRuntime.runtime;
         username = deployment.username;
         homeConfiguration = homeConfigurationName;
       };
@@ -121,17 +142,26 @@
 
       devShells.${system}.default = pkgs.mkShell {
         packages = [
-          (pkgs.python3.withPackages (pythonPackages: [ pythonPackages.tomli-w ]))
+          pythonRuntime.runtime
+          pkgs.uv
           pkgs.ruff
+          pkgs.pyright
+          pkgs.shellcheck
           pkgs.just
         ];
+        UV_NO_SYNC = "1";
+        UV_PYTHON = "${pythonRuntime.python}/bin/python";
+        UV_PYTHON_DOWNLOADS = "never";
       };
 
       checks.${system} = {
         configuration = import ./checks/configuration.nix { inherit lib pkgs inputs; };
         capabilities = import ./checks/capabilities.nix { inherit lib pkgs inputs; };
         optional-modules = import ./checks/optional-modules.nix { inherit lib pkgs inputs; };
-        source-format = import ./checks/format.nix { inherit lib pkgs; };
+        source-format = import ./checks/format.nix {
+          inherit lib pkgs;
+          pythonRuntime = pythonRuntime.runtime;
+        };
         arch-home = archHomes.${homeConfigurationName}.activationPackage;
       }
       // (import ./checks {
@@ -146,6 +176,7 @@
       // (import ./platforms/arch/checks.nix { inherit pkgs arch-switch llama-prepare; })
       // (import ./modules/home/checks.nix {
         inherit pkgs inputs;
+        pythonRuntime = pythonRuntime.runtime;
         home = archHomes.${homeConfigurationName};
       })
       // runners.checks;
