@@ -1,4 +1,4 @@
-"""Additive UFW convergence; never reset or own other tools' netfilter chains."""
+"""UFW convergence with explicit rule ownership and non-destructive adoption."""
 
 import re
 
@@ -6,14 +6,84 @@ from files import Conflict, assignments
 from hotspot import converge_firewall
 
 
+MANAGED_PREFIX = "nix-config:"
+
+
 def rule_port(rule):
     start, end = rule["fromPort"], rule["toPort"]
     return str(start) if end is None or end == start else f"{start}:{end}"
 
 
+def rule_families(rule):
+    source = rule.get("source")
+    if source and ":" in source:
+        return (True,)
+    if source and "." in source:
+        return (False,)
+    return (False, True)
+
+
+def rule_key(rule, v6):
+    return (
+        rule_port(rule),
+        rule["protocol"],
+        v6,
+        rule.get("interface"),
+        rule.get("source"),
+    )
+
+
+def rule_comment(rule):
+    return MANAGED_PREFIX + rule["owner"]
+
+
+def ufw_rule_args(rule):
+    args = ["allow", "in"]
+    if rule.get("interface"):
+        args.extend(["on", rule["interface"]])
+    if rule.get("source"):
+        args.extend(["from", rule["source"]])
+    args.extend(
+        [
+            "to",
+            "any",
+            "port",
+            rule_port(rule),
+            "proto",
+            rule["protocol"],
+            "comment",
+            rule_comment(rule),
+        ]
+    )
+    return args
+
+
+def _parse_rule_line(line):
+    body, marker, comment = line.partition("#")
+    match = re.fullmatch(
+        r"(\d+(?::\d+)?)/(tcp|udp)(?: on ([A-Za-z0-9_.-]+))?\s*(\(v6\))?\s+ALLOW IN\s+(.+?)\s*",
+        body,
+    )
+    if not match:
+        return None
+    port, protocol, interface, target_v6, source = match.groups()
+    source = source.strip()
+    source_v6 = source.endswith(" (v6)")
+    if source_v6:
+        source = source[: -len(" (v6)")].rstrip()
+    if source == "Anywhere":
+        source = None
+    owner = None
+    if marker:
+        comment = comment.strip()
+        if comment.startswith(MANAGED_PREFIX):
+            owner = comment[len(MANAGED_PREFIX) :]
+    return (port, protocol, bool(target_v6) or source_v6, interface, source, owner)
+
+
 def status(text):
     if text.strip() == "Status: inactive":
-        return {"active": False, "rules": set()}
+        return {"active": False, "rules": set(), "managed": set()}
     if not text.startswith("Status: active\n"):
         raise Conflict("unrecognized UFW status")
     policy = re.search(
@@ -26,14 +96,14 @@ def status(text):
     if not policy or not logging or not profiles:
         raise Conflict("incomplete UFW status")
     rules = set()
+    managed = set()
     for line in text.splitlines():
-        match = re.fullmatch(
-            r"(\d+(?::\d+)?)/(tcp|udp)\s*(\(v6\))?\s+ALLOW IN\s+Anywhere(?: \(v6\))?\s*(?:#.*)?",
-            line,
-        )
-        if match:
-            port, protocol, v6 = match.groups()
-            rules.add((port, protocol, bool(v6)))
+        parsed = _parse_rule_line(line)
+        if parsed:
+            key = parsed[:5]
+            rules.add(key)
+            if parsed[5] is not None:
+                managed.add((*key, parsed[5]))
         elif re.search(r"\b(DENY|REJECT|LIMIT)\b", line):
             # Do not silently append an ineffective allow after another owner's deny.
             raise Conflict(
@@ -42,6 +112,7 @@ def status(text):
     return {
         "active": True,
         "rules": rules,
+        "managed": managed,
         "policy": policy.groups(),
         "logging": logging[2] or "off",
         "profiles": profiles[1],
@@ -102,6 +173,11 @@ class Firewall:
         match = (
             ["-m", "multiport", "--dports", port] if ":" in port else ["--dport", port]
         )
+        scope = []
+        if rule.get("interface"):
+            scope.extend(["-i", rule["interface"]])
+        if rule.get("source"):
+            scope.extend(["-s", rule["source"]])
         return (
             self.run(
                 "ip6tables" if v6 else "iptables",
@@ -111,6 +187,7 @@ class Firewall:
                 "ufw6-user-input" if v6 else "ufw-user-input",
                 "-p",
                 rule["protocol"],
+                *scope,
                 *match,
                 "-j",
                 "ACCEPT",
@@ -134,18 +211,34 @@ class Firewall:
                     return False
         return True
 
+    @staticmethod
+    def present_rules(rules):
+        return [rule for rule in rules if rule.get("state", "present") == "present"]
+
     def converge(self):
         f, d = self.files, self.desired
         state = self.snapshot()
         pending = f.pending("firewall")
-        # Existing matching rules are adopted without changing comments or order.
-        # Declarations only add requirements; removing one never deletes a rule.
+
+        # Existing unowned matching rules are adopted non-destructively. Deletion
+        # is allowed only for rules carrying the stable nix-config ownership comment.
         for rule in d["rules"]:
-            expected = {(rule_port(rule), rule["protocol"], v6) for v6 in (False, True)}
-            if not expected <= state["rules"]:
+            keys = {rule_key(rule, v6) for v6 in rule_families(rule)}
+            owned = {(*key, rule["owner"]) for key in keys}
+            if rule.get("state", "present") == "absent":
+                if owned & state["managed"]:
+                    f.mark("firewall")
+                    self.run("ufw", "--force", "delete", *ufw_rule_args(rule))
+                    self.system.actions += 1
+                    state = self.snapshot()
+                continue
+            if not keys <= state["rules"]:
                 f.mark("firewall")
-                self.run("ufw", "allow", "in", rule_port(rule) + "/" + rule["protocol"])
+                self.run("ufw", *ufw_rule_args(rule))
                 self.system.actions += 1
+                state = self.snapshot()
+
+        present = self.present_rules(d["rules"])
         if state.get("logging") != d["logging"]:
             f.mark("firewall")
             self.run("ufw", "logging", d["logging"])
@@ -163,8 +256,8 @@ class Firewall:
             or not self.kernel_policy()
             or any(
                 not self.kernel_rule(rule, v6)
-                for rule in d["rules"]
-                for v6 in (False, True)
+                for rule in present
+                for v6 in rule_families(rule)
             )
         ):
             f.mark("firewall")
@@ -174,9 +267,13 @@ class Firewall:
         self.system.service("ufw.service", "firewall")
         final = self.snapshot()
         expected = {
-            (rule_port(rule), rule["protocol"], v6)
+            rule_key(rule, v6) for rule in present for v6 in rule_families(rule)
+        }
+        retired = {
+            (*rule_key(rule, v6), rule["owner"])
             for rule in d["rules"]
-            for v6 in (False, True)
+            if rule.get("state", "present") == "absent"
+            for v6 in rule_families(rule)
         }
         if (
             not final["active"]
@@ -185,10 +282,11 @@ class Firewall:
             or final["logging"] != d["logging"]
             or final["profiles"] != "skip"
             or not expected <= final["rules"]
+            or retired & final["managed"]
             or any(
                 not self.kernel_rule(rule, v6)
-                for rule in d["rules"]
-                for v6 in (False, True)
+                for rule in present
+                for v6 in rule_families(rule)
             )
         ):
             f.mark("firewall")
