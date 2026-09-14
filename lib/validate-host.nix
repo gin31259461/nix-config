@@ -45,9 +45,7 @@ in
 assert lib.assertMsg (
   host.platform == "arch" && host.system == "x86_64-linux"
 ) "only x86_64 Arch hosts are supported";
-assert lib.assertMsg (
-  builtins.hasAttr deployment.username users
-) "unknown deployment user";
+assert lib.assertMsg (builtins.hasAttr deployment.username users) "unknown deployment user";
 assert lib.assertMsg users.${deployment.username}.admin "deployment user must be an administrator";
 assert lib.assertMsg (builtins.elem deployment.profile
   users.${deployment.username}.profiles
