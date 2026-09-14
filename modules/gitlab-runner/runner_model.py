@@ -2,12 +2,12 @@
 
 from __future__ import annotations
 
-from decimal import Decimal, InvalidOperation
 import fnmatch
 import ipaddress
 import json
-from pathlib import Path
 import re
+from decimal import Decimal, InvalidOperation
+from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
 
