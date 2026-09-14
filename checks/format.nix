@@ -1,4 +1,4 @@
-{ lib, pkgs }:
+{ lib, pkgs, pythonRuntime }:
 let
   source = lib.fileset.toSource {
     root = ../.;
@@ -6,6 +6,7 @@ let
       ../configuration.nix
       ../flake.nix
       ../pyproject.toml
+      ../uv.lock
       ../lib
       ../hosts
       ../homes
@@ -21,6 +22,8 @@ pkgs.runCommand "source-format-check"
     nativeBuildInputs = [
       pkgs.nixfmt
       pkgs.ruff
+      pkgs.pyright
+      pkgs.shellcheck
       pkgs.findutils
     ];
   }
@@ -28,5 +31,9 @@ pkgs.runCommand "source-format-check"
     find ${source} -name '*.nix' -print0 | xargs -0 nixfmt --check
     ruff check --no-cache --select F ${source}
     ruff format --no-cache --check ${source}
+    shellcheck -x -e SC2154 ${source}/platforms/arch/arch-switch.sh
+    cd ${source}
+    pyright platforms/arch/system/model.py
+    ${pythonRuntime}/bin/python -c 'import tomli_w'
     touch "$out"
   ''
