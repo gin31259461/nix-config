@@ -25,6 +25,12 @@ polkit and native networking. Home Manager owns portable user packages, static
 home files and safe user services. Service accounts never receive a human home
 composition.
 
+Python dependency ownership is split deliberately: `pyproject.toml` declares
+requirements, `uv.lock` records Python resolution, and `lib/python-runtime.nix`
+projects that lock into the Nix runtime. Do not introduce ad-hoc
+`python3.withPackages`, deployment `.venv` state, `uv sync`, `uv run`, or uv-managed
+interpreters. Python version changes are explicit Nix changes.
+
 ## Preserve deployment contracts
 
 Core deployment prerequisites fail fast. Optional modules may be skipped only
@@ -39,11 +45,22 @@ a deployment subprocess wrapper that silently captures or discards diagnostics.
 For token-bearing registration commands outside workstation deployment, preserve
 the existing non-logging policy unless a proven redaction path is added.
 
+The public `arch-switch` entrypoint is Python-owned and the remaining shell
+backend is private. Migrate privileged phases one bounded phase at a time under
+existing behavioral tests; do not rewrite the backend wholesale merely to reduce
+its line count.
+
 Routine deployment never installs packages. Only explicit `--update` permits the
 full pacman update and AUR convergence. Preserve the running-kernel gate, pending
 action markers, mutation lock and idempotent repeat behavior. A disabled
 capability withdraws management but does not retire existing packages, files,
-services, registrations or application data.
+services, registrations or application data. Destructive cleanup requires an
+explicit lifecycle state plus proof that nix-config owns the exact resource.
+
+TTY autologin is opt-in and defaults off. Never infer it from `desktop.enable`.
+Firewall rules may adopt matching operator state for convergence, but only rules
+created by the adapter receive ownership receipts and may later be retired by an
+explicit `state = "absent"` declaration.
 
 AI preparation remains explicit. The prepared llama.cpp selector, build receipt
 and every declared model must match the declaration before service convergence.
@@ -91,7 +108,9 @@ git diff --check
 
 Tests use temporary paths, fake native commands and isolated VMs. Source checks
 must never mutate the real workstation. Build optional outputs only when their
-configuration exports them.
+configuration exports them. Ruff, Pyright, ShellCheck, QML/JavaScript validation
+and secret scanning are part of the source boundary; do not bypass them with
+local-only exclusions unless the repository documents why.
 
 Keep documentation limited to current behavior. Delete superseded planning,
 research and migration documents instead of maintaining historical narratives.
