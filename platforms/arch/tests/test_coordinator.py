@@ -1,9 +1,9 @@
 """Contract tests for the public Python arch-switch entrypoint."""
 
 import importlib.util
-from pathlib import Path
 import sys
 import unittest
+from pathlib import Path
 
 SOURCE = Path(sys.argv.pop()).resolve()
 spec = importlib.util.spec_from_file_location("arch_switch_coordinator", SOURCE)
