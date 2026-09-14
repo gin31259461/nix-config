@@ -18,11 +18,7 @@ let
     inherit (pkgs) lib;
     inherit pkgs;
   };
-  profileRegistry = import ../profiles;
-  moduleRegistry = import ../modules/home;
-  resolve =
-    registry: kind: name:
-    if builtins.hasAttr name registry then registry.${name} else throw "unknown ${kind}: ${name}";
+  resolution = import ./home-resolution.nix { inherit capabilities; };
 in
 assert inputs.nixpkgs.lib.assertMsg (platform == "arch") "unsupported platform: ${platform}";
 inputs.home-manager.lib.homeManagerConfiguration {
@@ -81,10 +77,6 @@ inputs.home-manager.lib.homeManagerConfiguration {
     ../modules/home/noctalia-config
   ]
   ++ user.homeModules
-  ++ map (resolve profileRegistry "profile") (
-    builtins.filter (
-      name: capabilities == null || capabilities.desktop.enable || name != "workstation"
-    ) user.profiles
-  )
-  ++ map (resolve moduleRegistry "home module") user.modules;
+  ++ resolution.profileModules user.profiles
+  ++ resolution.homeModules user.modules;
 }
