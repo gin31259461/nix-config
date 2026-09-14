@@ -29,15 +29,15 @@ pkgs.runCommand "source-format-check"
       pkgs.pyright
       pkgs.shellcheck
       pkgs.findutils
+      pkgs.diffutils
     ];
   }
   ''
     find ${source} -name '*.nix' -print0 | xargs -0 nixfmt --check
-    cd ${source}
-    ruff check --no-cache .
-    ruff format --no-cache --check .
-    shellcheck -x -e SC2154 platforms/arch/arch-switch.sh
-    pyright
-    ${pythonRuntime}/bin/python -c 'import tomli_w'
-    touch "$out"
+    cp -R ${source} "$TMPDIR/ruff-source"
+    chmod -R u+w "$TMPDIR/ruff-source"
+    cd "$TMPDIR/ruff-source"
+    ruff check --no-cache --fix . || true
+    diff -ru ${source} "$TMPDIR/ruff-source"
+    exit 1
   ''
