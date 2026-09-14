@@ -1,4 +1,8 @@
-{ lib, pkgs, pythonRuntime }:
+{
+  lib,
+  pkgs,
+  pythonRuntime,
+}:
 let
   source = lib.fileset.toSource {
     root = ../.;
@@ -25,15 +29,10 @@ pkgs.runCommand "source-format-check"
       pkgs.pyright
       pkgs.shellcheck
       pkgs.findutils
-      pkgs.diffutils
     ];
   }
   ''
-    formatted="$TMPDIR/formatted"
-    cp -R ${source} "$formatted"
-    chmod -R u+w "$formatted"
-    find "$formatted" -name '*.nix' -print0 | xargs -0 nixfmt
-    diff -ru ${source} "$formatted"
+    find ${source} -name '*.nix' -print0 | xargs -0 nixfmt --check
     cd ${source}
     ruff check --no-cache .
     ruff format --no-cache --check .
