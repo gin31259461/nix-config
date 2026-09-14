@@ -18,18 +18,22 @@
   };
   networking.firewall.rules = lib.mkDefault [
     {
+      owner = "service-7777-tcp";
       protocol = "tcp";
       fromPort = 7777;
     }
     {
+      owner = "service-7777-udp";
       protocol = "udp";
       fromPort = 7777;
     }
     {
+      owner = "service-47990-tcp";
       protocol = "tcp";
       fromPort = 47990;
     }
     {
+      owner = "service-27031-27036-udp";
       protocol = "udp";
       fromPort = 27031;
       toPort = 27036;
