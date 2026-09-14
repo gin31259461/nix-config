@@ -26,7 +26,17 @@ Host values are defaults. User overrides are ordinary Nix module definitions;
 import order is not precedence. Profiles and home modules are explicit
 registries, not directory discovery.
 
+Python requirements are declared in `pyproject.toml`, resolved by `uv.lock`, and
+projected into a Nix-owned runtime by uv2nix. uv does not own deployment Python,
+a mutable `.venv`, or interpreter installation. `lib/python-runtime.nix` is the
+single dependency projection used by adapters and Home Manager tooling.
+
 ## Realization flow
+
+The public `arch-switch` CLI is a Nix-built Python coordinator. It validates and
+normalizes CLI intent before executing the private, heavily tested shell backend.
+Privileged phases are migrated from that backend incrementally; existing mutation
+contracts are not rewritten wholesale.
 
 The deployment artifact fixes the Home Manager activation package at build time.
 Runtime execution is ordered as follows:
@@ -53,7 +63,7 @@ GitLab Runner instances use their own `runnerctl` lifecycle and are intentionall
 outside workstation deployment. Reconcile prepares host/runtime state; register
 initializes the GitLab registration; verify checks the resulting instance.
 
-## Ownership
+## Ownership and lifecycle
 
 Arch owns native package installation, `/etc` policy, system services, kernel and
 network integration. Home Manager owns user packages, static home files and user
@@ -62,8 +72,11 @@ One managed resource should have one owner.
 
 Disabling a declaration withdraws desired management. It does not authorize
 package removal, service retirement, account deletion, registration deletion or
-application-data cleanup. Mutable runtime state and credentials never belong in
-the Nix store or repository.
+application-data cleanup. A destructive transition must be explicit and bounded
+to state whose ownership can be proven. Firewall rule retirement therefore uses
+an explicit `state = "absent"` declaration plus an ownership receipt, while the
+legacy tty1 autologin migration removes only an exact generated artifact.
+Mutable runtime state and credentials never belong in the Nix store or repository.
 
 Operator commands are documented in [README.md](README.md) and `docs/`. Agent
 change constraints are in [AGENTS.md](AGENTS.md).
