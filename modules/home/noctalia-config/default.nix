@@ -3,6 +3,7 @@
   lib,
   pkgs,
   hostName,
+  pythonRuntime,
   ...
 }:
 {
@@ -14,7 +15,7 @@
     xdg.configFile."noctalia/config.toml".source = config.workstation.noctalia.preferencesFile;
     home.packages = [
       (import ./package.nix {
-        inherit pkgs;
+        inherit pkgs pythonRuntime;
         username = config.home.username;
         homeConfiguration = "${config.home.username}@${hostName}";
       })
