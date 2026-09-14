@@ -12,10 +12,7 @@
   },
 }:
 let
-  pkgs = import inputs.nixpkgs {
-    inherit system;
-    config.allowUnfree = true;
-  };
+  pkgs = import inputs.nixpkgs { inherit system; };
   pythonRuntime = import ./python-runtime.nix {
     inherit inputs;
     inherit (pkgs) lib;
