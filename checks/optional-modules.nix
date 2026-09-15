@@ -13,7 +13,13 @@ let
       }).host
       // {
         gitlabRunners = { };
-        personalAgent = false;
+        personalAgent = {
+          enable = false;
+          webSearch = {
+            enable = false;
+            port = 8888;
+          };
+        };
         users =
           lib.mapAttrs (_: user: builtins.removeAttrs user [ "homeConfig" ])
             (import ../lib/eval-configuration.nix {

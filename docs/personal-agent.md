@@ -40,6 +40,20 @@ sudo systemctl status personal-agent.service
 sudo journalctl -u personal-agent.service -f
 ```
 
+Enable private loopback web search declaratively:
+
+```nix
+services.personalAgent.webSearch.enable = true;
+```
+
+The Arch capability then manages `searxng.service`, enables its JSON search format,
+uses weighted Google results with Bing as a fallback, and injects
+`PERSONAL_AGENT_WEB_SEARCH_URL` into Personal Agent. The fallback keeps search
+available when Google's unauthenticated endpoint responds with a CAPTCHA. SearXNG
+listens only on `127.0.0.1:8888`; its generated runtime secret remains under
+`/var/lib/searxng`. The capability pins a newer SearXNG source than the
+release-channel package because its Google parser uses the current WML endpoint.
+
 Disabling the declaration withdraws management without stopping the service or
 deleting its account, configuration or state. Explicit workstation purge removes
 the managed unit and stops the service while preserving those runtime files and

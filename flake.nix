@@ -95,7 +95,7 @@
         aiConfig = archHost.ai;
         aiArtifacts = ai.artifacts;
         inherit personalAgentPackage;
-        personalAgentEnabled = archHost.personalAgent;
+        personalAgentConfig = archHost.personalAgent;
       };
       llama-prepare = import ./modules/ai/package.nix {
         inherit lib pkgs;

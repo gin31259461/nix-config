@@ -110,12 +110,16 @@ if ((purge)); then
   done
   [[ ! -e $fs_root/etc/pacman.conf ]] || sed -i "/^Include = \/etc\/pacman.d\/nix-config-lizardbyte.conf$/d" "$fs_root/etc/pacman.conf"
   [[ ! -e $root_state ]] || root rm -rf -- "$root_state"
-  if [[ -e $fs_root/etc/systemd/system/personal-agent.service ]]; then
-    native systemctl is-enabled --quiet personal-agent.service &&
-      root systemctl disable --now personal-agent.service || true
-    root rm -f -- "$fs_root/etc/systemd/system/personal-agent.service"
-    root systemctl daemon-reload
-  fi
+  personal_units_changed=0
+  for service in personal-agent.service searxng.service; do
+    unit="$fs_root/etc/systemd/system/$service"
+    [[ -e $unit ]] || continue
+    native systemctl is-enabled --quiet "$service" &&
+      root systemctl disable --now "$service" || true
+    root rm -f -- "$unit"
+    personal_units_changed=1
+  done
+  ((personal_units_changed == 0)) || root systemctl daemon-reload
   printf 'Arch deployment state purged; package and user data were preserved.\n'
   exit 0
 fi

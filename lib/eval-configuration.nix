@@ -40,7 +40,13 @@ let
         _: value: cfg.services.gitlabRunner.enable && value.enable
       ) cfg.services.gitlabRunner.instances
     );
-    personalAgent = cfg.services.personalAgent.enable;
+    personalAgent = {
+      enable = cfg.services.personalAgent.enable;
+      webSearch = {
+        enable = cfg.services.personalAgent.enable && cfg.services.personalAgent.webSearch.enable;
+        inherit (cfg.services.personalAgent.webSearch) port;
+      };
+    };
     users = lib.mapAttrs (
       _: user:
       (builtins.removeAttrs user [ "home" ])

@@ -121,8 +121,14 @@ in
     powerProfilesDaemon.enable = enable "power-profiles-daemon";
     tailscale.enable = enable "Tailscale";
     gitlabRunner = import ../modules/gitlab-runner/options.nix { inherit lib; };
-    personalAgent.enable = (lib.mkEnableOption "the Personal Agent system service") // {
-      default = true;
+    personalAgent = {
+      enable = (lib.mkEnableOption "the Personal Agent system service") // {
+        default = true;
+      };
+      webSearch = {
+        enable = lib.mkEnableOption "private SearXNG search for Personal Agent";
+        port = option types.port 8888 "Loopback SearXNG port used by Personal Agent.";
+      };
     };
   };
   programs = {

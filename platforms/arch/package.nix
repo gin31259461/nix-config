@@ -10,7 +10,13 @@
   aiConfig ? null,
   aiArtifacts ? null,
   personalAgentPackage ? null,
-  personalAgentEnabled ? false,
+  personalAgentConfig ? {
+    enable = false;
+    webSearch = {
+      enable = false;
+      port = 8888;
+    };
+  },
   moduleGroups ? [ ],
   moduleSystemUnits ? [ ],
 }:
@@ -32,7 +38,7 @@ let
       import ./personal-agent {
         inherit pkgs;
         package = personalAgentPackage;
-        enabled = personalAgentEnabled;
+        config = personalAgentConfig;
       };
 in
 pkgs.writeShellApplication {

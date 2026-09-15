@@ -95,7 +95,7 @@ let
       lib.concatLists (
         lib.mapAttrsToList (
           name: child:
-          if name == "enable" then
+          if name == "enable" && child then
             [ (path ++ [ name ]) ]
           else if name == "home" then
             [ ]
@@ -200,7 +200,7 @@ assert base.host.systemSettings.trim.enable;
 assert override.host.name == "overridden" && override.host.systemSettings.timeZone == "UTC";
 assert override.host.systemSettings.firewall.rules == [ ];
 assert disabled.host.gitlabRunners == { };
-assert !disabled.host.personalAgent;
+assert !disabled.host.personalAgent.enable;
 assert !overriddenHome.config.programs.git.enable;
 assert lib.all
   (name: lib.any (package: (package.pname or "") == name) overriddenHome.config.home.packages)
