@@ -6,8 +6,8 @@ dependencies = ["tomli-w"]
 
 [tool.pyright]
 include = ["checks", "lib", "modules", "platforms"]
-reportMissingTypeStubs = false
 typeCheckingMode = "standard"
+useLibraryCodeForTypes = true
 executionEnvironments = [
   { root = "platforms/arch/system", extraPaths = ["platforms/arch/system"] },
   { root = "platforms/arch/ai", extraPaths = ["platforms/arch/system"] },
