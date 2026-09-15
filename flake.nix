@@ -130,6 +130,7 @@
       devShells.${system}.default = pkgs.mkShell {
         packages = [
           (pkgs.python3.withPackages (pythonPackages: [ pythonPackages.tomli-w ]))
+          pkgs.pyright
           pkgs.ruff
           pkgs.just
         ];
@@ -140,6 +141,7 @@
         capabilities = import ./checks/capabilities.nix { inherit lib pkgs inputs; };
         optional-modules = import ./checks/optional-modules.nix { inherit lib pkgs inputs; };
         source-format = import ./checks/format.nix { inherit lib pkgs; };
+        python-types = import ./checks/python-types.nix { inherit lib pkgs; };
         arch-home = archHomes.${homeConfigurationName}.activationPackage;
       }
       // (import ./checks {

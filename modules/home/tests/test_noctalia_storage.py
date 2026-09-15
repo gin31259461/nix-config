@@ -9,6 +9,7 @@ import unittest
 from unittest.mock import patch
 
 spec = importlib.util.spec_from_file_location("storage", sys.argv.pop())
+assert spec is not None and spec.loader is not None
 storage = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(storage)
 

@@ -9,11 +9,13 @@ SOURCE = Path(sys.argv.pop()).resolve()
 BASE_TEST = Path(__file__).with_name("test_arch_switch.py")
 sys.argv.append(str(SOURCE))
 spec = importlib.util.spec_from_file_location("arch_switch_base", BASE_TEST)
+assert spec is not None and spec.loader is not None
 base = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(base)
 
 
 class OptionalLifecycleTests(unittest.TestCase):
+    state: dict[str, object]
     setUp = base.ArchSwitchTests.setUp
     save = base.ArchSwitchTests.save
     invoke = base.ArchSwitchTests.invoke

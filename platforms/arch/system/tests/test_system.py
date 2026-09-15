@@ -21,7 +21,7 @@ class Fake:
     def __init__(self, files):
         self.files = files
         self.calls = []
-        self.fail = None
+        self.fail: tuple[str, ...] | None = None
         self.locales = ["C", "en_US.utf8", "zh_TW.utf8"]
         self.zone = "UTC"
         self.local_rtc = "no"

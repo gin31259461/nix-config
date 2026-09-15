@@ -4,6 +4,15 @@ version = "0.1.0"
 requires-python = ">=3.12"
 dependencies = ["tomli-w"]
 
+[tool.pyright]
+include = ["checks", "lib", "modules", "platforms"]
+reportMissingTypeStubs = false
+typeCheckingMode = "standard"
+executionEnvironments = [
+  { root = "platforms/arch/system", extraPaths = ["platforms/arch/system"] },
+  { root = "platforms/arch/ai", extraPaths = ["platforms/arch/system"] },
+]
+
 [tool.ruff]
 line-length = 88
 

@@ -11,6 +11,7 @@ import unittest
 
 SOURCE = Path(sys.argv.pop()).resolve()
 spec = importlib.util.spec_from_file_location("ai_runtime", SOURCE)
+assert spec is not None and spec.loader is not None
 runtime = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(runtime)
 

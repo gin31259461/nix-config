@@ -58,7 +58,7 @@ class ArchSwitchTests(unittest.TestCase):
                     f"managed_identity=644:{os.getuid()}:{os.getgid()}",
                     f"curl_bin={q(str(self.root / 'bin/curl'))}",
                     f"tar_bin={q(str(self.root / 'bin/bsdtar'))}",
-                    f"flock_bin={q(shutil.which('flock'))}",
+                    f"flock_bin={q(shutil.which('flock') or 'flock')}",
                     "expected_user=tester",
                     "pacman_packages=(base)",
                     "aur_packages=(extra)",

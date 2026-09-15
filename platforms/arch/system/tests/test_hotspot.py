@@ -5,6 +5,7 @@ from pathlib import Path
 import sys
 import tempfile
 from types import SimpleNamespace
+from typing import Any, cast
 import unittest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -131,13 +132,13 @@ class Tests(unittest.TestCase):
 
     def test_disabled_preserves_pending_without_native_calls(self):
         self.files.mark("hotspot", "activate\n")
-        self.system.desired["hotspot"] = None
+        cast(dict[str, Any], self.system.desired)["hotspot"] = None
         self.system.converge()
         self.assertTrue(self.files.pending("hotspot"))
         self.assertEqual(self.native.calls, [])
 
     def test_firewall_disabled_does_not_suppress_hotspot_or_touch_ufw(self):
-        self.system.desired["firewall"] = None
+        cast(dict[str, Any], self.system.desired)["firewall"] = None
         self.native.active = False
         self.system.converge()
         self.assertTrue(self.native.active)

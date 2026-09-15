@@ -12,6 +12,7 @@ import tempfile
 import unittest
 
 spec = importlib.util.spec_from_file_location("sync", sys.argv.pop())
+assert spec is not None and spec.loader is not None
 sync = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(sync)
 
@@ -32,7 +33,7 @@ class SyncTests(unittest.TestCase):
         self.settings = self.state / "settings.toml"
         self.control = root / "control"
         self.commands = []
-        self.exported = {"theme": {"mode": "light"}}
+        self.exported: dict[str, object] = {"theme": {"mode": "light"}}
         self.fail_build = self.fail_switch = self.running = self.mismatch = False
         self.built = None
         self.mutate_after_build = False

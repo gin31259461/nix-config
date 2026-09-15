@@ -122,7 +122,7 @@ for the composition model. Keep one owner per package, account, file and service
 | `checks/` | Shared checks and isolated fixtures. |
 
 Feature tests also live beside their owning modules and adapters. Use
-`nix develop` for the Python, Ruff and Just development environment. For
+`nix develop` for the Python, Pyright, Ruff and Just development environment. For
 composition or adapter changes, run:
 
 ```bash
@@ -134,7 +134,8 @@ nix build --no-link --show-trace --print-build-logs \
 git diff --check
 ```
 
-`check-fast` validates formatting and selected interfaces; `check` builds all
-flake checks, including the home, adapter tests and firewall VM test. Tests use
+`check-fast` validates formatting, all Python types with Pyright's standard mode,
+and selected interfaces; `check` builds all flake checks, including the home,
+adapter tests and firewall VM test. Tests use
 temporary paths and fake native commands or isolated VMs. These commands build
 and validate source without activating the workstation.

@@ -148,6 +148,7 @@ def execute(argv):
         stderr=subprocess.PIPE,
         start_new_session=True,
     )
+    assert process.stdout is not None and process.stderr is not None
     try:
         stdout, stderr = process.communicate(timeout=timeout)
     except BaseException as error:

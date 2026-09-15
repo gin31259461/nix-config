@@ -8,17 +8,18 @@ import unittest
 
 SOURCE = Path(sys.argv.pop()).resolve()
 spec = importlib.util.spec_from_file_location("personal_agent_adapter", SOURCE)
+assert spec is not None and spec.loader is not None
 adapter = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(adapter)
 
 
 class FakeRun:
     def __init__(self):
-        self.calls = []
+        self.calls: list[tuple[str, ...]] = []
         self.group = False
         self.account = False
-        self.enabled = set()
-        self.active = set()
+        self.enabled: set[str] = set()
+        self.active: set[str] = set()
 
     def __call__(self, *argv, allow_failure=False):
         self.calls.append(argv)
@@ -88,7 +89,7 @@ class PersonalAgentTests(unittest.TestCase):
                 "searxngUnit": "",
             },
         }
-        self.run = FakeRun()
+        self.fake_run = FakeRun()
 
     def write_configuration(self):
         config = self.root / "etc/personal-agent/config.toml"
@@ -101,7 +102,7 @@ class PersonalAgentTests(unittest.TestCase):
         secrets.chmod(0o600)
 
     def subject(self):
-        return adapter.PersonalAgent(self.desired, self.root, self.run)
+        return adapter.PersonalAgent(self.desired, self.root, self.fake_run)
 
     def test_first_missing_configuration_is_not_ready(self):
         with self.assertRaises(adapter.NotReady):
@@ -124,9 +125,9 @@ class PersonalAgentTests(unittest.TestCase):
         self.write_configuration()
         subject = self.subject()
         subject.converge()
-        self.assertTrue(self.run.group and self.run.account)
-        self.assertIn("personal-agent.service", self.run.enabled)
-        self.assertIn("personal-agent.service", self.run.active)
+        self.assertTrue(self.fake_run.group and self.fake_run.account)
+        self.assertIn("personal-agent.service", self.fake_run.enabled)
+        self.assertIn("personal-agent.service", self.fake_run.active)
         self.assertTrue(
             (self.root / "var/lib/nix-config/arch/personal-agent.ready").exists()
         )
@@ -135,10 +136,10 @@ class PersonalAgentTests(unittest.TestCase):
         )
         unit = self.root / "etc/systemd/system/personal-agent.service"
         before = unit.stat().st_ino
-        calls = len(self.run.calls)
+        calls = len(self.fake_run.calls)
         subject.converge()
         self.assertEqual(before, unit.stat().st_ino)
-        repeated = self.run.calls[calls:]
+        repeated = self.fake_run.calls[calls:]
         self.assertFalse(
             any(
                 call[:2] in (("systemctl", "start"), ("systemctl", "restart"))
@@ -166,7 +167,7 @@ class PersonalAgentTests(unittest.TestCase):
 
         self.subject().converge()
 
-        calls = self.run.calls
+        calls = self.fake_run.calls
         web_start = calls.index(("systemctl", "start", "searxng.service"))
         probe = next(
             index for index, call in enumerate(calls) if call[0].endswith("curl")
@@ -200,7 +201,7 @@ class PersonalAgentTests(unittest.TestCase):
             }
         )
 
-        original_run = self.run
+        original_run = self.fake_run
 
         def empty_search(*argv, allow_failure=False):
             result = original_run(*argv, allow_failure=allow_failure)
@@ -233,7 +234,7 @@ class PersonalAgentTests(unittest.TestCase):
 
         self.subject().converge()
 
-        self.assertIn(("systemctl", "daemon-reload"), self.run.calls)
+        self.assertIn(("systemctl", "daemon-reload"), self.fake_run.calls)
 
 
 if __name__ == "__main__":

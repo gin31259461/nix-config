@@ -236,9 +236,11 @@ class PersonalAgent:
         )
         self.ensure_metadata(self.path("config"), "root", "personal-agent", 0o640)
         self.ensure_metadata(self.path("secrets"), "root", "root", 0o600)
-        web = self.desired.get("webSearch", {})
-        web_enabled = isinstance(web, dict) and web.get("enable") is True
+        web_value = self.desired.get("webSearch", {})
+        web = web_value if isinstance(web_value, dict) else {}
+        web_enabled = web.get("enable") is True
         web_changed = False
+        web_receipt: Path | None = None
         if web_enabled:
             web_path_value = web.get("unitPath")
             web_receipt_value = web.get("receipt")
@@ -267,6 +269,7 @@ class PersonalAgent:
             elif web_changed or retry:
                 self.run("systemctl", "restart", web_service)
             self.wait_for_web_search(web)
+            assert web_receipt is not None
             web_receipt.touch()
         enabled = self.run(
             "systemctl",
