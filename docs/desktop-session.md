@@ -11,11 +11,10 @@ Desktop capabilities are selected through `desktop.enable`, program switches and
 Disabling a user capability removes its managed Home Manager contribution from
 the next generation; it does not delete application data.
 
-KeePassXC starts minimized and remains manually unlocked. Noctalia starts
-independently and owns the StatusNotifier watcher. Tray consumers start after the
-shell. Vicinae has bounded degraded startup so a missing tray does not block the
-session. Vesktop keeps its application-specific compatibility flags in its own
-service/configuration.
+Noctalia starts independently and owns the StatusNotifier watcher. Tray
+consumers start after the shell. Vicinae has bounded degraded startup so a
+missing tray does not block the session. Vesktop keeps its application-specific
+compatibility flags in its own service/configuration.
 
 ## Noctalia storage initialization
 
@@ -50,15 +49,14 @@ Noctalia and rerunning activation.
 ## Verify the session
 
 ```bash
-systemctl --user is-active noctalia.service keepassxc.service
+systemctl --user is-active noctalia.service
 busctl --user call org.freedesktop.DBus /org/freedesktop/DBus \
   org.freedesktop.DBus GetConnectionUnixProcessID s org.kde.StatusNotifierWatcher
 systemctl --user show noctalia.service -p MainPID
 ```
 
-The watcher PID should correspond to Noctalia. Closing KeePassXC must not stop
-Noctalia. Shell restarts should not restart unrelated applications merely to
-restore tray state.
+The watcher PID should correspond to Noctalia. Shell restarts should not
+restart unrelated applications merely to restore tray state.
 
 ## Source validation
 

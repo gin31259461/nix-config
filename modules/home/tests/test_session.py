@@ -28,40 +28,6 @@ def unit(name):
 
 
 class SessionTests(unittest.TestCase):
-    def test_keepassxc_waits_for_tray_host_without_restart_coupling(self):
-        if not EXPECTED["keepassxc"]:
-            self.assertFalse((UNITS / "keepassxc.service").exists())
-            return
-        keepass = unit("keepassxc")
-        self.assertIn("noctalia.service", keepass["After"])
-        self.assertNotIn("noctalia.service", keepass.get("PartOf", []))
-        command = keepass["ExecStartPre"][0]
-        script = command.split(" -c '", 1)[1][:-1].replace("$$", "$")
-        # Execute the generated wait with fake native commands only. A watcher
-        # can answer before its host is ready; neither absence nor false is ready.
-        with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
-            busctl = root / "busctl"
-            busctl.write_text(
-                f"#!{shutil.which('bash')}\n"
-                f'echo call >> "{root}/calls"\n'
-                f'count=$(wc -l < "{root}/calls")\n'
-                'case "$count" in 1) exit 1;; 2) echo "b false";; '
-                '*) echo "b true";; esac\n'
-            )
-            busctl.chmod(0o755)
-            script = script.replace("/usr/bin/busctl", str(busctl)).replace(
-                "/usr/bin/sleep 0.1", ":"
-            )
-            subprocess.run(["bash", "-c", script], check=True, timeout=3)
-            self.assertEqual((root / "calls").read_text().splitlines(), ["call"] * 3)
-            # Exhausting the bounded wait still permits password-free startup.
-            subprocess.run(
-                ["bash", "-c", script.replace("SECONDS + 10", "SECONDS")],
-                check=True,
-                timeout=3,
-            )
-
     def test_launcher_wait_bounds_slow_calls_and_degrades(self):
         launcher = unit("vicinae")
         self.assertEqual(launcher["TimeoutStartSec"], ["15s"])
@@ -90,7 +56,7 @@ class SessionTests(unittest.TestCase):
         self.assertIn("noctalia.service", launcher["PartOf"])
         self.assertIn("vicinae.service", unit("noctalia").get("Wants", []))
         # Restart only the competing watcher, not communication apps or vaults.
-        for name in ("vesktop", "keepassxc", "tailscale-systray"):
+        for name in ("vesktop", "tailscale-systray"):
             if (UNITS / (name + ".service")).exists():
                 self.assertNotIn("noctalia.service", unit(name).get("PartOf", []))
 
@@ -100,34 +66,6 @@ class SessionTests(unittest.TestCase):
         self.assertNotIn("--ozone-platform-hint=wayland", command)
         flags = (UNITS / "../../vesktop-flags.conf").read_text()
         self.assertEqual(flags.strip(), "--ozone-platform=x11")
-
-    def test_keepassxc_loads_at_login_without_password_delivery(self):
-        if not EXPECTED["keepassxc"]:
-            self.assertFalse((UNITS / "keepassxc.service").exists())
-            return
-        keepass = unit("keepassxc")
-        self.assertEqual(keepass["WantedBy"], ["graphical-session.target"])
-        self.assertNotIn("ExecStartPost", keepass)
-        self.assertNotIn("LoadCredentialEncrypted", keepass)
-        self.assertNotIn("LoadCredential", keepass)
-        self.assertEqual(keepass["Restart"], ["no"])
-        self.assertEqual(
-            keepass["ExecStart"],
-            [
-                f'/usr/bin/keepassxc --minimized "{EXPECTED["home"]}/.local/share/keepassxc/credentials.kdbx"'
-            ],
-        )
-        self.assertFalse((UNITS / "keepassxc-tray-refresh.service").exists())
-        self.assertFalse((UNITS / "remmina-applet.service").exists())
-        for path in UNITS.glob("*.service"):
-            config = unit(path.stem)
-            for key in ("After", "Before", "Wants", "Requires", "BindsTo"):
-                self.assertNotIn("keepassxc.service", config.get(key, []), path.name)
-            self.assertNotIn("--pw-stdin", path.read_text())
-            self.assertNotIn(".cred", path.read_text().replace("credentials.kdbx", ""))
-        self.assertTrue(
-            (UNITS / "graphical-session.target.wants/keepassxc.service").exists()
-        )
 
     def test_noctalia_uses_a_runtime_file_key(self):
         if not EXPECTED["storage"]:

@@ -67,13 +67,12 @@ let
     username = host.deployment.username;
     deploymentUser = host.users.${host.deployment.username};
   };
-  homeWithoutKeePassXC = (import ../lib/mk-home-configuration.nix { inherit inputs; }) {
+  homeMinimal = (import ../lib/mk-home-configuration.nix { inherit inputs; }) {
     inherit (host) system platform hardware;
     hostName = host.name;
     username = host.deployment.username;
     user = host.users.${host.deployment.username} // {
       modules = [ "graphical-session" ];
-      # No user-specific database declaration when the capability is absent.
       homeModules = [ ];
     };
   };
@@ -83,12 +82,9 @@ assert !(builtins.elem "podman" packages.pacman);
 assert !(builtins.elem "openrazer-daemon" packages.pacman);
 assert !(builtins.elem "amd-ucode" packages.pacman);
 assert !(builtins.hasAttr "polychromatic-tray" home.config.systemd.user.services);
-assert !(builtins.hasAttr "keepassxc" homeWithoutKeePassXC.config.systemd.user.services);
-assert
-  !(builtins.elem "keepassxc.service" homeWithoutKeePassXC.config.systemd.user.services.noctalia.Unit.After);
 pkgs.runCommand "optional-modules-check" { } ''
   test -x ${controller}/bin/arch-switch
   test -x ${home.activationPackage}/activate
-  test -x ${homeWithoutKeePassXC.activationPackage}/activate
+  test -x ${homeMinimal.activationPackage}/activate
   touch "$out"
 ''

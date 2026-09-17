@@ -33,7 +33,6 @@ let
       console.enable = false;
       time.enable = false;
       i18n.enable = false;
-      users.users.abnertu.modules.keepassxc.enable = false;
       users.users.abnertu.modules.noctalia-config.enable = false;
     }
   ];
@@ -233,7 +232,6 @@ assert lib.all (name: !(builtins.elem name packages.pacman)) [
 assert packages.lizardbyte == [ ];
 assert !(builtins.elem "vesktop-bin" packages.aur) && !(builtins.elem "vicinae-bin" packages.aur);
 assert lib.all (name: !(builtins.hasAttr name home.config.systemd.user.services)) [
-  "keepassxc"
   "vesktop"
   "vicinae"
   "tailscale-systray"

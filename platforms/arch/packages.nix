@@ -87,7 +87,6 @@
       "hyprsunset"
       "imagemagick"
       "inter-font"
-      "keepassxc"
       "kitty"
       "libnotify"
       "loupe"

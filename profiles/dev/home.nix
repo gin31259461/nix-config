@@ -6,6 +6,10 @@
     git-credential-manager
     gnupg
     nodejs
-    pass
   ];
+
+  programs.password-store = {
+    enable = true;
+    package = pkgs.pass;
+  };
 }

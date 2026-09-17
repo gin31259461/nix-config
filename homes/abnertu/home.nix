@@ -6,7 +6,6 @@
 }:
 {
   config = lib.mkDefault {
-    workstation.keepassxc.databaseFile = "${config.home.homeDirectory}/.local/share/keepassxc/credentials.kdbx";
     workstation.noctalia.preferencesFile = ./noctalia/config.toml;
 
     programs.git.settings = {

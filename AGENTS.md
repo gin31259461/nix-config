@@ -59,7 +59,7 @@ separate lifecycle outside workstation deployment.
 
 ## Protected state and desktop
 
-Never read or print credentials, private keys, KeePassXC databases, Runner tokens,
+Never read or print credentials, private keys, password stores, Runner tokens,
 Noctalia keys or mutable application data. Keep secrets and mutable runtime state
 outside Git and Nix derivations; tokens must never appear in command arguments
 or unredacted logs. Use synthetic fixtures when investigating these paths.

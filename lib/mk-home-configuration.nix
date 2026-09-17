@@ -68,13 +68,12 @@ inputs.home-manager.lib.homeManagerConfiguration {
         default = { };
         internal = true;
       };
-      config.workstation.capabilities = lib.genAttrs [ "keepassxc" "noctalia-config" ] (name: {
+      config.workstation.capabilities = lib.genAttrs [ "noctalia-config" ] (name: {
         enable = builtins.elem name user.modules;
       });
     })
   ]
   ++ [
-    ../modules/home/keepassxc.nix
     ../modules/home/noctalia-config
   ]
   ++ user.homeModules

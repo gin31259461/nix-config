@@ -24,10 +24,9 @@ let
           "graphical-session"
         ]
         ++ lib.optionals full [
-          "keepassxc"
           "noctalia-storage"
         ];
-        homeModules = lib.optional full ./tests/session-home.nix;
+        homeModules = [ ];
       };
     };
   sessionFixture =
@@ -40,7 +39,6 @@ let
       expected = pkgs.writeText "session-expectations.json" (
         builtins.toJSON {
           home = generated.config.home.homeDirectory;
-          keepassxc = full;
           storage = full;
           openrazer = full;
         }
@@ -111,7 +109,6 @@ in
     profile=${home.config.home.path}
     for unit in \
       hyprpolkitagent.service \
-      keepassxc.service \
       noctalia.service \
       polychromatic-tray.service \
       quickshell-overview.service \
@@ -162,7 +159,6 @@ in
       hyprlock \
       hyprpolkitagent \
       hyprsunset \
-      keepassxc \
       kitty \
       mpv \
       mpvpaper \
