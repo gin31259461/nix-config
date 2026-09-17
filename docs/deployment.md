@@ -28,9 +28,9 @@ just arch-workstation update verbose
 just arch-workstation purge
 ```
 
-Routine deployment never installs missing packages. It exits 3 and lists the
-missing packages. `update` permits the full pacman upgrade followed by AUR
-convergence.
+Routine deployment never installs missing packages. It exits with code 3 and lists
+the missing packages. Rerunning with `update` permits the full pacman upgrade
+followed by declared AUR package convergence.
 
 `purge` is an explicit Arch cleanup. It disables managed system units, removes
 managed configuration files and pending state, and removes the managed
@@ -40,7 +40,7 @@ handled by its normal generation lifecycle.
 
 `just arch-workstation` always enables Nix `--show-trace` and
 `--print-build-logs`. `verbose` additionally enables Nix `--verbose` and passes
-`--verbose` into the deployment artifact, Arch adapter and Home Manager.
+`--verbose` into the deployment artifact, Arch adapter, and Home Manager.
 
 For direct execution with the same diagnostic level:
 
@@ -48,21 +48,20 @@ For direct execution with the same diagnostic level:
 nix run --show-trace --print-build-logs --verbose .#arch-workstation -- --verbose
 ```
 
-An app argument cannot change logging for Nix evaluation that occurred before
-the app started, so the Nix flags belong before the flake target and the adapter
-flag belongs after `--`.
+Nix evaluation flags belong before the flake target, and adapter flags belong
+after `--`.
 
 ## Deployment order
 
 The built deployment fixes one Home Manager activation package before runtime.
 Execution then follows this order:
 
-1. Validate Arch, login identity, administrator group and native command set.
+1. Validate Arch, login identity, administrator group, and native command set.
 2. Check installed package state and running-kernel compatibility.
 3. Preflight core system settings.
 4. Preflight optional native modules.
 5. If `--update` is selected, resolve inventories and update pacman/AUR packages.
-6. Converge core Arch system settings, files, groups and services.
+6. Converge core Arch system settings, files, groups, and services.
 7. Converge optional modules that reported ready.
 8. Activate the exact built Home Manager generation.
 
@@ -71,11 +70,10 @@ adapter returns the dedicated `not ready` status. A highlighted `SKIP optional
 module ...` message records that decision. All other optional-module errors are
 fatal.
 
-GitLab Runner reconciliation and registration are not part of this workflow.
-Personal Agent convergence is part of this workflow only when its external
-runtime configuration is ready; first-time absence is reported as an optional
-skip.
-See [runners](runners.md).
+GitLab Runner reconciliation and registration are not part of workstation deployment;
+see [runners](runners.md). Personal Agent convergence is part of this workflow only
+when its external runtime configuration is ready; first-time absence is reported as
+an optional skip (see [personal agent](personal-agent.md)).
 
 ## Failure and recovery
 
@@ -85,14 +83,14 @@ See [runners](runners.md).
 | Exit 3 | Declared native packages are missing; rerun with `update` |
 | Exit 75 | Deployment lock is busy or the running kernel no longer matches installed modules |
 | Highlighted optional skip | The module is enabled but has not completed explicit preparation |
-| Adapter command failure | Inspect the complete command, stdout and stderr and correct the native cause |
+| Adapter command failure | Inspect the complete command, stdout, and stderr to correct the native cause |
 
 Privileged system and AI adapters use the shared native command adapter. Failed
-commands include the executable, exit status, stdout and stderr. Timeout errors
-also preserve partial output. In verbose mode every native command and its
+commands report the executable, exit status, stdout, and stderr. Timeout errors
+also preserve partial output. In verbose mode, every native command and its
 captured output is printed.
 
-Managed writes compare content and metadata and use atomic replacement. Actions
+Managed writes compare content and metadata using atomic replacement. Actions
 that must follow a write are recorded under `/var/lib/nix-config/arch/` before
 mutation and cleared only after success. Leave pending markers intact after a
 failure; the next deployment retries the unfinished action.
@@ -114,4 +112,4 @@ precondition; see [desktop session](desktop-session.md).
 
 Disabling a capability stops declaring future management. Deployment does not
 automatically uninstall packages, delete service state, remove accounts, purge
-registrations or erase application data.
+registrations, or erase application data.

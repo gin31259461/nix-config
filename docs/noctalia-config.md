@@ -10,7 +10,7 @@ The reviewed snapshot is stored at:
 homes/abnertu/noctalia/config.toml
 ```
 
-Home Manager owns the corresponding managed config link.
+Home Manager owns the corresponding managed config symlink.
 
 ## Capture
 
@@ -21,15 +21,14 @@ nix run .#noctalia-config -- capture --dry-run
 nix run .#noctalia-config -- capture
 ```
 
-Capture exports the effective Noctalia settings, filters them to the owned UI
-sections, validates a temporary candidate and atomically updates the repository
-snapshot only when needed. It does not stage, commit or push changes.
+Capture exports effective Noctalia settings, filters them to owned UI sections,
+validates a temporary candidate, and atomically updates the repository snapshot
+only when needed. It does not stage, commit, or push changes.
 
-Review the resulting Git diff before committing. User labels, paths and other UI
-values can still be private even when they are within the supported filter.
+Review the resulting Git diff before committing. User labels, paths, and other UI
+values can still be private even when within the supported filter.
 
-Validation warnings stop capture. Inspect detailed live validation locally when
-needed:
+Validation warnings stop capture. Inspect detailed live validation locally when needed:
 
 ```bash
 /usr/bin/noctalia config validate
@@ -43,8 +42,8 @@ nix run .#noctalia-config -- deploy
 ```
 
 Deploy builds and activates the complete selected Home Manager configuration and
-then verifies the managed Noctalia sections. It does not run Arch convergence.
-The built Home Manager generation is fixed before activation.
+verifies the managed Noctalia sections. It does not run Arch convergence. The
+built Home Manager generation is fixed before activation.
 
 If live GUI overrides conflict with repository-owned sections, deployment stops.
 To deliberately replace those owned override sections:
@@ -67,14 +66,14 @@ Recovery state is stored under:
 ```
 
 If an override replacement is interrupted, keep the receipt and backup intact,
-stop Noctalia and run:
+stop Noctalia, and run:
 
 ```bash
 nix run .#noctalia-config -- deploy --recover
 ```
 
-Recovery restores saved bytes only when the current state still matches the
-recorded transition. Concurrent edits require manual reconciliation.
+Recovery restores saved bytes only when current state still matches the recorded
+transition. Concurrent edits require manual reconciliation.
 
 Noctalia encrypted-storage initialization is a separate Home Manager capability;
 see [desktop session](desktop-session.md).
@@ -88,4 +87,4 @@ just check
 ```
 
 Tests use temporary homes and fake commands. They do not inspect live settings,
-activate the real home or restart services.
+activate the real home, or restart services.

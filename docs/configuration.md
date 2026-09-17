@@ -21,17 +21,19 @@ combinations fail evaluation. Import order is not an override mechanism.
 
 ## Inspect resolved values
 
+Query resolved values directly from the normalized configuration without deployment:
+
 ```bash
 nix eval .#lib.configurations.arch.networking.hostname.name
 nix eval .#lib.configurations.arch.services.fstrim.enable
 nix eval --json .#lib.configurations.arch.networking.firewall
+```
 
 Host identity is grouped under `networking.hostname`:
 
 ```nix
 networking.hostname.name = "arch";
 networking.hostname.enable = true;
-```
 ```
 
 The public schema is defined by `lib/configuration-options.nix` and feature-owned
@@ -45,7 +47,8 @@ values into the private Host and adapter interfaces.
 | `networking` | Hostname, NetworkManager, hotspot and firewall |
 | `i18n`, `time`, `console` | Locale, timezone and virtual console |
 | `services` | Time sync, journal, logind, TRIM, power, Tailscale and GitLab Runner |
-| `services.personalAgent` | Pinned Personal Agent package and native system service |
+| `services.personalAgent` | Pinned Personal Agent package and native system service integration |
+| `services.searxng` | Standalone loopback SearXNG metasearch daemon |
 | `hardware` | Graphics, Bluetooth, OpenRazer and initramfs intent |
 | `programs.ai` | llama.cpp, Codex and shared AI skill presets |
 | `programs` | Sunshine, Vesktop and Vicinae |

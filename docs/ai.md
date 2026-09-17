@@ -2,8 +2,8 @@
 
 The AI module runs declared GGUF models through a pinned llama.cpp build and the
 llama-swap router. The current inventory contains one model with multiple
-requestable inference profiles. llama-swap, llama-server and Caddy listen only
-on loopback. Tailscale Serve publishes the Caddy listener to the tailnet.
+requestable inference profiles. llama-swap, llama-server, and Caddy listen only
+on loopback. Tailscale Serve publishes the Caddy listener securely to the tailnet.
 
 ```text
 Tailnet HTTPS -> Tailscale Serve -> 127.0.0.1:11435 Caddy
@@ -11,11 +11,11 @@ Tailnet HTTPS -> Tailscale Serve -> 127.0.0.1:11435 Caddy
                                   -> 127.0.0.1:<dynamic> llama-server
 ```
 
-Source revision, build policy, model revisions, checksums and runtime defaults
+Source revision, build policy, model revisions, checksums, and runtime defaults
 are owned by the AI artifact inventory. Models remain under
 `/var/lib/llama/models` and never enter the Nix store. Host-owned profiles expose
 the current model as the base ID plus `:thinking-general`, `:thinking-coding`,
-`:instruct` and `:preserved-thinking` aliases.
+`:instruct`, and `:preserved-thinking` aliases.
 
 ## Prepare
 
@@ -28,7 +28,7 @@ just prepare-ai build
 just prepare-ai model
 ```
 
-Equivalent direct commands are:
+Equivalent direct commands:
 
 ```bash
 sudo nix --extra-experimental-features 'nix-command flakes' run .#llama-prepare
@@ -47,33 +47,33 @@ review. The build requires the native C++/ROCm/Vulkan development toolchain.
 
 After full SHA-256 verification, preparation writes a root-owned receipt beside
 each model. Routine deployment compares that receipt with the declared artifact
-and the model's device, inode, size and timestamps. It therefore detects model
+and the model's device, inode, size, and timestamps. It therefore detects model
 replacement or modification without rereading the complete GGUF on every run.
 Run `just prepare-ai model` to perform an explicit full checksum verification and
 refresh matching receipts.
 
 Preparation is idempotent for matching owned state. An existing conflicting
-revision, selector, staging path or model checksum is an error and requires
+revision, selector, staging path, or model checksum is an error and requires
 operator review.
 
 ## Deployment behavior
 
-When AI is enabled but the build or one of its declared models has not been prepared, workstation
-deployment prints a bold yellow skip message and continues without touching AI
-files or services:
+When AI is enabled but the build or one of its declared models has not been prepared,
+workstation deployment prints a bold yellow skip message and continues without
+touching AI files or services:
 
 ```text
 SKIP optional module ai: llama.cpp build/model is not prepared; run 'just prepare-ai'
 ```
 
-This skip is limited to the explicit `not ready` adapter status. A mismatched
-selector, invalid receipt, unmanaged Caddy ownership, invalid service state or
-native command failure still stops deployment.
+This skip is strictly limited to the explicit `not ready` adapter status. A mismatched
+selector, invalid receipt, unmanaged Caddy ownership, invalid service state, or
+native command failure stops deployment.
 
 After preparation, normal deployment writes the llama-swap JSON/YAML config and
 service unit, converges the router, validates Caddy, checks the local model
-listing endpoint and reconciles the declared Tailscale Serve route. Caddy only
-proxies `/health` and `/v1/*`; llama-swap management endpoints are not exposed
+listing endpoint, and reconciles the declared Tailscale Serve route. Caddy only
+proxies `/health` and `/v1/*`; llama-swap management endpoints are never exposed
 through the published listener.
 
 ```bash
@@ -89,7 +89,7 @@ sudo tailscale serve status --json
 systemctl status llama-swap.service caddy.service
 ```
 
-For command-level diagnostics use:
+For command-level diagnostics, use:
 
 ```bash
 just arch-workstation verbose
@@ -100,4 +100,4 @@ stdout/stderr. Without verbose mode, failed native commands still report both
 streams.
 
 Disabling `programs.ai.llama.enable` withdraws AI convergence. It does not delete
-prepared binaries, models, system files, pending markers or Tailscale routes.
+prepared binaries, models, system files, pending markers, or Tailscale routes.

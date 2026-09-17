@@ -11,6 +11,22 @@ not a NixOS system or an Arch installer.
 
 ![Arch workstation preview](docs/assets/preview.png)
 
+## Versions and Environment
+
+This repository pins reproducible upstream channels, external inputs, and AI model artifacts:
+
+| Component | Target / Release | Pinned Source / Revision |
+| --- | --- | --- |
+| **Platform** | Arch Linux (`x86_64-linux`) | Host user `abnertu`, kernel module match |
+| **Nixpkgs** | `nixos-26.05` | [`c3eea5b`](https://github.com/NixOS/nixpkgs/tree/c3eea5b2156db11c7eeeada3dc737711255b253e) |
+| **Home Manager** | `release-26.05` (`stateVersion = "26.05"`) | [`ec17201`](https://github.com/nix-community/home-manager/tree/ec172013fa62135f58fb58dd17ae9651e8f39727) |
+| **Personal Agent** | Standalone Assistant & SearXNG | [`7cdfc49`](https://github.com/gin31259461/personal-agent/tree/7cdfc49851c70be14ba0e4d80bc77e65446a153a) |
+| **OrbitVim** | Pinned Neovim Runtime Config | [`335ad2e`](https://github.com/Orbit-Lua/orbitvim/tree/335ad2e5c83eaa7e7a2d0688efd012855c41e379) |
+| **Hyprland Config** | Pinned Hyprland & Waybar Config | [`09402e2`](https://github.com/Orbit-Lua/hypr/tree/09402e2cf53f62683ac0726b770e22c3c7fedd96) |
+| **llama.cpp** | Local ROCm0/Vulkan Inference Engine | [`434ddbb`](https://github.com/ggml-org/llama.cpp/tree/434ddbbc0e30522e897670681e503b797c12b7c1) |
+| **Default AI Model** | Qwen3.6-35B-A3B-GGUF (MXFP4_MOE) | [`a483e9e`](https://huggingface.co/unsloth/Qwen3.6-35B-A3B-GGUF) |
+| **DevShell Tooling** | Isolated Dev Toolchain | Python 3 (`tomli-w`), Pyright, Ruff, Just, Nixfmt |
+
 ## Operators
 
 Run commands from this checkout. Source checks and builds require Nix with
