@@ -23,6 +23,7 @@ let
       virtualisation.enable = false;
       services.gitlabRunner.enable = false;
       services.personalAgent.enable = false;
+      services.searxng.enable = false;
       services.tailscale.enable = false;
       services.timesyncd.enable = false;
       services.journald.enable = false;
@@ -201,6 +202,7 @@ assert override.host.name == "overridden" && override.host.systemSettings.timeZo
 assert override.host.systemSettings.firewall.rules == [ ];
 assert disabled.host.gitlabRunners == { };
 assert !disabled.host.personalAgent.enable;
+assert !disabled.host.searxng.enable;
 assert !overriddenHome.config.programs.git.enable;
 assert lib.all
   (name: lib.any (package: (package.pname or "") == name) overriddenHome.config.home.packages)

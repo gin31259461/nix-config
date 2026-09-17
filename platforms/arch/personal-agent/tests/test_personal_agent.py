@@ -80,14 +80,6 @@ class PersonalAgentTests(unittest.TestCase):
             "receipt": "/var/lib/nix-config/arch/personal-agent.ready",
             "pending": "/var/lib/nix-config/arch/personal-agent.pending",
             "unit": "[Service]\nExecStart=/nix/store/personal-agent\n",
-            "webSearch": {
-                "enable": False,
-                "endpoint": "http://127.0.0.1:8888",
-                "curl": str(self.root / "bin/curl"),
-                "unitPath": "/etc/systemd/system/searxng.service",
-                "receipt": "/var/lib/nix-config/arch/searxng.ready",
-                "searxngUnit": "",
-            },
         }
         self.fake_run = FakeRun()
 
@@ -154,87 +146,6 @@ class PersonalAgentTests(unittest.TestCase):
         )
         with self.assertRaises(adapter.Conflict):
             self.subject().converge()
-
-    def test_web_search_is_owned_probed_and_started_before_agent(self):
-        self.write_configuration()
-        (self.root / "bin/curl").touch()
-        self.desired["webSearch"].update(
-            {
-                "enable": True,
-                "searxngUnit": "[Service]\nExecStart=/nix/store/searxng\n",
-            }
-        )
-
-        self.subject().converge()
-
-        calls = self.fake_run.calls
-        web_start = calls.index(("systemctl", "start", "searxng.service"))
-        probe = next(
-            index for index, call in enumerate(calls) if call[0].endswith("curl")
-        )
-        agent_start = calls.index(("systemctl", "start", "personal-agent.service"))
-        self.assertLess(web_start, probe)
-        self.assertLess(probe, agent_start)
-        self.assertTrue((self.root / "var/lib/nix-config/arch/searxng.ready").exists())
-
-    def test_foreign_web_search_unit_is_rejected(self):
-        self.write_configuration()
-        (self.root / "bin/curl").touch()
-        self.desired["webSearch"].update(
-            {
-                "enable": True,
-                "searxngUnit": "[Service]\nExecStart=/nix/store/searxng\n",
-            }
-        )
-        (self.root / "etc/systemd/system/searxng.service").write_text("foreign\n")
-
-        with self.assertRaises(adapter.Conflict):
-            self.subject().converge()
-
-    def test_empty_web_search_fails_readiness(self):
-        self.write_configuration()
-        (self.root / "bin/curl").touch()
-        self.desired["webSearch"].update(
-            {
-                "enable": True,
-                "searxngUnit": "[Service]\nExecStart=/nix/store/searxng\n",
-            }
-        )
-
-        original_run = self.fake_run
-
-        def empty_search(*argv, allow_failure=False):
-            result = original_run(*argv, allow_failure=allow_failure)
-            if argv[0].endswith("curl"):
-                return subprocess.CompletedProcess(argv, 0, '{"results":[]}\n', "")
-            return result
-
-        subject = self.subject()
-        subject.run = empty_search
-        with self.assertRaisesRegex(adapter.Conflict, "no readiness results"):
-            subject.converge()
-
-    def test_web_only_unit_change_reloads_systemd(self):
-        self.write_configuration()
-        (self.root / "bin/curl").touch()
-        self.desired["webSearch"].update(
-            {
-                "enable": True,
-                "searxngUnit": "[Service]\nExecStart=/nix/store/new-searxng\n",
-            }
-        )
-        (self.root / "etc/systemd/system/personal-agent.service").write_text(
-            self.desired["unit"]
-        )
-        (self.root / "var/lib/nix-config/arch/personal-agent.ready").touch()
-        (self.root / "etc/systemd/system/searxng.service").write_text(
-            "[Service]\nExecStart=/nix/store/old-searxng\n"
-        )
-        (self.root / "var/lib/nix-config/arch/searxng.ready").touch()
-
-        self.subject().converge()
-
-        self.assertIn(("systemctl", "daemon-reload"), self.fake_run.calls)
 
 
 if __name__ == "__main__":

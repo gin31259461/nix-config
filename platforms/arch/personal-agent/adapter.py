@@ -136,15 +136,10 @@ class PersonalAgent:
             "personal-agent",
         )
 
-    def write_unit(
-        self,
-        path: Path | None = None,
-        unit: object | None = None,
-        receipt: Path | None = None,
-    ) -> bool:
-        path = path or self.path("unitPath")
-        receipt = receipt or self.path("receipt")
-        unit = self.desired.get("unit") if unit is None else unit
+    def write_unit(self) -> bool:
+        path = self.path("unitPath")
+        receipt = self.path("receipt")
+        unit = self.desired.get("unit")
         if not isinstance(unit, str):
             raise Conflict("Personal Agent unit is invalid")
         if path.exists() and (
@@ -168,43 +163,6 @@ class PersonalAgent:
         temporary.chmod(0o644)
         os.replace(temporary, path)
         return True
-
-    def wait_for_web_search(self, web: dict[str, object]) -> None:
-        curl = web.get("curl")
-        endpoint = web.get("endpoint")
-        if not isinstance(curl, str) or not Path(curl).is_file():
-            raise Conflict("Personal Agent web search probe is missing")
-        if not isinstance(endpoint, str) or not endpoint.startswith(
-            "http://127.0.0.1:"
-        ):
-            raise Conflict("Personal Agent web search endpoint is invalid")
-        response = self.run(
-            curl,
-            "--fail",
-            "--silent",
-            "--show-error",
-            "--retry",
-            "10",
-            "--retry-all-errors",
-            "--retry-delay",
-            "1",
-            "--max-time",
-            "20",
-            "--get",
-            "--data-urlencode",
-            "q=personal-agent readiness",
-            "--data",
-            "format=json",
-            f"{endpoint}/search",
-        )
-        try:
-            body = json.loads(response.stdout)
-        except (json.JSONDecodeError, TypeError) as error:
-            raise Conflict("Personal Agent web search returned invalid JSON") from error
-        if not isinstance(body, dict) or not isinstance(body.get("results"), list):
-            raise Conflict("Personal Agent web search response is invalid")
-        if not body["results"]:
-            raise Conflict("Personal Agent web search returned no readiness results")
 
     def ensure_metadata(self, path: Path, user: str, group: str, mode: int) -> None:
         info = path.stat()
@@ -236,41 +194,9 @@ class PersonalAgent:
         )
         self.ensure_metadata(self.path("config"), "root", "personal-agent", 0o640)
         self.ensure_metadata(self.path("secrets"), "root", "root", 0o600)
-        web_value = self.desired.get("webSearch", {})
-        web = web_value if isinstance(web_value, dict) else {}
-        web_enabled = web.get("enable") is True
-        web_changed = False
-        web_receipt: Path | None = None
-        if web_enabled:
-            web_path_value = web.get("unitPath")
-            web_receipt_value = web.get("receipt")
-            if not isinstance(web_path_value, str) or not isinstance(
-                web_receipt_value, str
-            ):
-                raise Conflict("Personal Agent web search unit path is invalid")
-            web_path = self.root / web_path_value.lstrip("/")
-            web_receipt = self.root / web_receipt_value.lstrip("/")
-            web_changed = self.write_unit(web_path, web.get("searxngUnit"), web_receipt)
         changed = self.write_unit()
-        if changed or web_changed:
+        if changed:
             self.run("systemctl", "daemon-reload")
-        if web_enabled:
-            web_service = "searxng.service"
-            web_enabled_state = self.run(
-                "systemctl", "is-enabled", "--quiet", web_service, allow_failure=True
-            )
-            web_active = self.run(
-                "systemctl", "is-active", "--quiet", web_service, allow_failure=True
-            )
-            if web_enabled_state.returncode:
-                self.run("systemctl", "enable", web_service)
-            if web_active.returncode:
-                self.run("systemctl", "start", web_service)
-            elif web_changed or retry:
-                self.run("systemctl", "restart", web_service)
-            self.wait_for_web_search(web)
-            assert web_receipt is not None
-            web_receipt.touch()
         enabled = self.run(
             "systemctl",
             "is-enabled",

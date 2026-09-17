@@ -42,10 +42,14 @@ let
     );
     personalAgent = {
       enable = cfg.services.personalAgent.enable;
-      webSearch = {
-        enable = cfg.services.personalAgent.enable && cfg.services.personalAgent.webSearch.enable;
-        inherit (cfg.services.personalAgent.webSearch) port;
+      searxng = {
+        enable = cfg.services.personalAgent.enable && cfg.services.personalAgent.searxng.enable;
+        inherit (cfg.services.personalAgent.searxng) url;
       };
+    };
+    searxng = {
+      enable = cfg.services.searxng.enable;
+      inherit (cfg.services.searxng) port;
     };
     users = lib.mapAttrs (
       _: user:

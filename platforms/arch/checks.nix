@@ -34,6 +34,10 @@
         python ${./personal-agent/tests/test_personal_agent.py} ${./personal-agent/adapter.py}
         touch "$out"
       '';
+  searxng-tests = pkgs.runCommand "searxng-tests" { nativeBuildInputs = [ pkgs.python3 ]; } ''
+    python ${./searxng/tests/test_searxng.py} ${./searxng/adapter.py}
+    touch "$out"
+  '';
   llama-prepare-interface =
     pkgs.runCommand "llama-prepare-interface"
       {

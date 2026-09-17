@@ -20,6 +20,7 @@ let
     "users"
     "gitlabRunners"
     "personalAgent"
+    "searxng"
     "hardware"
     "ai"
     "virtualization"
@@ -121,5 +122,6 @@ builtins.deepSeq users (
     };
     gitlabRunners = host.gitlabRunners or { };
     personalAgent = host.personalAgent or false;
+    searxng = host.searxng or false;
   }
 )

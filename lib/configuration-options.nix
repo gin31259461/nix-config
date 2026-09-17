@@ -125,10 +125,14 @@ in
       enable = (lib.mkEnableOption "the Personal Agent system service") // {
         default = true;
       };
-      webSearch = {
-        enable = lib.mkEnableOption "private SearXNG search for Personal Agent";
-        port = option types.port 8888 "Loopback SearXNG port used by Personal Agent.";
+      searxng = {
+        enable = lib.mkEnableOption "SearXNG search support for Personal Agent";
+        url = option types.str "http://127.0.0.1:8888" "SearXNG endpoint URL used by Personal Agent.";
       };
+    };
+    searxng = {
+      enable = enable "SearXNG metasearch engine";
+      port = option types.port 8888 "Loopback SearXNG port.";
     };
   };
   programs = {

@@ -52,5 +52,6 @@
     _: value: lib.mapAttrsRecursive (_: lib.mkDefault) value
   ) (import ./gitlab-runners.nix);
   services.personalAgent.enable = lib.mkDefault true;
-  services.personalAgent.webSearch.enable = lib.mkDefault true;
+  services.personalAgent.searxng.enable = lib.mkDefault true;
+  services.searxng.enable = lib.mkDefault true;
 }

@@ -166,6 +166,11 @@ personal_agent_settings() {
   mapfile -d '' -t args < <(adapter_args "$personal_agent_manifest" "$1")
   native sudo "$personal_agent_python" "$personal_agent_adapter" "${args[@]}"
 }
+searxng_settings() {
+  local args=()
+  mapfile -d '' -t args < <(adapter_args "$searxng_manifest" "$1")
+  native sudo "$searxng_python" "$searxng_adapter" "${args[@]}"
+}
 # Read-only ownership preflight precedes package/configuration writes. A second
 # pass after updates checks newly installed native tools and configuration.
 system_settings preflight
@@ -180,6 +185,11 @@ else
   else
     exit "$ai_status"
   fi
+fi
+if searxng_settings preflight; then
+  :
+else
+  exit $?
 fi
 personal_agent_skipped=0
 if ((ai_skipped)); then
@@ -316,6 +326,11 @@ if ((!ai_skipped)); then
       exit "$ai_status"
     fi
   fi
+fi
+if searxng_settings converge; then
+  :
+else
+  exit $?
 fi
 if ((!personal_agent_skipped)); then
   if personal_agent_settings converge; then
