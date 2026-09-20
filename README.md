@@ -30,7 +30,10 @@ This repository pins reproducible upstream channels, external inputs, and AI mod
 ## Operators
 
 Run commands from this checkout. Source checks and builds require Nix with
-`nix-command` and `flakes` enabled. Use `just` to list the available recipes; if
+`nix-command` and `flakes` enabled. This checkout provides [nix.conf](nix.conf) to
+enable these features and configure build concurrency (`max-jobs = auto`, `cores = 0`)
+as well as substitute download concurrency (`max-substitution-jobs = 64`,
+`http-connections = 50`). Use `just` to list the available recipes; if
 it is not installed yet, `nix run .#just -- <recipe>` runs the same recipes.
 
 Start by reviewing [configuration.nix](configuration.nix) and the selected
