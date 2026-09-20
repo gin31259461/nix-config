@@ -109,6 +109,15 @@ if ((purge)); then
     [[ ! -e $path ]] || root rm -f -- "$path"
   done
   [[ ! -e $fs_root/etc/pacman.conf ]] || sed -i "/^Include = \/etc\/pacman.d\/nix-config-lizardbyte.conf$/d" "$fs_root/etc/pacman.conf"
+  if [[ -e $fs_root/etc/nix/nix.conf ]]; then
+    sed -i '/^# BEGIN nix-config settings$/,/^# END nix-config settings$/d' "$fs_root/etc/nix/nix.conf" 2>/dev/null || {
+      sed '/^# BEGIN nix-config settings$/,/^# END nix-config settings$/d' "$fs_root/etc/nix/nix.conf" >"$work_dir/nix.conf"
+      root install -m0644 -o0 -g0 -- "$work_dir/nix.conf" "$fs_root/etc/nix/nix.conf"
+    }
+    if native systemctl is-active --quiet nix-daemon.service; then
+      root systemctl restart nix-daemon.service
+    fi
+  fi
   [[ ! -e $root_state ]] || root rm -rf -- "$root_state"
   personal_units_changed=0
   for service in personal-agent.service searxng.service; do
@@ -292,6 +301,20 @@ if ((${manage_initramfs:-1})); then
     actions=$((actions + 1))
   fi
 fi
+if [[ -f $fs_root/etc/nix/nix.conf ]]; then
+  awk '
+  /^# BEGIN nix-config settings$/ { if (managed) exit 1; managed = 1; next }
+  /^# END nix-config settings$/ { if (!managed) exit 1; managed = 0; next }
+  !managed { print }
+  END { if (managed) exit 1 }
+' "$fs_root/etc/nix/nix.conf" >"$work_dir/nix.conf"
+else
+  : >"$work_dir/nix.conf"
+fi
+{
+  printf '# BEGIN nix-config settings\ntrusted-users = root @wheel %s\n# END nix-config settings\n' "$login_user"
+} >>"$work_dir/nix.conf"
+ensure_file "$work_dir/nix.conf" "$fs_root/etc/nix/nix.conf" nix-daemon
 groups_changed=0
 for group in "${required_groups[@]}"; do
   if ! has_group "$group"; then
@@ -347,6 +370,11 @@ fi
 if ((${manage_network:-1})) && [[ -e $root_state/network.pending ]]; then
   root systemctl restart NetworkManager.service
   root rm -- "$root_state/network.pending"
+  actions=$((actions + 1))
+fi
+if [[ -e $root_state/nix-daemon.pending ]]; then
+  root systemctl restart nix-daemon.service
+  root rm -- "$root_state/nix-daemon.pending"
   actions=$((actions + 1))
 fi
 # Compare runtime values too: unchanged files must not conceal runtime drift.

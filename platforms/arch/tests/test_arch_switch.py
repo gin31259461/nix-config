@@ -33,6 +33,8 @@ class ArchSwitchTests(unittest.TestCase):
         (self.root / "etc/mkinitcpio.conf").write_text(
             "MODULES=(existing)\nHOOKS=(base)\n"
         )
+        (self.root / "etc/nix").mkdir(parents=True, exist_ok=True)
+        (self.root / "etc/nix/nix.conf").write_text("build-users-group = nixbld\n")
         self.state = {"groups": ["wheel"], "services": {}}
         self.save()
         for command in (
@@ -413,6 +415,52 @@ class ArchSwitchTests(unittest.TestCase):
         self.save()
         self.invoke(code=1)
         self.assertEqual(list((self.root / "etc/pacman.d").iterdir()), [])
+
+    def test_nix_daemon_trusted_users_converged_and_restarted(self):
+        self.invoke()
+        conf = (self.root / "etc/nix/nix.conf").read_text()
+        self.assertEqual(
+            conf,
+            "build-users-group = nixbld\n"
+            "# BEGIN nix-config settings\n"
+            "trusted-users = root @wheel tester\n"
+            "# END nix-config settings\n",
+        )
+        self.assertTrue(
+            any(
+                call == ["systemctl", "restart", "nix-daemon.service"]
+                for call in self.commands()
+            )
+        )
+        self.assertTrue(self.state["services"]["system:nix-daemon.service"]["active"])
+
+    def test_nix_daemon_configuration_is_idempotent(self):
+        self.invoke()
+        conf_before = (self.root / "etc/nix/nix.conf").read_text()
+        (self.root / "commands.jsonl").unlink()
+        result = self.invoke()
+        conf_after = (self.root / "etc/nix/nix.conf").read_text()
+        self.assertEqual(conf_before, conf_after)
+        self.assertIn("0 files updated, 0 runtime actions", result.stdout)
+        self.assertFalse(
+            any(
+                call == ["systemctl", "restart", "nix-daemon.service"]
+                for call in self.commands()
+            )
+        )
+
+    def test_nix_daemon_purge_removes_block(self):
+        self.invoke()
+        (self.root / "commands.jsonl").unlink()
+        self.invoke("--purge")
+        conf = (self.root / "etc/nix/nix.conf").read_text()
+        self.assertEqual(conf, "build-users-group = nixbld\n")
+        self.assertTrue(
+            any(
+                call == ["systemctl", "restart", "nix-daemon.service"]
+                for call in self.commands()
+            )
+        )
 
 
 if __name__ == "__main__":

@@ -95,7 +95,11 @@ elif command == "mktemp":
 elif command == "mv":
     target(args[-2]).replace(target(args[-1]))
 elif command == "rm":
-    target(args[-1]).unlink(missing_ok=True)
+    path = target(args[-1])
+    if path.is_dir():
+        shutil.rmtree(path, ignore_errors=True)
+    else:
+        path.unlink(missing_ok=True)
 elif command == "touch":
     target(args[-1]).touch()
 elif command == "mkinitcpio":

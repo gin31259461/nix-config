@@ -54,10 +54,10 @@ first storage activation, before applying the configuration.
 
 | Command | Effect on the workstation |
 | --- | --- |
-| `just arch-workstation` | Apply Arch state and the built home generation. |
+| `just arch-workstation` | Apply Arch state, `/etc/nix/nix.conf`, and the built home generation. |
 | `just arch-workstation update` | Upgrade pacman/AUR packages, then deploy. |
 | `just arch-workstation verbose` | Deploy with full diagnostics. |
-| `just arch-workstation purge` | Remove managed Arch state; skip the home. |
+| `just arch-workstation purge` | Remove managed Arch state and nix.conf settings; skip the home. |
 
 Routine deployment does not install packages. Missing declared packages stop the
 run with exit code 3. `update` performs a full pacman upgrade followed by declared
@@ -67,8 +67,10 @@ fails. Use `just arch-workstation update verbose` to include complete Nix and
 adapter diagnostics during an update.
 
 Disabling an Arch capability withdraws future management; it does not remove
-existing state. Explicit `purge` preserves installed packages, accounts, Runner
-registrations and mutable application data. See the
+existing state. Explicit `purge` removes managed configuration files, strips
+managed `/etc/nix/nix.conf` settings (restarting `nix-daemon.service` if active),
+and preserves installed packages, accounts, Runner registrations and mutable
+application data. See the
 [deployment runbook](docs/deployment.md) for cleanup scope and failure handling.
 
 AI assets require explicit preparation with `just prepare-ai`. An enabled AI

@@ -33,10 +33,11 @@ the missing packages. Rerunning with `update` permits the full pacman upgrade
 followed by declared AUR package convergence.
 
 `purge` is an explicit Arch cleanup. It disables managed system units, removes
-managed configuration files and pending state, and removes the managed
-repository include. It does not uninstall packages, delete accounts, unregister
-Runners, or remove mutable application data. Home Manager state is intentionally
-handled by its normal generation lifecycle.
+managed configuration files and pending state, strips managed settings from
+`/etc/nix/nix.conf` (restarting `nix-daemon.service` if active), and removes the
+managed repository include. It does not uninstall packages, delete accounts,
+unregister Runners, or remove mutable application data. Home Manager state is
+intentionally handled by its normal generation lifecycle.
 
 `just arch-workstation` always enables Nix `--show-trace` and
 `--print-build-logs`. `verbose` additionally enables Nix `--verbose` and passes
@@ -61,7 +62,7 @@ Execution then follows this order:
 3. Preflight core system settings.
 4. Preflight optional native modules.
 5. If `--update` is selected, resolve inventories and update pacman/AUR packages.
-6. Converge core Arch system settings, files, groups, and services.
+6. Converge core Arch system settings, files, groups, services, and `/etc/nix/nix.conf` (managing `trusted-users = root @wheel <user>` while preserving unmanaged lines and restarting `nix-daemon.service` upon change).
 7. Converge optional modules that reported ready.
 8. Activate the exact built Home Manager generation.
 
@@ -91,9 +92,11 @@ also preserve partial output. In verbose mode, every native command and its
 captured output is printed.
 
 Managed writes compare content and metadata using atomic replacement. Actions
-that must follow a write are recorded under `/var/lib/nix-config/arch/` before
-mutation and cleared only after success. Leave pending markers intact after a
-failure; the next deployment retries the unfinished action.
+that must follow a write (such as restarting `nix-daemon.service` after
+`/etc/nix/nix.conf` changes or `NetworkManager.service` after network changes)
+are recorded under `/var/lib/nix-config/arch/` before mutation and cleared only
+after success. Leave pending markers intact after a failure; the next deployment
+retries the unfinished action.
 
 A pacman update that replaces the running kernel stops before later convergence
 when `/usr/lib/modules/$(uname -r)` is unavailable. Reboot into the installed
