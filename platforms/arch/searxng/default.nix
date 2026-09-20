@@ -7,13 +7,27 @@ let
   settings = pkgs.writeText "searxng-settings.yml" ''
     use_default_settings:
       engines:
-        keep_only: [google, bing]
+        keep_only: [duckduckgo, brave, wikipedia, wikidata, google, bing]
     engines:
-      - name: google
+      - name: duckduckgo
         disabled: false
         weight: 2
+      - name: brave
+        disabled: false
+        weight: 2
+      - name: wikipedia
+        disabled: false
+      - name: wikidata
+        disabled: false
+      - name: google
+        disabled: false
+        weight: 1
       - name: bing
         disabled: false
+        weight: 1
+    suspended_times:
+      SearxEngineCaptcha: 1800
+      recaptcha_SearxEngineCaptcha: 1800
     search:
       safe_search: 1
       formats: [html, json]
