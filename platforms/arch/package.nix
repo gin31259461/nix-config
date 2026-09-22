@@ -23,6 +23,7 @@
   },
   moduleGroups ? [ ],
   moduleSystemUnits ? [ ],
+  progress ? import ../../lib/cli/progress { inherit pkgs; },
 }:
 let
   ai =
@@ -150,5 +151,6 @@ pkgs.writeShellApplication {
       )
     })
   ''
+  + progress.shell
   + builtins.readFile ./arch-switch.sh;
 }

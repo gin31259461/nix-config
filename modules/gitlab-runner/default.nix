@@ -7,7 +7,15 @@ let
   enabled = rawInstances != { };
   instances = import ./interface.nix { inherit lib rawInstances; };
   platform = import ./arch-platform.nix;
-  controller = import ./package.nix { inherit pkgs instances platform; };
+  progress = import ../../lib/cli/progress { inherit pkgs; };
+  controller = import ./package.nix {
+    inherit
+      pkgs
+      instances
+      platform
+      progress
+      ;
+  };
   fixtures = import ./interface.nix {
     inherit lib;
     rawInstances = import ./tests/instances.nix;
@@ -28,10 +36,11 @@ in
       assert import ./tests/interface.nix { inherit lib; };
       pkgs.writeText "gitlab-runner-interface" "passed";
     gitlab-runner-tests =
-      pkgs.runCommand "gitlab-runner-tests" { nativeBuildInputs = [ pkgs.python3 ]; }
+      pkgs.runCommand "gitlab-runner-tests" { nativeBuildInputs = [ progress.python ]; }
         ''
-          python ${./tests}/test_host_io.py ${./.}
-          python ${./tests}/test_runnerctl.py ${
+          export PYTHONPATH=${progress.pythonPath}
+          ${progress.python}/bin/python ${./tests}/test_host_io.py ${./.}
+          ${progress.python}/bin/python ${./tests}/test_runnerctl.py ${
             pkgs.writeText "runner-test-config.json" (
               builtins.toJSON {
                 instances = fixtures;

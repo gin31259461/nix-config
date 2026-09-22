@@ -4,6 +4,7 @@ import hashlib
 import fcntl
 import os
 from pathlib import Path
+import shlex
 import shutil
 import subprocess
 import sys
@@ -11,6 +12,14 @@ import tempfile
 import unittest
 
 SOURCE = Path(sys.argv.pop()).resolve()
+
+
+def progress_preamble() -> str:
+    shell = os.environ.get("PROGRESS_TEST_SHELL")
+    renderer = os.environ.get("PROGRESS_TEST_RENDERER")
+    if not shell or not renderer:
+        raise unittest.SkipTest("set PROGRESS_TEST_SHELL and PROGRESS_TEST_RENDERER")
+    return f"source {shlex.quote(shell)}\nprogress_renderer={shlex.quote(renderer)}\nprogress_base64=$(command -v base64)\n"
 
 
 class PrepareTests(unittest.TestCase):
@@ -32,7 +41,7 @@ class PrepareTests(unittest.TestCase):
         hf.chmod(0o755)
         text = SOURCE.read_text()
         text = text.replace(
-            "((EUID == 0)) || { printf \"run llama-prepare as root (sudo nix --extra-experimental-features 'nix-command flakes' run .#llama-prepare)\\n\" >&2; exit 1; }",
+            "((EUID == 0)) || { report_error \"run llama-prepare as root (sudo nix --extra-experimental-features 'nix-command flakes' run .#llama-prepare)\"; exit 1; }",
             "true",
         ).replace(
             "/run/lock/nix-config-llama-prepare.lock", str(self.root / "prepare.lock")
@@ -43,14 +52,17 @@ class PrepareTests(unittest.TestCase):
         )
         text = text.replace(
             "[[ -x /usr/bin/c++ && -x /opt/rocm/bin/hipcc && -f /usr/include/vulkan/vulkan.h ]] || {\n"
-            "    printf 'native C++, ROCm, or Vulkan development toolchain is missing\\n' >&2; exit 1;\n"
+            "    report_error 'native C++, ROCm, or Vulkan development toolchain is missing'; exit 1;\n"
             "  }",
             "true",
         )
         text = text.replace(" -o0 -g0", "")
         text = text.replace('chown 0:0 "$receipt_stage"', "true")
         digest = hashlib.sha256(self.payload).hexdigest()
-        preamble = f"""set -euo pipefail
+        preamble = (
+            "set -euo pipefail\n"
+            + progress_preamble()
+            + f"""
 source_repository=unused
 source_revision={"0" * 40}
 grammar_threshold=20000
@@ -61,6 +73,7 @@ model_files=(model.gguf second-model.gguf)
 model_paths=({self.model} {self.second_model})
 model_sha256s=({digest} {digest})
 """
+        )
         self.script = self.root / "prepare"
         self.script.write_text(preamble + text)
         self.env = os.environ | {"PATH": f"{fake_bin}:{os.environ['PATH']}"}
@@ -81,8 +94,12 @@ model_sha256s=({digest} {digest})
         self.assertEqual(self.second_model.read_bytes(), self.payload)
         self.assertEqual(self.model.stat().st_mode & 0o777, 0o644)
         self.assertTrue(Path(str(self.model) + ".nix-config-receipt").is_file())
+        self.assertIn("[done] Verify model 1 of 2", result.stderr)
+        self.assertIn("[done] Publish receipt for model 2 of 2", result.stderr)
         result = self.invoke()
         self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertNotIn("[start] Download", result.stderr)
+        self.assertIn("[done] Check model 1 of 2", result.stderr)
 
     def test_refuses_checksum_mismatch_without_overwrite(self):
         self.model.parent.mkdir()
@@ -104,7 +121,11 @@ model_sha256s=({digest} {digest})
             hashlib.sha256(self.payload).hexdigest(), "f" * 64
         )
         self.script.write_text(text)
-        self.assertNotEqual(self.invoke().returncode, 0)
+        result = self.invoke()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("[failed] Verify model 1 of 2", result.stderr)
+        self.assertNotIn("[done] Verify", result.stderr)
+        self.assertNotIn("[start] Publish", result.stderr)
         self.assertFalse(self.model.exists())
 
     def test_existing_owned_revision_selects_current_and_repeats(self):

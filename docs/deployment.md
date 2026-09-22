@@ -52,6 +52,38 @@ nix run --show-trace --print-build-logs --verbose .#arch-workstation -- --verbos
 Nix evaluation flags belong before the flake target, and adapter flags belong
 after `--`.
 
+## Progress display
+
+The operator commands use Nix's native progress bar with build logs while Nix
+evaluates and builds their artifacts. After launch, deployment, AI preparation,
+and Runner commands use a shared Rich task display. The active task updates on
+one line with its name and elapsed time. Completed, skipped, and failed tasks
+leave a permanent result line in the terminal history.
+
+A count or filled bar describes known completed work within the current task,
+not an estimate of the entire command's remaining time. Work without a known
+total uses a spinner. Each workflow reports its own tasks; finishing the Arch
+stage does not mean Home Manager has finished. Home Manager activation is
+announced before handing over to its native output and exit status.
+
+Before commands that print their own logs, progress bars, or input prompts, the
+task display yields the terminal to that command. This keeps Nix, pacman/yay,
+download tools, compilers, and sudo prompts readable. The task result appears
+after the command returns. Detailed command output and error diagnostics retain
+their existing handling; progress output is written to stderr.
+
+Redirecting stderr, using `verbose`, setting `TERM=dumb`, or setting `NO_COLOR`
+(including an empty value) selects plain task logs without animation or color.
+A nonempty `CI` also selects plain task and Nix logs. For example:
+
+```bash
+NO_COLOR=1 just build
+```
+
+Rich is provided by the Nix-built tools. No separate Python or native package
+installation is required for the display. Direct app execution also reports
+runtime tasks; the preceding `nix run` build uses Nix's own selected log format.
+
 ## Deployment order
 
 The built deployment fixes one Home Manager activation package before runtime.

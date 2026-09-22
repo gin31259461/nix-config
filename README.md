@@ -66,6 +66,12 @@ can continue. Arch changes remain applied if the later Home Manager activation
 fails. Use `just arch-workstation update verbose` to include complete Nix and
 adapter diagnostics during an update.
 
+Long-running commands display task progress in an interactive terminal. The
+current task updates on one line; completed tasks retain their result and elapsed
+time in the console history. Native build/download tools keep their own output.
+Redirected output, `verbose`, `TERM=dumb`, and `NO_COLOR` use plain task logs; see
+the [progress display behavior](docs/deployment.md#progress-display).
+
 Disabling an Arch capability withdraws future management; it does not remove
 existing state. Explicit `purge` removes managed configuration files, strips
 managed `/etc/nix/nix.conf` settings (restarting `nix-daemon.service` if active),

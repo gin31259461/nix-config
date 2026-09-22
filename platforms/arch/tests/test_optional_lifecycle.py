@@ -1,7 +1,10 @@
 """Focused orchestration tests for optional modules and verbose adapters."""
 
 import importlib.util
+import os
 from pathlib import Path
+import pty
+import subprocess
 import sys
 import unittest
 
@@ -16,6 +19,8 @@ spec.loader.exec_module(base)
 
 class OptionalLifecycleTests(unittest.TestCase):
     state: dict[str, object]
+    root: Path
+    script: Path
     setUp = base.ArchSwitchTests.setUp
     save = base.ArchSwitchTests.save
     invoke = base.ArchSwitchTests.invoke
@@ -25,7 +30,8 @@ class OptionalLifecycleTests(unittest.TestCase):
         self.state["ai_not_ready"] = True
         self.save()
         result = self.invoke()
-        self.assertIn("\x1b[1;33mSKIP optional module ai:", result.stderr)
+        self.assertIn("SKIP optional module ai:", result.stderr)
+        self.assertNotIn("\x1b[", result.stderr)
         ai_calls = [
             call
             for call in self.commands()
@@ -36,6 +42,43 @@ class OptionalLifecycleTests(unittest.TestCase):
             [["python", "/fixture/ai-adapter", "/fixture/ai-manifest", "preflight"]],
         )
         self.assertIn("Arch converged:", result.stdout)
+
+    def test_empty_no_color_keeps_optional_skip_plain_on_a_terminal(self):
+        self.state["ai_not_ready"] = True
+        self.save()
+        master, slave = pty.openpty()
+        try:
+            result = subprocess.run(
+                ["bash", str(self.script)],
+                stdout=subprocess.PIPE,
+                stderr=slave,
+                env={
+                    **os.environ,
+                    "ARCH_TEST_ROOT": str(self.root),
+                    "TERM": "xterm-256color",
+                    "NO_COLOR": "",
+                },
+                timeout=30,
+            )
+            os.close(slave)
+            slave = -1
+            chunks = []
+            while True:
+                try:
+                    chunk = os.read(master, 4096)
+                except OSError:
+                    break
+                if not chunk:
+                    break
+                chunks.append(chunk)
+            output = b"".join(chunks)
+            self.assertEqual(result.returncode, 0, output)
+            self.assertIn(b"SKIP optional module ai:", output)
+            self.assertNotIn(b"\x1b[", output)
+        finally:
+            os.close(master)
+            if slave >= 0:
+                os.close(slave)
 
     def test_verbose_reaches_both_privileged_adapters(self):
         self.invoke("--verbose")

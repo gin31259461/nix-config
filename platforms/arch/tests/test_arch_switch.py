@@ -15,6 +15,18 @@ SOURCE = Path(sys.argv.pop()).resolve()
 FAKE = Path(__file__).with_name("native.py")
 
 
+def progress_preamble() -> str:
+    shell = os.environ.get("PROGRESS_TEST_SHELL")
+    renderer = os.environ.get("PROGRESS_TEST_RENDERER")
+    if not shell or not renderer:
+        raise unittest.SkipTest("set PROGRESS_TEST_SHELL and PROGRESS_TEST_RENDERER")
+    return (
+        f"source {shlex.quote(shell)}\n"
+        f"progress_renderer={shlex.quote(renderer)}\n"
+        "progress_base64=$(command -v base64)\n"
+    )
+
+
 class ArchSwitchTests(unittest.TestCase):
     def setUp(self):
         self.directory = tempfile.TemporaryDirectory()
@@ -52,6 +64,7 @@ class ArchSwitchTests(unittest.TestCase):
         self.script = self.root / "switch.sh"
         self.script.write_text(
             "set -euo pipefail\n"
+            + progress_preamble()
             + "\n".join(
                 [
                     f"fs_root={q(str(self.root))}",
@@ -110,6 +123,19 @@ class ArchSwitchTests(unittest.TestCase):
             if path.exists()
             else []
         )
+
+    def test_progress_marks_successful_stage_and_closes_after_convergence(self):
+        result = self.invoke()
+        self.assertEqual(result.returncode, 0)
+        self.assertIn("[start] Validate Arch host, packages, and kernel", result.stderr)
+        self.assertIn("[done] Finish runtime convergence", result.stderr)
+
+    def test_progress_marks_core_failure_without_false_success(self):
+        self.state["fail"] = ["python", "/fixture/adapter"]
+        self.save()
+        result = self.invoke(code=1)
+        self.assertIn("[failed] Preflight core and optional modules", result.stderr)
+        self.assertNotIn("[done] Preflight core and optional modules", result.stderr)
 
     def test_disabled_capabilities_preserve_files_and_pending_actions(self):
         self.invoke()

@@ -2,7 +2,7 @@
 name = "nix-config-tools"
 version = "0.1.0"
 requires-python = ">=3.12"
-dependencies = ["tomli-w"]
+dependencies = ["tomli-w", "rich"]
 
 [tool.pyright]
 include = ["checks", "lib", "modules", "platforms"]
@@ -11,6 +11,7 @@ useLibraryCodeForTypes = true
 executionEnvironments = [
   { root = "platforms/arch/system", extraPaths = ["platforms/arch/system"] },
   { root = "platforms/arch/ai", extraPaths = ["platforms/arch/system"] },
+  { root = "modules/gitlab-runner", extraPaths = ["lib/cli/progress"] },
 ]
 
 [tool.ruff]

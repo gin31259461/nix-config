@@ -1,6 +1,9 @@
 { lib, pkgs }:
 let
-  python = pkgs.python3.withPackages (packages: [ packages.tomli-w ]);
+  python = pkgs.python3.withPackages (packages: [
+    packages.tomli-w
+    packages.rich
+  ]);
   source = lib.fileset.toSource {
     root = ../.;
     fileset = lib.fileset.unions [

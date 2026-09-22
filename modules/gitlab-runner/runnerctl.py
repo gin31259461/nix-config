@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 import argparse
+from contextlib import contextmanager
 from datetime import datetime
 import tomllib
 import grp
@@ -39,6 +40,23 @@ from host_io import (
     read_managed,
     remove_managed_file,
 )
+from progress import Progress
+
+
+@contextmanager
+def progress_task(scope: str, label: str, progress: Progress | None = None):
+    """Run a lifecycle boundary and close an owned renderer safely."""
+    owner = progress is None
+    current = progress or Progress(scope, verbose=False)
+    try:
+        with current.task(label):
+            yield current
+    finally:
+        if owner:
+            try:
+                current.close()
+            except Exception:
+                pass
 
 
 def require_root() -> None:
@@ -369,32 +387,49 @@ def check_prerequisites(instance: dict[str, Any], platform: dict[str, str]) -> N
     run(health_command(instance, platform), capture=True)
 
 
+def _check_impl(
+    instance_name: str,
+    instance: dict[str, Any],
+    platform: dict[str, str],
+    *,
+    progress: Progress,
+) -> None:
+    require_root()
+    with progress.task("Checking prerequisites"):
+        check_prerequisites(instance, platform)
+    with progress.external_output():
+        print(f"{instance_name}: prerequisites ready")
+
+
 def check(
     instance_name: str, instance: dict[str, Any], platform: dict[str, str]
 ) -> None:
-    require_root()
-    check_prerequisites(instance, platform)
-    print(f"{instance_name}: prerequisites ready")
+    with progress_task("runnerctl check", "Running check") as progress:
+        _check_impl(instance_name, instance, platform, progress=progress)
 
 
-def reconcile(
+def _reconcile_impl(
     instance: dict[str, Any],
     platform: dict[str, str],
     *,
     paths: HostPaths = HostPaths(),
+    progress: Progress,
 ) -> bool:
     require_root()
-    check_prerequisites(instance, platform)
+    with progress.task("Checking prerequisites"):
+        check_prerequisites(instance, platform)
 
-    entry = ensure_account(instance, platform)
-    account = instance["account"]
-    ensure_subordinate_range(paths.subuid, entry.pw_name, account["subUid"])
-    ensure_subordinate_range(paths.subgid, entry.pw_name, account["subGid"])
-    run([platform["loginctl"], "enable-linger", entry.pw_name])
-    run([platform["systemctl"], "start", f"user@{entry.pw_uid}.service"])
-    wait_for_path(paths.runtime / str(entry.pw_uid) / "bus")
-    verify_rootless_podman(entry, platform)
-    config_dir, _, unit_dir = ensure_directories(entry)
+    with progress.task("Preparing account, sub-IDs and runtime"):
+        with progress.external_output():
+            entry = ensure_account(instance, platform)
+            account = instance["account"]
+            ensure_subordinate_range(paths.subuid, entry.pw_name, account["subUid"])
+            ensure_subordinate_range(paths.subgid, entry.pw_name, account["subGid"])
+            run([platform["loginctl"], "enable-linger", entry.pw_name])
+            run([platform["systemctl"], "start", f"user@{entry.pw_uid}.service"])
+            wait_for_path(paths.runtime / str(entry.pw_uid) / "bus")
+            verify_rootless_podman(entry, platform)
+            config_dir, _, unit_dir = ensure_directories(entry)
     pending = config_dir / ".reconcile.pending"
 
     def mark_pending():
@@ -402,92 +437,102 @@ def reconcile(
             pending, "pending\n", mode=0o600, uid=entry.pw_uid, gid=entry.pw_gid
         )
 
-    ca_changed = reconcile_ca(instance, entry, config_dir, platform, mark_pending)
-    config_path = config_dir / "config.toml"
-    metadata = registration_metadata(config_path)
-    template_changed = atomic_write(
-        config_dir / "registration-template.toml",
-        render_registration_template(instance),
-        mode=0o600,
-        uid=entry.pw_uid,
-        gid=entry.pw_gid,
-        before_change=mark_pending,
-    )
-    config_changed = atomic_write(
-        config_path,
-        render_config(instance, metadata),
-        mode=0o600,
-        uid=entry.pw_uid,
-        gid=entry.pw_gid,
-        before_change=mark_pending,
-    )
-    service_name = instance["runner"]["serviceName"]
-    unit_changed = atomic_write(
-        unit_dir / f"{service_name}.service",
-        render_service(instance, entry.pw_uid, platform["podman"]),
-        mode=0o600,
-        uid=entry.pw_uid,
-        gid=entry.pw_gid,
-        before_change=mark_pending,
-    )
+    with progress.task("Reconciling trust and configuration"):
+        with progress.external_output():
+            ca_changed = reconcile_ca(
+                instance, entry, config_dir, platform, mark_pending
+            )
+            config_path = config_dir / "config.toml"
+            metadata = registration_metadata(config_path)
+            template_changed = atomic_write(
+                config_dir / "registration-template.toml",
+                render_registration_template(instance),
+                mode=0o600,
+                uid=entry.pw_uid,
+                gid=entry.pw_gid,
+                before_change=mark_pending,
+            )
+            config_changed = atomic_write(
+                config_path,
+                render_config(instance, metadata),
+                mode=0o600,
+                uid=entry.pw_uid,
+                gid=entry.pw_gid,
+                before_change=mark_pending,
+            )
+            service_name = instance["runner"]["serviceName"]
+            unit_changed = atomic_write(
+                unit_dir / f"{service_name}.service",
+                render_service(instance, entry.pw_uid, platform["podman"]),
+                mode=0o600,
+                uid=entry.pw_uid,
+                gid=entry.pw_gid,
+                before_change=mark_pending,
+            )
 
     retry_pending = pending.exists()
-    if unit_changed or retry_pending:
-        run_as(
+    with progress.task("Preparing user services"):
+        with progress.external_output():
+            if unit_changed or retry_pending:
+                run_as(
+                    entry,
+                    [platform["systemctl"], "--user", "daemon-reload"],
+                    platform=platform,
+                )
+            run_as(
+                entry,
+                [platform["systemctl"], "--user", "enable", "--now", "podman.socket"],
+                platform=platform,
+            )
+    with progress.task("Preparing manager image"):
+        image = instance["runner"]["managerImage"]
+        image_exists = run_as(
             entry,
-            [platform["systemctl"], "--user", "daemon-reload"],
+            [platform["podman"], "image", "exists", image],
             platform=platform,
+            capture=True,
+            check=False,
         )
-    run_as(
-        entry,
-        [platform["systemctl"], "--user", "enable", "--now", "podman.socket"],
-        platform=platform,
-    )
-    image = instance["runner"]["managerImage"]
-    image_exists = run_as(
-        entry,
-        [platform["podman"], "image", "exists", image],
-        platform=platform,
-        capture=True,
-        check=False,
-    )
-    image_pulled = image_exists.returncode == 1
-    if image_pulled:
-        mark_pending()
-        run_as(entry, [platform["podman"], "pull", image], platform=platform)
-    elif image_exists.returncode != 0:
-        raise RunnerError("unable to inspect the Runner manager image")
+        image_pulled = image_exists.returncode == 1
+        if image_pulled:
+            mark_pending()
+            with progress.external_output():
+                run_as(entry, [platform["podman"], "pull", image], platform=platform)
+        elif image_exists.returncode != 0:
+            raise RunnerError("unable to inspect the Runner manager image")
     service_unit = f"{service_name}.service"
-    run_as(
-        entry,
-        [platform["systemctl"], "--user", "enable", service_unit],
-        platform=platform,
-    )
-    service_active = run_as(
-        entry,
-        [platform["systemctl"], "--user", "is-active", service_unit],
-        platform=platform,
-        capture=True,
-        check=False,
-    )
-    manager_drift = (
-        service_active.returncode == 0
-        and inspect_manager(instance, platform, entry) != "matches-declaration"
-    )
-    if manager_drift:
-        mark_pending()
-    if service_active.returncode != 0:
-        run_as(
-            entry,
-            [platform["systemctl"], "--user", "start", service_unit],
-            platform=platform,
-        )
-    elif retry_pending or image_pulled or manager_drift:
-        run_as(
-            entry,
-            [platform["systemctl"], "--user", "restart", service_unit],
-            platform=platform,
-        )
+    with progress.task("Converging Runner service"):
+        with progress.external_output():
+            run_as(
+                entry,
+                [platform["systemctl"], "--user", "enable", service_unit],
+                platform=platform,
+            )
+            service_active = run_as(
+                entry,
+                [platform["systemctl"], "--user", "is-active", service_unit],
+                platform=platform,
+                capture=True,
+                check=False,
+            )
+            manager_drift = (
+                service_active.returncode == 0
+                and inspect_manager(instance, platform, entry) != "matches-declaration"
+            )
+            if manager_drift:
+                mark_pending()
+            if service_active.returncode != 0:
+                run_as(
+                    entry,
+                    [platform["systemctl"], "--user", "start", service_unit],
+                    platform=platform,
+                )
+            elif retry_pending or image_pulled or manager_drift:
+                run_as(
+                    entry,
+                    [platform["systemctl"], "--user", "restart", service_unit],
+                    platform=platform,
+                )
     remove_managed_file(pending)
     return (
         retry_pending
@@ -501,7 +546,22 @@ def reconcile(
     )
 
 
-def register(instance: dict[str, Any], platform: dict[str, str]) -> None:
+def reconcile(
+    instance: dict[str, Any],
+    platform: dict[str, str],
+    *,
+    paths: HostPaths = HostPaths(),
+    progress: Progress | None = None,
+) -> bool:
+    with progress_task(
+        "runnerctl reconcile", "Reconciling Runner", progress
+    ) as current:
+        return _reconcile_impl(instance, platform, paths=paths, progress=current)
+
+
+def _register_impl(
+    instance: dict[str, Any], platform: dict[str, str], *, progress: Progress
+) -> None:
     require_root()
     token = os.environ.get("GITLAB_RUNNER_TOKEN", "")
     if not (token.startswith("glrt-") or token.startswith("glrtr-")):
@@ -521,8 +581,8 @@ def register(instance: dict[str, Any], platform: dict[str, str]) -> None:
             raise RunnerError(
                 "the dedicated stack already contains a different registration"
             )
-        reconcile(instance, platform)
-        verify(instance, platform)
+        reconcile(instance, platform, progress=progress)
+        verify(instance, platform, progress=progress)
         return
 
     service_name = instance["runner"]["serviceName"]
@@ -556,20 +616,31 @@ def register(instance: dict[str, Any], platform: dict[str, str]) -> None:
         "--template-config",
         "/etc/gitlab-runner/registration-template.toml",
     ]
-    result = subprocess.run(
-        command,
-        env=registration_env,
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
-        check=False,
-        timeout=120,
-    )
+    with progress.external_output():
+        result = subprocess.run(
+            command,
+            env=registration_env,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            check=False,
+            timeout=120,
+        )
     if result.returncode != 0:
         raise RunnerError(
             "Runner registration failed; output was suppressed to protect the token"
         )
-    reconcile(instance, platform)
-    verify(instance, platform)
+    reconcile(instance, platform, progress=progress)
+    verify(instance, platform, progress=progress)
+
+
+def register(
+    instance: dict[str, Any],
+    platform: dict[str, str],
+    *,
+    progress: Progress | None = None,
+) -> None:
+    with progress_task("runnerctl register", "Registering Runner", progress) as current:
+        _register_impl(instance, platform, progress=current)
 
 
 def validate_job_network(
@@ -673,67 +744,75 @@ def inspect_manager(instance, platform, entry):
     return "matches-declaration" if matches else "drifted"
 
 
-def verify(instance: dict[str, Any], platform: dict[str, str]) -> None:
+def _verify_impl(
+    instance: dict[str, Any], platform: dict[str, str], *, progress: Progress
+) -> None:
     require_root()
-    required_interface_is_up(
-        instance["network"].get("requiredInterface"), platform["ip"]
-    )
-    entry = pwd.getpwnam(instance["account"]["user"])
-    verify_rootless_podman(entry, platform)
-    verify_aardvark(platform)
-    socket_path = Path(f"/run/user/{entry.pw_uid}/podman/podman.sock")
-    if not socket_path.exists() or not stat.S_ISSOCK(socket_path.stat().st_mode):
-        raise RunnerError(f"rootless Podman socket is unavailable for {entry.pw_name}")
+    with progress.task("Checking runtime and socket"):
+        with progress.external_output():
+            required_interface_is_up(
+                instance["network"].get("requiredInterface"), platform["ip"]
+            )
+            entry = pwd.getpwnam(instance["account"]["user"])
+            verify_rootless_podman(entry, platform)
+            verify_aardvark(platform)
+            socket_path = Path(f"/run/user/{entry.pw_uid}/podman/podman.sock")
+            if not socket_path.exists() or not stat.S_ISSOCK(
+                socket_path.stat().st_mode
+            ):
+                raise RunnerError(
+                    f"rootless Podman socket is unavailable for {entry.pw_name}"
+                )
     service_name = instance["runner"]["serviceName"]
-    metadata = registration_metadata(
-        Path(entry.pw_dir) / "gitlab-runner/config/config.toml"
-    )
-    if "token" not in metadata:
-        raise RunnerError("the dedicated Runner stack is not registered")
-    run_as(
-        entry,
-        [
-            platform["systemctl"],
-            "--user",
-            "is-active",
-            f"{service_name}.service",
-        ],
-        platform=platform,
-        capture=True,
-    )
-    if inspect_manager(instance, platform, entry) != "matches-declaration":
-        raise RunnerError(
-            "Runner manager does not match declared image, mounts or isolation"
+    with progress.task("Checking registration and service"):
+        metadata = registration_metadata(
+            Path(entry.pw_dir) / "gitlab-runner/config/config.toml"
         )
-    runner_help = run_as(
-        entry,
-        [platform["podman"], "exec", service_name, "gitlab-runner", "--help"],
-        platform=platform,
-        capture=True,
-    )
-    if re.search(r"(?m)^\s+lint\s+", runner_help.stdout):
+        if "token" not in metadata:
+            raise RunnerError("the dedicated Runner stack is not registered")
         run_as(
             entry,
-            [
-                platform["podman"],
-                "exec",
-                service_name,
-                "gitlab-runner",
-                "lint",
-                "--config",
-                "/etc/gitlab-runner/config.toml",
-            ],
+            [platform["systemctl"], "--user", "is-active", f"{service_name}.service"],
             platform=platform,
             capture=True,
         )
-    run_as(
-        entry,
-        [platform["podman"], "exec", service_name, "gitlab-runner", "verify"],
-        platform=platform,
-        capture=True,
-    )
-    run(health_command(instance, platform), capture=True)
-    validate_job_network(instance, platform, entry)
+        if inspect_manager(instance, platform, entry) != "matches-declaration":
+            raise RunnerError(
+                "Runner manager does not match declared image, mounts or isolation"
+            )
+    with progress.task("Checking GitLab verification"):
+        runner_help = run_as(
+            entry,
+            [platform["podman"], "exec", service_name, "gitlab-runner", "--help"],
+            platform=platform,
+            capture=True,
+        )
+        if re.search(r"(?m)^\s+lint\s+", runner_help.stdout):
+            run_as(
+                entry,
+                [
+                    platform["podman"],
+                    "exec",
+                    service_name,
+                    "gitlab-runner",
+                    "lint",
+                    "--config",
+                    "/etc/gitlab-runner/config.toml",
+                ],
+                platform=platform,
+                capture=True,
+            )
+        run_as(
+            entry,
+            [platform["podman"], "exec", service_name, "gitlab-runner", "verify"],
+            platform=platform,
+            capture=True,
+        )
+    with progress.task("Checking GitLab health"):
+        run(health_command(instance, platform), capture=True)
+    with progress.task("Checking disposable job network"):
+        with progress.external_output():
+            validate_job_network(instance, platform, entry)
 
 
 def subordinate_range_matches(path: Path, user: str, desired: dict[str, int]) -> bool:
@@ -743,20 +822,33 @@ def subordinate_range_matches(path: Path, user: str, desired: dict[str, int]) ->
     return [line.strip() for line in path.read_text().splitlines()].count(expected) == 1
 
 
-def status(
+def verify(
+    instance: dict[str, Any],
+    platform: dict[str, str],
+    *,
+    progress: Progress | None = None,
+) -> None:
+    with progress_task("runnerctl verify", "Verifying Runner", progress) as current:
+        _verify_impl(instance, platform, progress=current)
+
+
+def _status_impl(
     instance_name: str,
     instance: dict[str, Any],
     platform: dict[str, str],
+    *,
+    progress: Progress,
 ) -> None:
     require_root()
     account_name = instance["account"]["user"]
     try:
         entry = pwd.getpwnam(account_name)
     except KeyError:
-        print(
-            f"{instance_name}: account=missing, subids=missing, socket=missing, "
-            "service=unavailable, container=absent, registration=absent"
-        )
+        with progress.external_output():
+            print(
+                f"{instance_name}: account=missing, subids=missing, socket=missing, "
+                "service=unavailable, container=absent, registration=absent"
+            )
         return
     runtime_dir = f"/run/user/{entry.pw_uid}"
     environment = {
@@ -809,10 +901,24 @@ def status(
         else "drifted"
     )
     container = inspect_manager(instance, platform, entry)
-    print(
-        f"{instance_name}: account=present, subids={subids}, socket={socket_state}, "
-        f"service={state}, container={container}, registration={registered}"
-    )
+    with progress.external_output():
+        print(
+            f"{instance_name}: account=present, subids={subids}, socket={socket_state}, "
+            f"service={state}, container={container}, registration={registered}"
+        )
+
+
+def status(
+    instance_name: str,
+    instance: dict[str, Any],
+    platform: dict[str, str],
+    *,
+    progress: Progress | None = None,
+) -> None:
+    with progress_task(
+        "runnerctl status", "Inspecting Runner status", progress
+    ) as current:
+        _status_impl(instance_name, instance, platform, progress=current)
 
 
 def parse_args() -> argparse.Namespace:

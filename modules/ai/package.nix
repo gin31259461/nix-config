@@ -2,6 +2,7 @@
   lib,
   pkgs,
   artifacts,
+  progress ? import ../../lib/cli/progress { inherit pkgs; },
 }:
 pkgs.writeShellApplication {
   name = "llama-prepare";
@@ -35,5 +36,6 @@ pkgs.writeShellApplication {
       lib.escapeShellArgs (map (model: model.sha256) (builtins.attrValues artifacts.models))
     })
   ''
+  + progress.shell
   + builtins.readFile ./prepare.sh;
 }

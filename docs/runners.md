@@ -58,6 +58,14 @@ mount isolation, rootless Podman socket, GitLab health, and a disposable job
 network. `status` reports the current account, subordinate IDs, socket, service,
 container, and registration states without printing sensitive metadata.
 
+Runner commands show the current task and elapsed time, then keep its completion
+result in console history. Registration includes reconciliation and verification;
+completion of one of those tasks does not announce completion of the whole
+registration. Progress uses safe task names only. Registration command output
+remains suppressed to protect tokens, and `status` retains its existing stdout
+summary. See [progress display](deployment.md#progress-display) for terminal
+handoff and plain-output modes.
+
 Jobs run unprivileged, use isolated per-job networks, and do not receive the host
 Podman socket. Manager access is restricted to the instance's own rootless socket.
 

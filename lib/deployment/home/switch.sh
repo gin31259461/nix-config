@@ -10,4 +10,5 @@ done
 # The locked Home Manager activation driver 0 updates its generation profile
 # at writeBoundary, after preflight. No second evaluation or target override.
 unset HOME_MANAGER_BACKUP_EXT HOME_MANAGER_BACKUP_OVERWRITE SKIP_SANITY_CHECKS
+printf '[start] Home Manager activation\n' >&2
 exec "$activation_package/activate" --driver-version 0

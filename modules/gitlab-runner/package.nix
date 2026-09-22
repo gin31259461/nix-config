@@ -2,6 +2,7 @@
   pkgs,
   instances,
   platform ? import ./arch-platform.nix,
+  progress ? import ../../lib/cli/progress { inherit pkgs; },
 }:
 let
   config = pkgs.writeText "gitlab-runner-instances.json" (
@@ -10,10 +11,9 @@ let
 in
 pkgs.writeShellApplication {
   name = "runnerctl";
-  runtimeInputs = with pkgs; [
-    python3
-  ];
+  runtimeInputs = [ progress.python ];
   text = ''
-    exec python3 ${./.}/runnerctl.py --config ${config} "$@"
+    export PYTHONPATH=${progress.pythonPath}
+    exec ${progress.python}/bin/python ${./.}/runnerctl.py --config ${config} "$@"
   '';
 }

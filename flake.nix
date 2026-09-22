@@ -130,7 +130,10 @@
 
       devShells.${system}.default = pkgs.mkShell {
         packages = [
-          (pkgs.python3.withPackages (pythonPackages: [ pythonPackages.tomli-w ]))
+          (pkgs.python3.withPackages (pythonPackages: [
+            pythonPackages.tomli-w
+            pythonPackages.rich
+          ]))
           pkgs.pyright
           pkgs.ruff
           pkgs.just

@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import copy
 from contextlib import ExitStack
+from contextlib import redirect_stderr
 import importlib.util
+from io import StringIO
 import json
 import os
 from pathlib import Path
@@ -176,7 +178,19 @@ class RunnerControlTests(unittest.TestCase):
                     return_value="matches-declaration",
                 )
             )
-            self.assertTrue(self.runnerctl.reconcile(instance, platform, paths=paths))
+            rendered = StringIO()
+            with redirect_stderr(rendered):
+                self.assertTrue(
+                    self.runnerctl.reconcile(instance, platform, paths=paths)
+                )
+            for label in (
+                "Checking prerequisites",
+                "Preparing account, sub-IDs and runtime",
+                "Reconciling trust and configuration",
+                "Preparing manager image",
+                "Converging Runner service",
+            ):
+                self.assertIn(label, rendered.getvalue())
             files = [path for path in root.rglob("*") if path.is_file()]
             before = {path: path.stat().st_ino for path in files}
             calls.clear()
@@ -190,8 +204,18 @@ class RunnerControlTests(unittest.TestCase):
             )
             instance["runner"]["memory"] = "8g"
             fail_restart = True
-            with self.assertRaisesRegex(self.runnerctl.RunnerError, "restart failed"):
-                self.runnerctl.reconcile(instance, platform, paths=paths)
+            failure_output = StringIO()
+            with redirect_stderr(failure_output):
+                with self.assertRaisesRegex(
+                    self.runnerctl.RunnerError, "restart failed"
+                ):
+                    self.runnerctl.reconcile(instance, platform, paths=paths)
+            self.assertIn(
+                "[failed] Converging Runner service", failure_output.getvalue()
+            )
+            self.assertNotIn(
+                "[done] Converging Runner service", failure_output.getvalue()
+            )
             self.assertTrue((root / "gitlab-runner/config/.reconcile.pending").exists())
             fail_restart = False
             self.assertTrue(self.runnerctl.reconcile(instance, platform, paths=paths))
@@ -237,6 +261,38 @@ class RunnerControlTests(unittest.TestCase):
         ):
             self.assertIn(command, result.stdout)
         self.assertNotIn("--token", result.stdout)
+
+    def test_progress_boundaries_use_static_labels_and_mark_failures(self) -> None:
+        output = StringIO()
+        instance = self.instances["frontend"]
+        platform = self.document["platform"]
+        with redirect_stderr(output):
+            with mock.patch.object(
+                self.runnerctl,
+                "check_prerequisites",
+                side_effect=self.runnerctl.RunnerError("synthetic secret"),
+            ):
+                with self.assertRaises(self.runnerctl.RunnerError):
+                    self.runnerctl.check("frontend", instance, platform)
+            with mock.patch.object(
+                self.runnerctl, "_reconcile_impl", return_value=False
+            ):
+                self.runnerctl.reconcile(instance, platform)
+            with mock.patch.object(self.runnerctl, "_register_impl"):
+                self.runnerctl.register(instance, platform)
+            with mock.patch.object(self.runnerctl, "_verify_impl"):
+                self.runnerctl.verify(instance, platform)
+            with mock.patch.object(self.runnerctl, "_status_impl"):
+                self.runnerctl.status("frontend", instance, platform)
+
+        rendered = output.getvalue()
+        self.assertIn("[failed] Running check", rendered)
+        self.assertIn("[done] Reconciling Runner", rendered)
+        self.assertIn("[done] Registering Runner", rendered)
+        self.assertIn("[done] Verifying Runner", rendered)
+        self.assertIn("[done] Inspecting Runner status", rendered)
+        self.assertNotIn("synthetic secret", rendered)
+        self.assertNotIn(instance["gitlab"]["url"], rendered)
 
     def test_overlapping_subordinate_ids_are_rejected(self) -> None:
         instances = copy.deepcopy(self.instances)
@@ -542,7 +598,9 @@ class RunnerControlTests(unittest.TestCase):
                 )
             )
             completed = subprocess.CompletedProcess([], 0)
+            rendered = StringIO()
             with (
+                redirect_stderr(rendered),
                 mock.patch.dict(
                     os.environ,
                     {
@@ -566,6 +624,8 @@ class RunnerControlTests(unittest.TestCase):
             self.assertNotIn(authentication_value, arguments)
             self.assertEqual(environment["CI_SERVER_TOKEN"], authentication_value)
             self.assertNotIn("UNRELATED_SECRET", environment)
+            self.assertIn("[done] Registering Runner", rendered.getvalue())
+            self.assertNotIn(authentication_value, rendered.getvalue())
 
     def test_manager_inspection_rejects_runtime_drift(self):
         instance = self.instances["frontend"]

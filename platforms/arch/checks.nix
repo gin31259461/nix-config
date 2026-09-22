@@ -1,4 +1,9 @@
-{ pkgs, llama-prepare, ... }:
+{
+  pkgs,
+  llama-prepare,
+  progress ? import ../../lib/cli/progress { inherit pkgs; },
+  ...
+}:
 {
   system-firewall-integration = import ./system/tests/firewall-vm.nix { inherit pkgs; };
   system-settings-interface =
@@ -41,6 +46,8 @@
   llama-prepare-interface =
     pkgs.runCommand "llama-prepare-interface"
       {
+        PROGRESS_TEST_SHELL = ./../../lib/cli/progress/progress.sh;
+        PROGRESS_TEST_RENDERER = "${progress.renderer}/bin/progress-renderer";
         nativeBuildInputs = [
           pkgs.python3
           pkgs.util-linux
@@ -72,6 +79,8 @@
           gnused
           util-linux
         ];
+        PROGRESS_TEST_SHELL = ./../../lib/cli/progress/progress.sh;
+        PROGRESS_TEST_RENDERER = "${progress.renderer}/bin/progress-renderer";
       }
       ''
         python ${./tests}/test_arch_switch.py ${./.}/arch-switch.sh

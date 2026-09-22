@@ -1,14 +1,30 @@
 # Private implementation. package.nix supplies all paths and declared values.
 # The test harness supplies an isolated filesystem and fake native commands.
 usage() { printf 'usage: arch-switch [--check | --update | --purge] [--verbose]\n'; }
-native() { "$native_bin/$1" "${@:2}"; }
-root() { native sudo "$native_bin/$1" "${@:2}"; }
+native() {
+  local status
+  progress_suspend
+  status=0
+  "$native_bin/$1" "${@:2}" || status=$?
+  progress_resume
+  return "$status"
+}
+root() {
+  native sudo "$native_bin/$1" "${@:2}"
+}
 fail() {
+  progress_suspend
   printf '%s\n' "$1" >&2
   exit "${2:-1}"
 }
 optional_skip() {
-  printf '\033[1;33mSKIP optional module %s: %s\033[0m\n' "$1" "$2" >&2
+  progress_suspend
+  if [[ ${progress_interactive:-0} == 1 ]]; then
+    printf '\033[1;33mSKIP optional module %s: %s\033[0m\n' "$1" "$2" >&2
+  else
+    printf 'SKIP optional module %s: %s\n' "$1" "$2" >&2
+  fi
+  progress_resume
 }
 
 check_only=0
@@ -31,6 +47,15 @@ for argument in "$@"; do
       ;;
   esac
 done
+progress_init arch "$verbose"
+arch_exit() {
+  local status=$?
+  progress_exit "$status"
+  return "$status"
+}
+trap arch_exit EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
 if ((check_only && (update_system || purge))); then
   usage >&2
   exit 2
@@ -55,17 +80,28 @@ done
 work_dir=$(mktemp -d)
 pending_file=''
 cleanup() {
+  local status=$?
+  progress_exit "$status"
   if [[ -n $pending_file ]]; then root rm -f -- "$pending_file"; fi
   rm -rf -- "$work_dir"
+  return "$status"
 }
 trap cleanup EXIT
+
+raw() {
+  local status=0
+  progress_suspend
+  "$@" || status=$?
+  progress_resume
+  return "$status"
+}
 
 resolve_inventory() {
   native pacman --sync --print --needed -- "${pacman_packages[@]}" >/dev/null
   if ((${#lizardbyte_package_names[@]})); then
-    "$curl_bin" --fail --location --show-error --silent --connect-timeout 10 --max-time 60 \
+    raw "$curl_bin" --fail --location --show-error --silent --connect-timeout 10 --max-time 60 \
       --output "$work_dir/lizardbyte.db" "$lizardbyte_server/lizardbyte.db"
-    "$tar_bin" -tf "$work_dir/lizardbyte.db" >"$work_dir/lizardbyte-files"
+    raw "$tar_bin" -tf "$work_dir/lizardbyte.db" >"$work_dir/lizardbyte-files"
     for package in "${lizardbyte_package_names[@]}"; do
       grep -Eq "^$package-[^/]+/desc$" "$work_dir/lizardbyte-files" ||
         fail "LizardByte package did not resolve: $package"
@@ -80,8 +116,13 @@ if ((${#lizardbyte_package_names[@]})); then
   lizardbyte_server=$(native pacman-conf --config "$files/pacman-lizardbyte.conf" --repo lizardbyte Server)
 fi
 if ((check_only)); then
+  progress_start 'Check package inventories' 1
   resolve_inventory
+  progress_suspend
   printf 'Arch, LizardByte, and AUR package inventories resolve\n'
+  progress_resume
+  progress_update 1 1
+  progress_finish 'done'
   exit 0
 fi
 
@@ -93,6 +134,7 @@ exec {lock_fd}>"$runtime_dir/nix-config-arch.lock"
 "$flock_bin" -n "$lock_fd" || fail 'another arch-switch is running' 75
 
 if ((purge)); then
+  progress_start 'Purge managed Arch state' 1
   [[ $update_system == 0 ]] || fail '--purge cannot be combined with --update' 2
   root_state="$fs_root/var/lib/nix-config/arch"
   native sudo -v
@@ -129,17 +171,25 @@ if ((purge)); then
     personal_units_changed=1
   done
   ((personal_units_changed == 0)) || root systemctl daemon-reload
+  progress_suspend
   printf 'Arch deployment state purged; package and user data were preserved.\n'
+  progress_resume
+  progress_update 1 1
+  progress_finish 'done'
   exit 0
 fi
+
+progress_start 'Validate Arch host, packages, and kernel'
 
 missing_packages=()
 for package in "${pacman_packages[@]}" "${lizardbyte_package_names[@]}" "${aur_packages[@]}"; do
   native pacman --query -- "$package" >/dev/null 2>&1 || missing_packages+=("$package")
 done
 if ((!update_system && ${#missing_packages[@]})); then
+  progress_suspend
   printf 'declared Arch packages are missing; rerun with --update to install them safely:\n' >&2
   printf '  %s\n' "${missing_packages[@]}" >&2
+  progress_resume
   exit 3
 fi
 running_kernel=$(uname -r)
@@ -148,6 +198,7 @@ check_kernel() {
     fail "kernel modules do not match running kernel $running_kernel; reboot, then rerun the deployment" 75
 }
 check_kernel
+progress_finish 'done'
 repo_file="$fs_root/etc/pacman.d/nix-config-lizardbyte.conf"
 repo_include='Include = /etc/pacman.d/nix-config-lizardbyte.conf'
 if ((${#lizardbyte_package_names[@]})) && ! grep -Fxq "$repo_include" "$fs_root/etc/pacman.conf" &&
@@ -182,6 +233,7 @@ searxng_settings() {
 }
 # Read-only ownership preflight precedes package/configuration writes. A second
 # pass after updates checks newly installed native tools and configuration.
+progress_start 'Preflight core and optional modules'
 system_settings preflight
 ai_skipped=0
 if ai_settings preflight; then
@@ -215,7 +267,11 @@ else
     exit "$personal_agent_status"
   fi
 fi
-if ((update_system)); then resolve_inventory; fi
+progress_finish 'done'
+if ((update_system)); then
+  progress_start 'Resolve and update native packages'
+  resolve_inventory
+fi
 
 root_state="$fs_root/var/lib/nix-config/arch"
 native sudo -v
@@ -239,7 +295,9 @@ ensure_file() {
   root mv -fT -- "$pending_file" "$target"
   pending_file=''
   changed_files=$((changed_files + 1))
+  progress_suspend
   printf 'updated %s\n' "${target#"$fs_root"}"
+  progress_resume
 }
 if ((${#lizardbyte_package_names[@]})); then
   ensure_file "$files/pacman-lizardbyte.conf" "$repo_file"
@@ -258,8 +316,10 @@ if ((update_system)); then
     "${pacman_packages[@]}" "${lizardbyte_packages[@]}"
   check_kernel
   if ((${#aur_packages[@]})); then native yay --sync --needed --noconfirm -- "${aur_packages[@]}"; fi
+  progress_finish 'done'
 fi
 
+progress_start 'Converge core files and services'
 system_settings converge
 
 if ((${manage_network:-1})); then
@@ -338,6 +398,8 @@ for service in "${system_units[@]}"; do
     actions=$((actions + 1))
   fi
 done
+progress_finish 'done'
+progress_start 'Converge optional modules'
 if ((!ai_skipped)); then
   if ai_settings converge; then
     :
@@ -367,6 +429,8 @@ if ((!personal_agent_skipped)); then
     fi
   fi
 fi
+progress_finish 'done'
+progress_start 'Finish runtime convergence'
 if ((${manage_network:-1})) && [[ -e $root_state/network.pending ]]; then
   root systemctl restart NetworkManager.service
   root rm -- "$root_state/network.pending"
@@ -409,5 +473,6 @@ if ((${manage_sunshine:-1})); then
     actions=$((actions + 1))
   fi
 fi
+progress_finish 'done'
 printf 'Arch converged: %s files updated, %s runtime actions.\n' "$changed_files" "$actions"
 if ((groups_changed)); then printf 'Group membership changed; log out and back in.\n'; fi

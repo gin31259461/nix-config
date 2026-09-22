@@ -52,6 +52,15 @@ replacement or modification without rereading the complete GGUF on every run.
 Run `just prepare-ai model` to perform an explicit full checksum verification and
 refresh matching receipts.
 
+Preparation reports tasks for the selected build/model mode, including source
+preparation, compilation, checksum verification, and publication. Existing assets
+are reported as checked rather than downloaded or rebuilt. A download finishing
+does not mark preparation complete: checksum verification and receipt publication
+must succeed first. Git, Ninja, and Hugging Face retain their native output while
+the shared task display yields the terminal; completed task results remain in
+the console history. See [progress display](deployment.md#progress-display) for
+plain-output modes and terminal behavior.
+
 Preparation is idempotent for matching owned state. An existing conflicting
 revision, selector, staging path, or model checksum is an error and requires
 operator review.
@@ -59,7 +68,7 @@ operator review.
 ## Deployment behavior
 
 When AI is enabled but the build or one of its declared models has not been prepared,
-workstation deployment prints a bold yellow skip message and continues without
+workstation deployment prints a highlighted skip message (plain text in log mode) and continues without
 touching AI files or services:
 
 ```text

@@ -5,6 +5,9 @@
   archDeployment,
   deploymentName,
 }:
+let
+  progress = import ../lib/cli/progress { inherit pkgs; };
+in
 {
   home-source-assets = import ./assets.nix { inherit pkgs; };
   host-interface =
@@ -14,6 +17,21 @@
     actionlint ${../.github/workflows/check.yml}
     touch "$out"
   '';
+  progress-ui =
+    pkgs.runCommand "progress-ui-tests"
+      {
+        nativeBuildInputs = [
+          progress.python
+          pkgs.bash
+          pkgs.coreutils
+        ];
+      }
+      ''
+        export PYTHONPATH=${progress.pythonPath}
+        python -m unittest discover -s ${progress.pythonPath}/tests -v
+        python ${./tests/test_progress_contract.py} ${progress.pythonPath}
+        touch "$out"
+      '';
   deployment-ordering =
     pkgs.runCommand "deployment-ordering"
       {
@@ -35,9 +53,14 @@
   '';
   justfile =
     let
-      fakeNix = pkgs.writeShellScriptBin "nix" ''
-        printf '%s\n' "$*" >> "$JUST_NIX_LOG"
-      '';
+      source = lib.fileset.toSource {
+        root = ../.;
+        fileset = lib.fileset.unions [
+          ../Justfile
+          ../lib/cli/nix.sh
+          ./tests/test_cli.py
+        ];
+      };
     in
     pkgs.runCommand "justfile-check"
       {
@@ -45,36 +68,12 @@
           pkgs.bash
           pkgs.coreutils
           pkgs.just
-          fakeNix
+          pkgs.python3
         ];
       }
       ''
-        just --justfile ${../Justfile} --summary > "$out"
+        just --justfile ${source}/Justfile --summary > "$out"
         grep -Fxq 'arch-workstation build check check-arch check-fast default initialize-runner prepare-ai prepare-runner status-runner verify-runner' "$out"
-
-        export JUST_NIX_LOG="$TMPDIR/nix.log"
-        run_recipe() {
-          just --justfile ${../Justfile} --dry-run arch-workstation "$@" 2>&1 |
-            tail -n +2 |
-            bash
-        }
-        run_recipe verbose update
-        grep -Fxq 'build --no-link --show-trace --print-build-logs --verbose .#arch-workstation' "$JUST_NIX_LOG"
-        grep -Fxq 'run --show-trace --print-build-logs --verbose .#arch-workstation -- --update --verbose' "$JUST_NIX_LOG"
-
-        : > "$JUST_NIX_LOG"
-        run_recipe update verbose
-        grep -Fxq 'run --show-trace --print-build-logs --verbose .#arch-workstation -- --update --verbose' "$JUST_NIX_LOG"
-
-        : > "$JUST_NIX_LOG"
-        run_recipe
-        grep -Fxq 'build --no-link --show-trace --print-build-logs .#arch-workstation' "$JUST_NIX_LOG"
-        grep -Fxq 'run --show-trace --print-build-logs .#arch-workstation' "$JUST_NIX_LOG"
-        test "$(wc -l < "$JUST_NIX_LOG")" -eq 2
-
-        : > "$JUST_NIX_LOG"
-        if run_recipe update update; then exit 1; fi
-        if run_recipe unknown; then exit 1; fi
-        test ! -s "$JUST_NIX_LOG"
+        python ${source}/checks/tests/test_cli.py ${source}
       '';
 }

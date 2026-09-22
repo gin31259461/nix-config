@@ -95,6 +95,26 @@ class DeploymentTests(unittest.TestCase):
             self.assertEqual(result.returncode, 2)
             self.assertFalse((root / "args").exists())
 
+    def test_home_failure_preserves_exit_status_without_false_success(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            activation = root / "activate"
+            activation.write_text(
+                f"#!{shutil.which('bash')}\nprintf 'Activating Home Manager...\\n'\nexit 17\n"
+            )
+            activation.chmod(0o755)
+            script = (
+                f"set -euo pipefail\nactivation_package={shlex.quote(directory)}\n"
+                + HOME
+            )
+            result = subprocess.run(
+                ["bash", "-c", script, "home"], capture_output=True, text=True
+            )
+            self.assertEqual(result.returncode, 17)
+            self.assertIn("[start] Home Manager activation", result.stderr)
+            self.assertNotIn("[done] Home Manager activation", result.stderr)
+            self.assertIn("Activating Home Manager...", result.stdout)
+
 
 if __name__ == "__main__":
     unittest.main()
