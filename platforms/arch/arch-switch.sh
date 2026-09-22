@@ -178,8 +178,24 @@ if ((purge)); then
   progress_finish 'done'
   exit 0
 fi
+total_steps=5
+if ((update_system)); then total_steps=6; fi
+completed_steps=0
 
-progress_start 'Validate Arch host, packages, and kernel'
+step_start() {
+  progress_start "$1" "$total_steps"
+  progress_update "$completed_steps" "$total_steps"
+}
+step_finish() {
+  local status=${1:-done}
+  if [[ $status == "done" || $status == "skip" ]]; then
+    completed_steps=$((completed_steps + 1))
+    progress_update "$completed_steps" "$total_steps"
+  fi
+  progress_finish "$status"
+}
+
+step_start 'Validate Arch host, packages, and kernel'
 
 missing_packages=()
 for package in "${pacman_packages[@]}" "${lizardbyte_package_names[@]}" "${aur_packages[@]}"; do
@@ -198,7 +214,7 @@ check_kernel() {
     fail "kernel modules do not match running kernel $running_kernel; reboot, then rerun the deployment" 75
 }
 check_kernel
-progress_finish 'done'
+step_finish 'done'
 repo_file="$fs_root/etc/pacman.d/nix-config-lizardbyte.conf"
 repo_include='Include = /etc/pacman.d/nix-config-lizardbyte.conf'
 if ((${#lizardbyte_package_names[@]})) && ! grep -Fxq "$repo_include" "$fs_root/etc/pacman.conf" &&
@@ -233,7 +249,7 @@ searxng_settings() {
 }
 # Read-only ownership preflight precedes package/configuration writes. A second
 # pass after updates checks newly installed native tools and configuration.
-progress_start 'Preflight core and optional modules'
+step_start 'Preflight core and optional modules'
 system_settings preflight
 ai_skipped=0
 if ai_settings preflight; then
@@ -267,9 +283,9 @@ else
     exit "$personal_agent_status"
   fi
 fi
-progress_finish 'done'
+step_finish 'done'
 if ((update_system)); then
-  progress_start 'Resolve and update native packages'
+  step_start 'Resolve and update native packages'
   resolve_inventory
 fi
 
@@ -316,10 +332,10 @@ if ((update_system)); then
     "${pacman_packages[@]}" "${lizardbyte_packages[@]}"
   check_kernel
   if ((${#aur_packages[@]})); then native yay --sync --needed --noconfirm -- "${aur_packages[@]}"; fi
-  progress_finish 'done'
+  step_finish 'done'
 fi
 
-progress_start 'Converge core files and services'
+step_start 'Converge core files and services'
 system_settings converge
 
 if ((${manage_network:-1})); then
@@ -398,8 +414,8 @@ for service in "${system_units[@]}"; do
     actions=$((actions + 1))
   fi
 done
-progress_finish 'done'
-progress_start 'Converge optional modules'
+step_finish 'done'
+step_start 'Converge optional modules'
 if ((!ai_skipped)); then
   if ai_settings converge; then
     :
@@ -429,8 +445,8 @@ if ((!personal_agent_skipped)); then
     fi
   fi
 fi
-progress_finish 'done'
-progress_start 'Finish runtime convergence'
+step_finish 'done'
+step_start 'Finish runtime convergence'
 if ((${manage_network:-1})) && [[ -e $root_state/network.pending ]]; then
   root systemctl restart NetworkManager.service
   root rm -- "$root_state/network.pending"
@@ -473,6 +489,6 @@ if ((${manage_sunshine:-1})); then
     actions=$((actions + 1))
   fi
 fi
-progress_finish 'done'
+step_finish 'done'
 printf 'Arch converged: %s files updated, %s runtime actions.\n' "$changed_files" "$actions"
 if ((groups_changed)); then printf 'Group membership changed; log out and back in.\n'; fi
