@@ -101,7 +101,9 @@ in
     assert !(home.config.xdg.configFile ? nvim) || !home.config.xdg.configFile.nvim.recursive;
     assert !(home.config.xdg.configFile ? hypr) || home.config.xdg.configFile.hypr.recursive;
     assert builtins.all (
-      name: !pkgs.lib.hasPrefix ".agents/skills/" name || !home.config.home.file.${name}.recursive
+      name:
+      (!pkgs.lib.hasPrefix ".agents/skills/" name && !pkgs.lib.hasPrefix ".gemini/config/skills/" name)
+      || !home.config.home.file.${name}.recursive
     ) (builtins.attrNames home.config.home.file);
     pkgs.writeText "home-projection-interface" "passed";
   arch-graphical-session = pkgs.runCommand "arch-graphical-session-check" { } ''

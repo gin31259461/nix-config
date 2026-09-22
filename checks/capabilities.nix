@@ -78,6 +78,9 @@ let
     moduleAurPackages = enabled.aurPackages;
   };
   skills = lib.filterAttrs (name: _: lib.hasPrefix ".agents/skills/" name) home.config.home.file;
+  geminiSkills = lib.filterAttrs (
+    name: _: lib.hasPrefix ".gemini/config/skills/" name
+  ) home.config.home.file;
 in
 assert enabled.aurPackages == [ "openai-codex-bin" ];
 assert disabled.aurPackages == [ ] && disabled.homeModule.home.file == { };
@@ -174,6 +177,11 @@ assert builtins.elem "qemu-desktop" native.pacman && builtins.elem "podman" nati
 assert
   lib.filterAttrs (name: _: lib.hasPrefix ".agents/skills/" name) homeDisabled.config.home.file
   == { };
+assert
+  lib.filterAttrs (name: _: lib.hasPrefix ".gemini/config/skills/" name) homeDisabled.config.home.file
+  == { };
 assert skills != { };
 assert lib.all (file: !file.recursive) (builtins.attrValues skills);
+assert geminiSkills != { };
+assert lib.all (file: !file.recursive) (builtins.attrValues geminiSkills);
 pkgs.writeText "capabilities-check" "passed"

@@ -46,14 +46,26 @@ in
   homeModule = {
     home.file = lib.optionalAttrs (config.enable && config.skillsPresets.enable) (
       let
-        skillRoot = ../../files/home/.agents/skills;
+        agentSkillRoot = ../../files/home/.agents/skills;
+        geminiSkillRoot = ../../files/home/.gemini/config/skills;
+        agentSkills = lib.mapAttrs' (
+          name: _:
+          lib.nameValuePair ".agents/skills/${name}" {
+            source = agentSkillRoot + "/${name}";
+          }
+        ) (builtins.readDir agentSkillRoot);
+        geminiSkills =
+          if builtins.pathExists geminiSkillRoot then
+            lib.mapAttrs' (
+              name: _:
+              lib.nameValuePair ".gemini/config/skills/${name}" {
+                source = geminiSkillRoot + "/${name}";
+              }
+            ) (builtins.readDir geminiSkillRoot)
+          else
+            { };
       in
-      lib.mapAttrs' (
-        name: _:
-        lib.nameValuePair ".agents/skills/${name}" {
-          source = skillRoot + "/${name}";
-        }
-      ) (builtins.readDir skillRoot)
+      agentSkills // geminiSkills
     );
   };
 }
