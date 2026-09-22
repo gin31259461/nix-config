@@ -6,6 +6,7 @@
     git-credential-manager
     gnupg
     nodejs
+    nix-output-monitor
   ];
 
   programs.password-store = {

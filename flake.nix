@@ -137,6 +137,7 @@
           pkgs.pyright
           pkgs.ruff
           pkgs.just
+          pkgs.nix-output-monitor
         ];
       };
 
