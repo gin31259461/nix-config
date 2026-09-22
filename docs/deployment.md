@@ -60,12 +60,10 @@ and Runner commands use a shared Rich task display. The active task updates on
 one line with its name and elapsed time. Completed, skipped, and failed tasks
 leave a permanent result line in the terminal history.
 
-During Arch deployment, a filled progress bar tracks the overall remaining
-deployment milestones. The completed step count increases as tasks finish,
-allowing you to see exactly how many operations remain. Work without a known
-total, such as AI preparation or Runner registration, uses a spinner.
-Each workflow reports its own tasks; finishing the Arch stage does not mean
-Home Manager has finished. Home Manager activation is
+A count or filled bar describes known completed work within the current task,
+not an estimate of the entire command's remaining time. Work without a known
+total uses a spinner. Each workflow reports its own tasks; finishing the Arch
+stage does not mean Home Manager has finished. Home Manager activation is
 announced before handing over to its native output and exit status.
 
 Before commands that print their own logs, progress bars, or input prompts, the

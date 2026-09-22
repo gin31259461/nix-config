@@ -146,7 +146,6 @@ class Progress:
         table.add_column(ratio=1, no_wrap=True, overflow="ellipsis")
         if status is None and current.total is not None and width >= 60:
             table.add_column(width=min(22, width // 4))
-        if current.total is not None and width >= 60:
             table.add_column(justify="right", no_wrap=True)
         table.add_column(justify="right", no_wrap=True)
         if status:
@@ -158,19 +157,17 @@ class Progress:
             icon = current._spinner
         cells: list[RenderableType] = [icon, label]
         if status is None and current.total is not None and width >= 60:
-            cells.append(
-                ProgressBar(
-                    total=max(1, current.total),
-                    completed=current.completed,
-                    style="grey23",
-                    complete_style="cyan",
-                    finished_style="green",
-                )
-            )
-        if current.total is not None and width >= 60:
-            count_style = "cyan" if status is None else styles.get(status, "dim")
-            cells.append(
-                Text(f"{current.completed}/{current.total}", style=count_style)
+            cells.extend(
+                [
+                    ProgressBar(
+                        total=max(1, current.total),
+                        completed=current.completed,
+                        style="grey23",
+                        complete_style="cyan",
+                        finished_style="green",
+                    ),
+                    Text(f"{current.completed}/{current.total}", style="cyan"),
+                ]
             )
         cells.append(Text(elapsed, style="dim"))
         table.add_row(*cells)
