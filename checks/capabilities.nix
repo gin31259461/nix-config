@@ -82,17 +82,33 @@ let
     name: _: lib.hasPrefix ".gemini/config/skills/" name
   ) home.config.home.file;
 in
-assert enabled.aurPackages == [ "openai-codex-bin" ];
+assert
+  enabled.aurPackages == [
+    "openai-codex-bin"
+    "antigravity-cli"
+  ];
 assert disabled.aurPackages == [ ] && disabled.homeModule.home.file == { };
 assert
   (ai {
     enable = true;
     codex.enable = false;
+  }).aurPackages == [ "antigravity-cli" ];
+assert
+  (ai {
+    enable = true;
+    agy.pkg.enable = false;
+  }).aurPackages == [ "openai-codex-bin" ];
+assert
+  (ai {
+    enable = true;
+    codex.enable = false;
+    agy.pkg.enable = false;
   }).aurPackages == [ ];
 assert
   (ai {
     enable = true;
     skillsPresets.enable = false;
+    agy.skills.enable = false;
   }).homeModule.home.file == { };
 assert (virtualization { }).requiredPackages != [ ];
 assert (virtualization { enable = false; }).loginGroups == [ ];
@@ -156,6 +172,7 @@ assert lib.all (name: !(valid name { enable = "true"; }) && !(valid name { typo 
   "virtualization"
 ];
 assert !(valid "ai" { codex.enabel = true; });
+assert !(valid "ai" { agy.enabel = true; });
 assert !(valid "ai" { llama.proxy.httpsPort = 0; });
 assert !(valid "ai" { llama.model.microBatchSize = 4096; });
 assert !(valid "ai" { llama.model.name = "unknown"; });
@@ -169,6 +186,7 @@ assert
   });
 assert !(valid "virtualization" { kvm.enabel = true; });
 assert builtins.elem "openai-codex-bin" native.aur;
+assert builtins.elem "antigravity-cli" native.aur;
 assert enabled.artifacts.model.contextSize == 4096;
 assert profiled.artifacts.profiles.coding.artifacts.temperature == 0.6;
 assert !(builtins.elem "llama-cpp" native.pacman);

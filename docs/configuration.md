@@ -50,7 +50,7 @@ values into the private Host and adapter interfaces.
 | `services.personalAgent` | Pinned Personal Agent package and native system service integration |
 | `services.searxng` | Standalone loopback SearXNG metasearch daemon |
 | `hardware` | Graphics, Bluetooth, OpenRazer and initramfs intent |
-| `programs.ai` | llama.cpp, Codex and shared AI skill presets |
+| `programs.ai` | llama.cpp, Codex, Antigravity (agy) and shared AI skill presets |
 | `programs` | Sunshine, Vesktop and Vicinae |
 | `virtualisation` | KVM, virt-manager/libvirt and Podman |
 | `desktop` | Graphical session and desktop-owned services |

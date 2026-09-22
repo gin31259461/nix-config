@@ -110,3 +110,13 @@ streams.
 
 Disabling `programs.ai.llama.enable` withdraws AI convergence. It does not delete
 prepared binaries, models, system files, pending markers, or Tailscale routes.
+
+## Client tools and skills
+
+The AI module also declares companion client tools and skill presets:
+
+* `programs.ai.codex.enable`: manages the AUR `openai-codex-bin` package.
+* `programs.ai.agy.enable`: master toggle for Antigravity (agy) tools.
+* `programs.ai.agy.pkg.enable`: manages the AUR `antigravity-cli` package.
+* `programs.ai.agy.skills.enable`: projects `.gemini/config/skills/*` into `~/.gemini/config/skills/`.
+* `programs.ai.skillsPresets.enable`: projects `.agents/skills/*` into `~/.agents/skills/`.

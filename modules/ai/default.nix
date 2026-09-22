@@ -34,6 +34,7 @@ let
     }
   ) profileInputs;
   defaultProfile = profiles.default;
+  packages = import ./packages.nix;
 in
 {
   inherit llama;
@@ -42,20 +43,28 @@ in
     models = modelArtifacts;
     inherit profiles;
   };
-  aurPackages = lib.optionals (config.enable && config.codex.enable) (import ./packages.nix);
+  aurPackages =
+    lib.optionals (config.enable && config.codex.enable) packages.codex
+    ++ lib.optionals (
+      config.enable && config.agy.enable && config.agy.pkg.enable && config.agy.package.enable
+    ) packages.agy;
   homeModule = {
-    home.file = lib.optionalAttrs (config.enable && config.skillsPresets.enable) (
+    home.file = lib.optionalAttrs config.enable (
       let
         agentSkillRoot = ../../files/home/.agents/skills;
         geminiSkillRoot = ../../files/home/.gemini/config/skills;
-        agentSkills = lib.mapAttrs' (
-          name: _:
-          lib.nameValuePair ".agents/skills/${name}" {
-            source = agentSkillRoot + "/${name}";
-          }
-        ) (builtins.readDir agentSkillRoot);
+        agentSkills =
+          if config.skillsPresets.enable then
+            lib.mapAttrs' (
+              name: _:
+              lib.nameValuePair ".agents/skills/${name}" {
+                source = agentSkillRoot + "/${name}";
+              }
+            ) (builtins.readDir agentSkillRoot)
+          else
+            { };
         geminiSkills =
-          if builtins.pathExists geminiSkillRoot then
+          if (config.agy.enable && config.agy.skills.enable) && builtins.pathExists geminiSkillRoot then
             lib.mapAttrs' (
               name: _:
               lib.nameValuePair ".gemini/config/skills/${name}" {

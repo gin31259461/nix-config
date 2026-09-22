@@ -8,6 +8,12 @@ in
   enable = enable "ai";
   codex.enable = enable "Codex";
   skillsPresets.enable = enable "the repository skill presets";
+  agy = {
+    enable = enable "Antigravity (agy)";
+    pkg.enable = enable "the Antigravity CLI package (antigravity-cli)";
+    package.enable = enable "the Antigravity CLI package (antigravity-cli)";
+    skills.enable = enable "the Antigravity / Gemini skills";
+  };
   llama = {
     enable = enable "llama.cpp";
     model = {

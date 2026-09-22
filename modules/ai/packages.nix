@@ -1,1 +1,4 @@
-[ "openai-codex-bin" ]
+{
+  codex = [ "openai-codex-bin" ];
+  agy = [ "antigravity-cli" ];
+}
