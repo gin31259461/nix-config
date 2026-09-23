@@ -79,11 +79,11 @@
         "uv2nix": "uv2nix"
       },
       "locked": {
-        "lastModified": 1789898863,
-        "narHash": "sha256-/5lbLy4TH+R0cZ7o4e6EB/Q/ylhk6oe/fIuCzHHhCQ8=",
+        "lastModified": 1790067237,
+        "narHash": "sha256-2G1+3HSxVV6aEGARUviClWbj+0AeH2V3lG2XybhxZ2s=",
         "owner": "gin31259461",
         "repo": "personal-agent",
-        "rev": "5d414d3acf6f04418b96c95093744f0eff040058",
+        "rev": "dcfdbaf93150274d6909be3798a512d58de86829",
         "type": "github"
       },
       "original": {
