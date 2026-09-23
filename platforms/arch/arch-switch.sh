@@ -205,7 +205,12 @@ if ((purge)); then
   exit 0
 fi
 
-progress_start 'Validate Arch host, packages, and kernel'
+total_steps=5
+if ((update_system)); then total_steps=6; fi
+current_step=1
+
+progress_start "[$current_step/$total_steps] Validate Arch host, packages, and kernel"
+current_step=$((current_step + 1))
 
 missing_packages=()
 for package in "${pacman_packages[@]}" "${lizardbyte_package_names[@]}" "${aur_packages[@]}"; do
@@ -259,7 +264,8 @@ searxng_settings() {
 }
 # Read-only ownership preflight precedes package/configuration writes. A second
 # pass after updates checks newly installed native tools and configuration.
-progress_start 'Preflight core and optional modules'
+progress_start "[$current_step/$total_steps] Preflight core and optional modules"
+current_step=$((current_step + 1))
 system_settings preflight
 ai_skipped=0
 if ai_settings preflight; then
@@ -295,7 +301,8 @@ else
 fi
 progress_finish 'done'
 if ((update_system)); then
-  progress_start 'Resolve and update native packages'
+  progress_start "[$current_step/$total_steps] Resolve and update native packages"
+  current_step=$((current_step + 1))
   resolve_inventory
 fi
 
@@ -345,7 +352,8 @@ if ((update_system)); then
   progress_finish 'done'
 fi
 
-progress_start 'Converge core files and services'
+progress_start "[$current_step/$total_steps] Converge core files and services"
+current_step=$((current_step + 1))
 system_settings converge
 
 if ((${manage_network:-1})); then
@@ -425,7 +433,8 @@ for service in "${system_units[@]}"; do
   fi
 done
 progress_finish 'done'
-progress_start 'Converge optional modules'
+progress_start "[$current_step/$total_steps] Converge optional modules"
+current_step=$((current_step + 1))
 if ((!ai_skipped)); then
   if ai_settings converge; then
     :
@@ -456,7 +465,8 @@ if ((!personal_agent_skipped)); then
   fi
 fi
 progress_finish 'done'
-progress_start 'Finish runtime convergence'
+progress_start "[$current_step/$total_steps] Finish runtime convergence"
+current_step=$((current_step + 1))
 if ((${manage_network:-1})) && [[ -e $root_state/network.pending ]]; then
   root systemctl restart NetworkManager.service
   root rm -- "$root_state/network.pending"

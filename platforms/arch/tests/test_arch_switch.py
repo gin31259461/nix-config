@@ -127,15 +127,24 @@ class ArchSwitchTests(unittest.TestCase):
     def test_progress_marks_successful_stage_and_closes_after_convergence(self):
         result = self.invoke()
         self.assertEqual(result.returncode, 0)
-        self.assertIn("[start] Validate Arch host, packages, and kernel", result.stderr)
-        self.assertIn("[done] Finish runtime convergence", result.stderr)
+        self.assertRegex(
+            result.stderr,
+            r"\[start\] \[\d+/\d+\] Validate Arch host, packages, and kernel",
+        )
+        self.assertRegex(
+            result.stderr, r"\[done\] \[\d+/\d+\] Finish runtime convergence"
+        )
 
     def test_progress_marks_core_failure_without_false_success(self):
         self.state["fail"] = ["python", "/fixture/adapter"]
         self.save()
         result = self.invoke(code=1)
-        self.assertIn("[failed] Preflight core and optional modules", result.stderr)
-        self.assertNotIn("[done] Preflight core and optional modules", result.stderr)
+        self.assertRegex(
+            result.stderr, r"\[failed\] \[\d+/\d+\] Preflight core and optional modules"
+        )
+        self.assertNotRegex(
+            result.stderr, r"\[done\] \[\d+/\d+\] Preflight core and optional modules"
+        )
 
     def test_disabled_capabilities_preserve_files_and_pending_actions(self):
         self.invoke()

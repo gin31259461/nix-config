@@ -36,8 +36,10 @@ for argument in "$@"; do
       ;;
   esac
 done
+printf '\n==> Phase 1/2: Arch System Convergence <==\n\n' >&2
 "$arch_switch" "${arch_switch_args[@]}"
 if ((purge_seen)); then
   exit 0
 fi
+printf '\n==> Phase 2/2: Home Manager Activation <==\n\n' >&2
 exec "$home_switch" "${home_switch_args[@]}"

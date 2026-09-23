@@ -72,9 +72,11 @@ leave a permanent result line in the terminal history.
 
 A count or filled bar describes known completed work within the current task,
 not an estimate of the entire command's remaining time. Work without a known
-total uses a spinner. Each workflow reports its own tasks; finishing the Arch
-stage does not mean Home Manager has finished. Home Manager activation is
-announced before handing over to its native output and exit status.
+total uses a spinner. To provide clear overall context, major workflows are
+announced with text headers (e.g. `==> Phase 1/2: Arch System Convergence <==`).
+Within the Arch phase, task labels include a step prefix (e.g. `[1/5]`) to indicate
+overall progression. Home Manager activation is
+announced as a separate phase before handing over to its native output and exit status.
 
 Before commands that print their own logs, progress bars, or input prompts, the
 task display yields the terminal to that command. This keeps Nix, pacman/yay,
@@ -99,6 +101,7 @@ runtime tasks; the preceding `nix run` build uses Nix's own selected log format.
 The built deployment fixes one Home Manager activation package before runtime.
 Execution then follows this order:
 
+**Phase 1/2: Arch System Convergence**
 1. Validate Arch, login identity, administrator group, and native command set.
 2. Check installed package state and running-kernel compatibility.
 3. Preflight core system settings.
@@ -106,6 +109,8 @@ Execution then follows this order:
 5. If `--update` is selected, resolve inventories and update pacman/AUR packages.
 6. Converge core Arch system settings, files, groups, services, and `/etc/nix/nix.conf` (managing `trusted-users = root @wheel <user>` while preserving unmanaged lines and restarting `nix-daemon.service` upon change).
 7. Converge optional modules that reported ready.
+
+**Phase 2/2: Home Manager Activation**
 8. Activate the exact built Home Manager generation.
 
 Core failures stop immediately. Optional modules may continue only when their
