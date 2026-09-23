@@ -82,33 +82,35 @@ class Searxng:
             "http://127.0.0.1:"
         ):
             raise Conflict("SearXNG endpoint is invalid")
-        response = self.run(
-            curl,
-            "--fail",
-            "--silent",
-            "--show-error",
-            "--retry",
-            "10",
-            "--retry-all-errors",
-            "--retry-delay",
-            "1",
-            "--max-time",
-            "20",
-            "--get",
-            "--data-urlencode",
-            "q=readiness",
-            "--data",
-            "format=json",
-            f"{endpoint}/search",
-        )
-        try:
-            body = json.loads(response.stdout)
-        except (json.JSONDecodeError, TypeError) as error:
-            raise Conflict("SearXNG returned invalid JSON") from error
-        if not isinstance(body, dict) or not isinstance(body.get("results"), list):
-            raise Conflict("SearXNG response is invalid")
-        if not body["results"]:
-            raise Conflict("SearXNG returned no readiness results")
+        for query in ("test", "SearXNG", "readiness"):
+            response = self.run(
+                curl,
+                "--fail",
+                "--silent",
+                "--show-error",
+                "--retry",
+                "10",
+                "--retry-all-errors",
+                "--retry-delay",
+                "1",
+                "--max-time",
+                "20",
+                "--get",
+                "--data-urlencode",
+                f"q={query}",
+                "--data",
+                "format=json",
+                f"{endpoint}/search",
+            )
+            try:
+                body = json.loads(response.stdout)
+            except (json.JSONDecodeError, TypeError) as error:
+                raise Conflict("SearXNG returned invalid JSON") from error
+            if not isinstance(body, dict) or not isinstance(body.get("results"), list):
+                raise Conflict("SearXNG response is invalid")
+            if body["results"]:
+                return
+        raise Conflict("SearXNG returned no readiness results")
 
     def converge(self) -> None:
         if not self.desired.get("enabled"):
