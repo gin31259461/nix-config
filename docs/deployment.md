@@ -4,6 +4,16 @@ Run deployment as the Host's selected login user on Arch Linux. The account must
 already exist, belong to `wheel`, have native Nix and `yay`, and boot a kernel
 whose module directory is present.
 
+## Bootstrap on a fresh machine
+
+On a newly installed Arch Linux workstation lacking Nix or Just, use the bootstrap script to install native prerequisites, configure `/etc/nix/nix.conf`, and start `nix-daemon.service`:
+
+```bash
+git clone <repository-url> ~/.config/nix
+cd ~/.config/nix
+./scripts/bootstrap.sh
+```
+
 ## Commands
 
 ```bash
@@ -122,6 +132,12 @@ Privileged system and AI adapters use the shared native command adapter. Failed
 commands report the executable, exit status, stdout, and stderr. Timeout errors
 also preserve partial output. In verbose mode, every native command and its
 captured output is printed.
+
+Package resolution errors (such as conflicting packages detected by pacman or yay)
+suspend progress display and print the captured error diagnostics before failing.
+If declared Wi-Fi hotspot interfaces are absent on the current machine, hotspot
+convergence is skipped with a highlighted message without halting workstation
+convergence.
 
 Managed writes compare content and metadata using atomic replacement. Actions
 that must follow a write (such as restarting `nix-daemon.service` after

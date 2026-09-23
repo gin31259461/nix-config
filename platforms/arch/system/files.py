@@ -218,13 +218,14 @@ class Files:
                             for section, key in values
                         ):
                             raise Conflict(
-                                "custom TRIM timing requires operator review"
+                                f"custom TRIM timing in {name} requires operator review"
                             )
                         if ("Timer", "Persistent") in values and values[
                             ("Timer", "Persistent")
                         ] != "false":
+                            persistent_val = values[("Timer", "Persistent")]
                             raise Conflict(
-                                "conflicting TRIM timer persistence override"
+                                f"conflicting TRIM timer persistence override in {name} (Persistent={persistent_val})"
                             )
         return target, "[Timer]\nPersistent=false\n"
 
@@ -275,10 +276,14 @@ class Files:
             if path.is_symlink() and os.readlink(path) == "/dev/null":
                 continue
             values = ini(self.read(source))
-            if any(
-                key in values and values[key] != value for key, value in desired.items()
-            ):
+            conflicts = [
+                f"[{sec}] {k}={values[(sec, k)]} (expected: {v})"
+                for (sec, k), v in desired.items()
+                if (sec, k) in values and values[(sec, k)] != v
+            ]
+            if conflicts:
+                details = ", ".join(conflicts)
                 raise Conflict(
-                    f"conflicting {name} configuration; review other overrides"
+                    f"conflicting {name} configuration in {source} ({details}); review other overrides"
                 )
         return target

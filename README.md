@@ -36,6 +36,12 @@ as well as substitute download concurrency (`max-substitution-jobs = 64`,
 `http-connections = 50`). Use `just` to list the available recipes; if
 it is not installed yet, `nix run .#just -- <recipe>` runs the same recipes.
 
+On a fresh Arch Linux installation lacking Nix, Just, or AUR tooling, run the bootstrap script:
+
+```bash
+./scripts/bootstrap.sh
+```
+
 Start by reviewing [configuration.nix](configuration.nix) and the selected
 [Host defaults](hosts/arch/default.nix), then validate and build without activation:
 
@@ -45,7 +51,7 @@ just check
 just build
 ```
 
-Deployment must run on Arch as the selected login user, currently `abnertu`.
+Deployment must run on Arch as the selected login user, currently `abnertu` (or configured via `deployment.username`).
 The account must already exist, belong to `wheel`, and have native Nix, `yay`
 and the required native commands available. The running kernel must have a
 matching module directory. Review the [deployment prerequisites and recovery
@@ -97,13 +103,23 @@ Host baselines use `lib.mkDefault`; ordinary definitions override them without
 depending on import order. For example:
 
 ```nix
-{ ... }:
+{ config, lib, ... }:
+let
+  archUsers = import ./hosts/arch/users.nix { inherit config lib; };
+in
 {
   imports = [ ./hosts/arch ];
 
+  deployment.username = "abner";
+  users.users = lib.mkForce {
+    abner = archUsers.abnertu // {
+      description = "Abner";
+      homeDirectory = "/home/abner";
+    };
+  };
+
   networking.hotspot.enable = false;
   virtualisation.kvm.gui.enable = false;
-  users.users.abnertu.home.programs.git.settings.init.defaultBranch = "main";
 }
 ```
 

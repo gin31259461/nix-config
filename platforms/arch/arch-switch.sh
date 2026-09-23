@@ -97,7 +97,20 @@ raw() {
 }
 
 resolve_inventory() {
-  native pacman --sync --print --needed -- "${pacman_packages[@]}" >/dev/null
+  local pacman_err="$work_dir/pacman-resolve.err"
+  if ! native pacman --sync --print --needed -- "${pacman_packages[@]}" 2>"$pacman_err" >/dev/null; then
+    progress_suspend
+    if [[ -s $pacman_err ]]; then
+      if [[ ${progress_interactive:-0} == 1 ]]; then
+        printf '\033[1;31mPackage resolution error:\033[0m\n' >&2
+      else
+        printf 'Package resolution error:\n' >&2
+      fi
+      cat "$pacman_err" >&2
+    fi
+    progress_resume
+    fail 'Arch package inventory did not resolve; check for package conflicts'
+  fi
   if ((${#lizardbyte_package_names[@]})); then
     raw "$curl_bin" --fail --location --show-error --silent --connect-timeout 10 --max-time 60 \
       --output "$work_dir/lizardbyte.db" "$lizardbyte_server/lizardbyte.db"
@@ -108,7 +121,20 @@ resolve_inventory() {
     done
   fi
   if ((${#aur_packages[@]})); then
-    native yay --sync --info -- "${aur_packages[@]}" >/dev/null
+    local yay_err="$work_dir/yay-resolve.err"
+    if ! native yay --sync --info -- "${aur_packages[@]}" 2>"$yay_err" >/dev/null; then
+      progress_suspend
+      if [[ -s $yay_err ]]; then
+        if [[ ${progress_interactive:-0} == 1 ]]; then
+          printf '\033[1;31mAUR package resolution error:\033[0m\n' >&2
+        else
+          printf 'AUR package resolution error:\n' >&2
+        fi
+        cat "$yay_err" >&2
+      fi
+      progress_resume
+      fail 'AUR package inventory did not resolve'
+    fi
   fi
 }
 lizardbyte_server=""

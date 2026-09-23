@@ -70,6 +70,35 @@ Do not change Home Manager `stateVersion` as part of routine updates. Human
 accounts must be provisioned before deployment; service accounts are owned by
 their modules.
 
+## User accounts and deployment target
+
+The default Host baseline defines `abnertu` in `hosts/arch/users.nix` and sets `deployment.username = lib.mkDefault "abnertu"`.
+
+When deploying to a machine where the login user differs (such as `abner`), set `deployment.username` and inherit the baseline configuration:
+
+```nix
+{ config, lib, ... }:
+let
+  archUsers = import ./hosts/arch/users.nix { inherit config lib; };
+in
+{
+  imports = [ ./hosts/arch ];
+
+  # Select the active administrator account to deploy
+  deployment.username = "abner";
+
+  # Inherit baseline groups, profiles, and modules, overriding identity
+  users.users = lib.mkForce {
+    abner = archUsers.abnertu // {
+      description = "Abner";
+      homeDirectory = "/home/abner";
+    };
+  };
+}
+```
+
+Importing `hosts/arch/users.nix` directly avoids infinite recursion within the module system, while `lib.mkForce` cleanly replaces the user set so unneeded baseline accounts are omitted from evaluation.
+
 ## Disable semantics
 
 For Arch-native capabilities, `enable = false` withdraws desired management. It

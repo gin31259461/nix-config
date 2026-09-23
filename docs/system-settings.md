@@ -68,7 +68,9 @@ just arch-workstation verbose
 
 Verbose mode prints each native command and its captured output. Unexpected
 adapter exceptions retain their concrete exception type/message and include a
-Python traceback in verbose mode.
+Python traceback in verbose mode. Configuration conflicts (such as unmanaged
+systemd drop-in files with contradictory keys) explicitly identify the source file
+path, existing value, and expected value.
 
 Keep credentials, private keys, and unrelated application data out of diagnostic
 reports.

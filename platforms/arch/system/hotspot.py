@@ -4,6 +4,7 @@ import ipaddress
 import json
 import re
 import shlex
+import sys
 
 from files import Conflict
 
@@ -235,6 +236,32 @@ class Hotspot:
         if d["interface"] == d["uplink"]:
             raise Conflict("hotspot and uplink interfaces must differ")
         self.system.ready_unit("NetworkManager.service")
+
+        # Detect missing hardware before requiring NetworkManager connection configuration.
+        dev_res = self.system.run(
+            "nmcli",
+            "-g",
+            "GENERAL.CON-UUID",
+            "device",
+            "show",
+            d["interface"],
+            check=False,
+        )
+        if dev_res.returncode != 0:
+            msg = f"SKIP hotspot: wireless interface '{d['interface']}' not found on this machine"
+            formatted = f"\033[1;33m{msg}\033[0m" if sys.stderr.isatty() else msg
+            print(formatted, file=sys.stderr)
+            return False
+
+        uplink_res = self.system.run(
+            "ip", "link", "show", "dev", d["uplink"], check=False
+        )
+        if uplink_res.returncode != 0:
+            msg = f"SKIP hotspot: uplink interface '{d['uplink']}' not found on this machine"
+            formatted = f"\033[1;33m{msg}\033[0m" if sys.stderr.isatty() else msg
+            print(formatted, file=sys.stderr)
+            return False
+
         # List only identifiers, then inspect an explicit public-property allowlist.
         lines = self.system.run(
             "nmcli", "--escape", "no", "-t", "-f", "UUID,NAME", "connection", "show"
@@ -258,16 +285,15 @@ class Hotspot:
             raise Conflict("prepared hotspot must use WPA personal security")
         if self.read("connection.interface-name") not in ("", d["interface"]):
             raise Conflict("prepared hotspot belongs to a different interface")
-        # Detect missing hardware and other active connections before any writes.
-        device_uuid = self.system.run(
-            "nmcli", "-g", "GENERAL.CON-UUID", "device", "show", d["interface"]
-        ).stdout.strip()
+
+        device_uuid = dev_res.stdout.strip()
         if device_uuid not in ("", "--", self.uuid):
             raise Conflict("hotspot interface is in use by another connection")
-        self.system.run("ip", "link", "show", "dev", d["uplink"])
+        return True
 
     def converge(self):
-        self.preflight()
+        if not self.preflight():
+            return
         changes = []
         for field, expected in self.properties().items():
             actual = self.read(field)

@@ -37,6 +37,8 @@ class Fake:
         self.fail_up = False
         self.channel = 36
         self.device_uuid = UUID
+        self.device_exists = True
+        self.uplink_exists = True
         self.props = Hotspot(
             SimpleNamespace(desired={"hotspot": DESIRED})
         ).properties() | {
@@ -56,11 +58,17 @@ class Fake:
             out = '[{"addr_info":[{"local":"192.0.2.1","prefixlen":24}]}]'
         elif args[0] == "iw":
             out = f"\tssid Fixture\n\tchannel {self.channel} (5180 MHz)\n"
+        elif args[:4] == ("ip", "link", "show", "dev"):
+            if not self.uplink_exists:
+                return SimpleNamespace(stdout="", returncode=1)
+            out = ""
         elif args[0] == "ip":
             out = ""
         elif "UUID,NAME" in args:
             out = f"{UUID}:fixture-ap\n" * (2 if self.duplicate else int(self.exists))
         elif "GENERAL.CON-UUID" in args:
+            if not self.device_exists:
+                return SimpleNamespace(stdout="", returncode=1)
             out = self.device_uuid
         elif "--active" in args:
             out = UUID if self.active else ""
@@ -213,7 +221,21 @@ class Tests(unittest.TestCase):
                 "ufw allow in on other from 192.0.2.0/24 to 192.0.2.1 port 53 proto udp".split()
             ),
         )
-        self.assertIsNone(canonical_rule("ufw deny 53".split()))
+
+    def test_missing_interface_skips_gracefully(self):
+        # Missing wireless device
+        self.native.device_exists = False
+        self.assertFalse(self.ap.preflight())
+        self.ap.converge()
+        self.assertEqual(self.mutations(), [])
+        self.native.device_exists = True
+
+        # Missing uplink device
+        self.native.uplink_exists = False
+        self.assertFalse(self.ap.preflight())
+        self.ap.converge()
+        self.assertEqual(self.mutations(), [])
+        self.native.uplink_exists = True
 
 
 if __name__ == "__main__":

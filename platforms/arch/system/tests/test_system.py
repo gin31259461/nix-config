@@ -491,6 +491,18 @@ class SystemTests(unittest.TestCase):
         self.write("/etc/systemd/journald.conf.d/vendor.conf", text)
         self.files.dropin("journald", text)
         self.write(
+            "/etc/systemd/journald.conf.d/conflict.conf",
+            "[Journal]\nStorage=persistent\n",
+        )
+        with self.assertRaises(Conflict) as caught:
+            self.files.dropin("journald", text)
+        self.assertIn(
+            "/etc/systemd/journald.conf.d/conflict.conf", str(caught.exception)
+        )
+        self.assertIn(
+            "[Journal] Storage=persistent (expected: volatile)", str(caught.exception)
+        )
+        self.write(
             "/etc/systemd/journald.conf.d/vendor.conf",
             "[Journal]\nStorage=volatile\nStorage=volatile\n",
         )

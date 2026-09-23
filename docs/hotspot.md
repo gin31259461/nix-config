@@ -36,6 +36,12 @@ rules for DHCP, gateway DNS, and forwarding from the hotspot subnet through the
 declared uplink. NetworkManager owns NAT. Default incoming and routed deny policy
 remains in effect outside those rules.
 
+If the declared wireless interface or uplink does not exist on the host hardware,
+hotspot convergence is safely skipped with a highlighted notice without failing
+workstation deployment. Set `networking.hotspot.enable = false;` or override
+`networking.hotspot.interface` / `networking.hotspot.uplink` in `configuration.nix`
+for machines with different hardware.
+
 ## Verify
 
 ```bash
