@@ -1,27 +1,18 @@
-# Configuration
+# Configure the workstation
 
-Edit `configuration.nix`. It is the selected Host entry and imports the reviewed
-machine defaults from `hosts/arch`.
+Edit `configuration.nix` to override the selected Host. Its import of `hosts/arch` supplies reviewed machine defaults through `lib.mkDefault`; ordinary definitions in `configuration.nix` take precedence. Import order never supplies precedence. The public schema and feature interfaces reject unknown options, wrong types and invalid combinations during evaluation.
 
 ```nix
 { ... }:
 {
   imports = [ ./hosts/arch ];
-
   networking.firewall.enable = false;
   services.fstrim.enable = false;
-  virtualisation.kvm.gui.enable = false;
   time.timeZone = "UTC";
 }
 ```
 
-Host values use `lib.mkDefault`. Ordinary definitions in `configuration.nix`
-override those defaults. Unknown option names, wrong types and invalid
-combinations fail evaluation. Import order is not an override mechanism.
-
-## Inspect resolved values
-
-Query resolved values directly from the normalized configuration without deployment:
+Inspect the normalized result before building or activating:
 
 ```bash
 nix eval .#lib.configurations.arch.networking.hostname.name
@@ -29,97 +20,22 @@ nix eval .#lib.configurations.arch.services.fstrim.enable
 nix eval --json .#lib.configurations.arch.networking.firewall
 ```
 
-Host identity is grouped under `networking.hostname`:
+`lib/configuration-options.nix` and capability interfaces under `modules/` own option types; `lib/eval-configuration.nix` produces private Host and adapter values. `hosts/arch` owns machine defaults and user identity. `profiles/`, `homes/` and home modules own reusable and user-specific Home Manager composition.
 
-```nix
-networking.hostname.name = "arch";
-networking.hostname.enable = true;
-```
+## Pick the correct owner
 
-The public schema is defined by `lib/configuration-options.nix` and feature-owned
-interfaces under `modules/`. `lib/eval-configuration.nix` normalizes evaluated
-values into the private Host and adapter interfaces.
-
-## Main capability groups
-
-| Namespace | Responsibility |
+| Change | Public namespace or owner |
 | --- | --- |
-| `networking` | Hostname, NetworkManager, hotspot and firewall |
-| `i18n`, `time`, `console` | Locale, timezone and virtual console |
-| `services` | Time sync, journal, logind, TRIM, power, Tailscale and GitLab Runner |
-| `services.personalAgent` | Pinned Personal Agent package and native system service integration |
-| `services.searxng` | Standalone loopback SearXNG metasearch daemon |
-| `hardware` | Graphics, Bluetooth, OpenRazer and initramfs intent |
-| `programs.ai` | llama.cpp, Codex, Antigravity (agy) and shared AI skill presets |
-| `programs` | Sunshine, Vesktop and Vicinae |
-| `virtualisation` | KVM, virt-manager/libvirt and Podman |
-| `desktop` | Graphical session and desktop-owned services |
-| `users.users.<name>` | Human account profile and Home Manager composition |
+| Network, hotspot, firewall and hostname | `networking` |
+| Locale, timezone and console | `i18n`, `time`, `console` |
+| Native services, AI, Runners and Personal Agent | `services`, `programs.ai` and their feature interfaces |
+| Hardware and virtualization | `hardware`, `virtualisation` |
+| Graphical session and user programs | `desktop`, `programs`, `users.users.<name>.home` |
 
-Parent/child capability switches gate the resources owned by that capability.
-GitLab Runner instances remain independent from the login user's virtualization
-selection.
+Parent capability switches gate their owned resources. A disabled Arch capability withdraws future management; it does not uninstall a package, retire a service, remove a registration or erase application state. Home Manager applies the next selected generation through its normal transition. An enabled optional module that has never completed required preparation may report `not ready`; invalid prepared state is an error.
 
-## Home Manager overrides
+## User and home selection
 
-User-specific Home Manager values live under `users.users.<name>.home`. Reusable
-behavior belongs in `profiles/` or `modules/home/`; machine-specific differences
-belong in `homes/` or the Host declaration.
+The default Host selects its existing human account through `deployment.username`. The account must exist on the machine before deployment. For a different login user, change both the selected account and the declared user identity in `configuration.nix`; [Host users](../hosts/arch/users.nix) are the baseline to adapt. Keep reusable home behavior in `profiles/` or home modules and machine-specific differences in `homes/` or the Host. Service accounts are owned by their modules and do not get a human home configuration. Do not bump Home Manager `stateVersion` as a routine update.
 
-Do not change Home Manager `stateVersion` as part of routine updates. Human
-accounts must be provisioned before deployment; service accounts are owned by
-their modules.
-
-## User accounts and deployment target
-
-The default Host baseline defines `abnertu` in `hosts/arch/users.nix` and sets `deployment.username = lib.mkDefault "abnertu"`.
-
-When deploying to a machine where the login user differs (such as `abner`), set `deployment.username` and inherit the baseline configuration:
-
-```nix
-{ config, lib, ... }:
-let
-  archUsers = import ./hosts/arch/users.nix { inherit config lib; };
-in
-{
-  imports = [ ./hosts/arch ];
-
-  # Select the active administrator account to deploy
-  deployment.username = "abner";
-
-  # Inherit baseline groups, profiles, and modules, overriding identity
-  users.users = lib.mkForce {
-    abner = archUsers.abnertu // {
-      description = "Abner";
-      homeDirectory = "/home/abner";
-    };
-  };
-}
-```
-
-Importing `hosts/arch/users.nix` directly avoids infinite recursion within the module system, while `lib.mkForce` cleanly replaces the user set so unneeded baseline accounts are omitted from evaluation.
-
-## Disable semantics
-
-For Arch-native capabilities, `enable = false` withdraws desired management. It
-does not uninstall already installed packages, delete files, stop unrelated
-runtime state or clear pending actions.
-
-For Home Manager, the next generation omits disabled managed links and units and
-uses normal Home Manager transition behavior. Application data is not deleted.
-
-An optional module that remains enabled but requires preparation is handled by
-its adapter readiness contract. If it has never been prepared, deployment may
-skip that module. Invalid prepared state is an error.
-
-## Validate
-
-```bash
-just check-fast
-just check
-just build
-```
-
-Use [deployment](deployment.md) only after source evaluation and checks pass.
-System ownership and adoption requirements are documented in
-[system settings](system-settings.md).
+Validate the result with `just check-fast`, `just check` and `just build`. Read [deployment](deployment.md) before activating and [system settings](system-settings.md) before changing native ownership.

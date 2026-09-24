@@ -1,171 +1,60 @@
-# Workstation deployment
+# Deploy and recover the Arch workstation
 
-Run deployment as the Host's selected login user on Arch Linux. The account must
-already exist, belong to `wheel`, have native Nix and `yay`, and boot a kernel
-whose module directory is present.
+Run from this checkout as the selected existing login user on `x86_64-linux` Arch. The account must be in `wheel`; native Nix, `yay` and the required commands must be available. The running kernel needs its installed module directory. Review [configuration](configuration.md), [system ownership](system-settings.md) and any enabled feature's preparation guide before activation.
 
-## Bootstrap on a fresh machine
+## Bootstrap
 
-On a newly installed Arch Linux workstation lacking Nix or Just, use the bootstrap script to install native prerequisites, configure `/etc/nix/nix.conf`, and start `nix-daemon.service`:
+On a freshly installed Arch machine lacking Nix or Just, clone this repository to the user's configuration checkout and run the checked-in bootstrap script there. It installs native prerequisites, configures Nix and starts `nix-daemon.service`:
 
 ```bash
-git clone <repository-url> ~/.config/nix
+git clone https://github.com/gin31259461/nix-config.git ~/.config/nix
 cd ~/.config/nix
 ./scripts/bootstrap.sh
 ```
 
-## Commands
+Bootstrap changes the live machine. Inspect the script and local package state first. It is separate from source validation.
+
+## Source checks and activation
 
 ```bash
-# Source validation only.
-just check-fast
-just check
-
-# Build without activation.
-just build
-
-# Routine convergence.
-just arch-workstation
-
-# Install/upgrade declared native packages, then converge.
-just arch-workstation update
-
-# Complete Nix and adapter diagnostics.
-just arch-workstation verbose
-just arch-workstation update verbose
-
-# Explicitly remove managed Arch files, units and pending state.
-just arch-workstation purge
+just check-fast                 # Source formatting, types and selected interfaces.
+just check                      # All flake checks, including isolated tests.
+just build                      # Build the deployment without activation.
+just arch-workstation           # Converge Arch, then activate the fixed home.
+just arch-workstation update    # Upgrade/converge declared pacman and AUR packages too.
+just arch-workstation verbose   # Propagate verbose diagnostics throughout the run.
+just arch-workstation purge     # Remove managed Arch deployment state; skip home.
 ```
 
-Routine deployment never installs missing packages. It exits with code 3 and lists
-the missing packages. Rerunning with `update` permits the full pacman upgrade
-followed by declared AUR package convergence.
+A routine run does not install missing native packages and exits 3 if they are absent. `update` performs a full pacman upgrade and declared AUR convergence. A kernel update may require a reboot before later convergence. `purge` removes managed Arch files, units, pending state and Nix configuration entries while preserving installed packages, accounts, Runner registrations and mutable application data. It does not activate Home Manager.
 
-`purge` is an explicit Arch cleanup. It disables managed system units, removes
-managed configuration files and pending state, strips managed settings from
-`/etc/nix/nix.conf` (restarting `nix-daemon.service` if active), and removes the
-managed repository include. It does not uninstall packages, delete accounts,
-unregister Runners, or remove mutable application data. Home Manager state is
-intentionally handled by its normal generation lifecycle.
+`just arch-workstation` first builds a deployment artifact containing one exact Home Manager activation package. Runtime preflights core system state and optional readiness, optionally updates packages, converges native files and services, then activates that built home. Arch changes remain applied if home activation fails; the stages have no shared rollback transaction. Runner reconciliation and registration are outside this sequence. [AI preparation](ai.md) is also separate.
 
-`just arch-workstation` always enables Nix `--show-trace` and
-`--print-build-logs`. `verbose` additionally enables Nix `--verbose` and passes
-`--verbose` into the deployment artifact, Arch adapter, and Home Manager.
+An optional adapter may report `not ready` only when it has never completed required preparation. Its highlighted skip leaves its files and services untouched. Invalid receipts, checksum drift, ownership conflicts, missing declared core hardware, native command failures and readiness changes after preflight stop deployment.
 
-For direct execution with the same diagnostic level:
+## Progress and diagnostics
+
+Nix shows its native build progress. After launch, shared task progress reports active, completed, skipped and failed tasks while yielding the terminal to native tools. `verbose`, redirected stderr, `TERM=dumb`, `NO_COLOR` (even empty) or nonempty `CI` select plain logs. `verbose` reaches Nix, Home Manager and privileged adapters. Adapter failures include command, exit status, stdout, stderr and partial timeout output with secrets redacted.
+
+```bash
+NO_COLOR=1 just build
+just arch-workstation update verbose
+```
+
+For direct invocation, Nix flags precede the target and adapter flags follow `--`:
 
 ```bash
 nix run --show-trace --print-build-logs --verbose .#arch-workstation -- --verbose
 ```
 
-Nix evaluation flags belong before the flake target, and adapter flags belong
-after `--`.
+## Recover an interrupted run
 
-## Progress display
-
-The operator commands use Nix's native progress bar with build logs while Nix
-evaluates and builds their artifacts. After launch, deployment, AI preparation,
-and Runner commands use a shared Rich task display. The active task updates on
-one line with its name and elapsed time. Completed, skipped, and failed tasks
-leave a permanent result line in the terminal history.
-
-A count or filled bar describes known completed work within the current task,
-not an estimate of the entire command's remaining time. Work without a known
-total uses a spinner. To provide clear overall context, major workflows are
-announced with text headers (e.g. `==> Phase 1/2: Arch System Convergence <==`).
-Within the Arch phase, task labels include a step prefix (e.g. `[1/5]`) to indicate
-overall progression. Home Manager activation is
-announced as a separate phase before handing over to its native output and exit status.
-
-Before commands that print their own logs, progress bars, or input prompts, the
-task display yields the terminal to that command. This keeps Nix, pacman/yay,
-download tools, compilers, and sudo prompts readable. The task result appears
-after the command returns. Detailed command output and error diagnostics retain
-their existing handling; progress output is written to stderr.
-
-Redirecting stderr, using `verbose`, setting `TERM=dumb`, or setting `NO_COLOR`
-(including an empty value) selects plain task logs without animation or color.
-A nonempty `CI` also selects plain task and Nix logs. For example:
-
-```bash
-NO_COLOR=1 just build
-```
-
-Rich is provided by the Nix-built tools. No separate Python or native package
-installation is required for the display. Direct app execution also reports
-runtime tasks; the preceding `nix run` build uses Nix's own selected log format.
-
-## Deployment order
-
-The built deployment fixes one Home Manager activation package before runtime.
-Execution then follows this order:
-
-**Phase 1/2: Arch System Convergence**
-1. Validate Arch, login identity, administrator group, and native command set.
-2. Check installed package state and running-kernel compatibility.
-3. Preflight core system settings.
-4. Preflight optional native modules.
-5. If `--update` is selected, resolve inventories and update pacman/AUR packages.
-6. Converge core Arch system settings, files, groups, services, and `/etc/nix/nix.conf` (managing `trusted-users = root @wheel <user>` while preserving unmanaged lines and restarting `nix-daemon.service` upon change).
-7. Converge optional modules that reported ready.
-
-**Phase 2/2: Home Manager Activation**
-8. Activate the exact built Home Manager generation.
-
-Core failures stop immediately. Optional modules may continue only when their
-adapter returns the dedicated `not ready` status. A highlighted `SKIP optional
-module ...` message records that decision. All other optional-module errors are
-fatal.
-
-GitLab Runner reconciliation and registration are not part of workstation deployment;
-see [runners](runners.md). Personal Agent convergence is part of this workflow only
-when its external runtime configuration is ready; first-time absence is reported as
-an optional skip (see [personal agent](personal-agent.md)).
-
-## Failure and recovery
-
-| Result | Meaning |
+| Signal | Response |
 | --- | --- |
-| Exit 2 | Invalid CLI arguments |
-| Exit 3 | Declared native packages are missing; rerun with `update` |
-| Exit 75 | Deployment lock is busy or the running kernel no longer matches installed modules |
-| Highlighted optional skip | The module is enabled but has not completed explicit preparation |
-| Adapter command failure | Inspect the complete command, stdout, and stderr to correct the native cause |
+| Exit 2 | Correct the command arguments. |
+| Exit 3 | Review missing native packages, then run `update` if intended. |
+| Exit 75 | Wait for the lock or boot a kernel with matching installed modules. |
+| Optional skip | Complete that module's explicit preparation. |
+| Native failure | Correct the reported cause and rerun the same command. |
 
-Privileged system and AI adapters use the shared native command adapter. Failed
-commands report the executable, exit status, stdout, and stderr. Timeout errors
-also preserve partial output. In verbose mode, every native command and its
-captured output is printed.
-
-Package resolution errors (such as conflicting packages detected by pacman or yay)
-suspend progress display and print the captured error diagnostics before failing.
-If declared Wi-Fi hotspot interfaces are absent on the current machine, hotspot
-convergence is skipped with a highlighted message without halting workstation
-convergence.
-
-Managed writes compare content and metadata using atomic replacement. Actions
-that must follow a write (such as restarting `nix-daemon.service` after
-`/etc/nix/nix.conf` changes or `NetworkManager.service` after network changes)
-are recorded under `/var/lib/nix-config/arch/` before mutation and cleared only
-after success. Leave pending markers intact after a failure; the next deployment
-retries the unfinished action.
-
-A pacman update that replaces the running kernel stops before later convergence
-when `/usr/lib/modules/$(uname -r)` is unavailable. Reboot into the installed
-kernel and rerun the same deployment command.
-
-The Arch stage and Home Manager stage do not share a rollback transaction. If
-Home Manager fails, completed Arch work remains applied; fix the reported home
-problem and rerun.
-
-## Preparation dependencies
-
-The AI module requires explicit native/model preparation; see [AI service](ai.md).
-The selected hotspot requires a NetworkManager connection with local credentials;
-see [hotspot](hotspot.md). Noctalia's first storage activation has a user-session
-precondition; see [desktop session](desktop-session.md).
-
-Disabling a capability stops declaring future management. Deployment does not
-automatically uninstall packages, delete service state, remove accounts, purge
-registrations, or erase application data.
+Managed writes record pending actions under `/var/lib/nix-config/arch/` before mutation and clear them only after success. Keep those markers for retry; do not delete them to mask unfinished work. Healthy repeat runs avoid rewriting identical files and restarting healthy services. If Home Manager fails after Arch convergence, correct the home error and rerun deployment. Do not treat `purge` as a recovery shortcut.

@@ -1,70 +1,25 @@
-# Wi-Fi hotspot
+# Adopt a Wi-Fi hotspot
 
-The Arch system adapter adopts one existing NetworkManager AP connection by its
-unique connection name. It manages declared public properties while preserving
-the UUID, credentials, security material, and unrelated NetworkManager fields.
+The Arch system adapter manages public properties of one existing NetworkManager AP connection, selected by its unique connection name. NetworkManager retains the UUID, WPA credentials, security material and unrelated profile fields. The adapter never reads or prints the password.
 
-## Prepare
+## Prepare the native connection
 
-Before enabling hotspot management:
+Before enabling `networking.hotspot`, make sure NetworkManager is installed and running. Create the named AP profile with `nmcli`, configure WPA personal security and its password in NetworkManager's protected storage, and check that both declared wireless and uplink interfaces exist. Another connection must not occupy the wireless interface. Keep credentials out of Nix, Git, shell arguments and logs.
 
-1. Ensure NetworkManager is installed and running.
-2. Create the declared AP connection with native NetworkManager tools (`nmcli`).
-3. Configure WPA personal security and the password in NetworkManager.
-4. Ensure the declared wireless and uplink interfaces exist.
-5. Stop any other connection that occupies the hotspot interface.
+The public options live in `configuration.nix`; use [configuration](configuration.md) to inspect resolved values. If a machine has different hardware, override `networking.hotspot.interface` and `networking.hotspot.uplink`, or disable the capability. A selected hotspot with either declared interface missing fails core preflight before mutation. Duplicate names, non-AP profiles, insecure or conflicting ownership and failed native queries also fail.
 
-Credentials must remain in NetworkManager's protected system storage. Do not put
-them in Nix expressions, environment files, shell arguments, Git, or logs.
-
-The adapter rejects duplicate connection names, non-AP profiles, unsupported
-security, and conflicting interface use. Source builds and flake checks use
-fixtures and never inspect the live NetworkManager configuration.
-
-## Deploy
+## Deploy and verify
 
 ```bash
 just arch-workstation
-```
-
-Use `just arch-workstation update` if declared native packages are missing.
-Changing hotspot settings can reactivate an active connection and briefly
-disconnect clients. An unchanged healthy configuration is left running.
-
-When firewall management is enabled, the system adapter derives scoped IPv4
-rules for DHCP, gateway DNS, and forwarding from the hotspot subnet through the
-declared uplink. NetworkManager owns NAT. Default incoming and routed deny policy
-remains in effect outside those rules.
-
-If the declared wireless interface or uplink does not exist on the host hardware,
-hotspot convergence is safely skipped with a highlighted notice without failing
-workstation deployment. Set `networking.hotspot.enable = false;` or override
-`networking.hotspot.interface` / `networking.hotspot.uplink` in `configuration.nix`
-for machines with different hardware.
-
-## Verify
-
-```bash
 nmcli -f DEVICE,TYPE,STATE device status
-iw dev wlp15s0 info
 sudo ufw status verbose
 ```
 
-Connect a client and verify IP address assignment, DNS resolution, and Internet
-routing. Adjust interface names to match your Host declaration if they differ.
+If declared native packages are missing, use `just arch-workstation update` after reviewing the package operation. Changing AP properties may reactivate the connection and briefly disconnect clients; an unchanged healthy connection stays running. When firewall management is enabled, the adapter derives scoped IPv4 DHCP, gateway DNS and forwarding rules for the selected subnet and uplink. NetworkManager owns NAT; default deny policy outside those rules remains in effect.
 
-## Recovery
+Connect a client and check address assignment, DNS and Internet routing. To inspect the radio, use `iw dev <declared-wireless-interface> info` with the actual declared interface name.
 
-Interrupted network and firewall actions retain pending markers under:
+## Recover
 
-```text
-/var/lib/nix-config/arch/
-```
-
-Correct the reported prerequisite or runtime problem and rerun deployment.
-**Do not delete pending markers as a recovery shortcut.**
-
-Disabling hotspot or NetworkManager management leaves existing connections,
-credentials, and runtime state untouched. Changing interface, subnet, or uplink
-can require explicit cleanup of obsolete rules after the new declaration is
-verified; deployment does not infer retirement intent.
+Interrupted native actions retain pending markers under `/var/lib/nix-config/arch/`. Correct the reported conflict or missing prerequisite and rerun deployment. Do not remove markers merely to make a retry pass. Disabling hotspot management leaves existing NetworkManager profiles, credentials and runtime state intact. If a declaration changes interface, subnet or uplink, review any obsolete manual rules explicitly; deployment does not infer retirement intent.

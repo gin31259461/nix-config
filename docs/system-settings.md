@@ -1,81 +1,28 @@
 # Arch system settings
 
-System settings are selected through `configuration.nix` and realized by the
-privileged adapter under `platforms/arch/system/`. Home Manager does not manage
-these system files or services.
+`configuration.nix` selects native system capabilities; `platforms/arch/system/` reconciles them. Nix generates fixed systemd drop-in content, including the fstrim timer policy. The Python adapter checks the live filesystem, ownership, native commands and units before writing or starting anything. Home Manager does not own these `/etc` files.
 
-## Managed capabilities
-
-| Capability | Scope |
+| Public area | Native responsibility |
 | --- | --- |
-| `i18n` | Generated locales and `LANG` |
-| `time` | System timezone |
-| `networking.hostname` | Static and transient hostname |
-| `services.timesyncd` | systemd-timesyncd network time policy |
-| `services.journald` | Journal storage and retention |
-| `console` | Virtual-console keymap and font |
-| `services.logind` | Power-key and lid-event policy |
-| `networking.firewall` | UFW policy and declared rules |
-| `services.fstrim` | Native fstrim timer policy |
-| `networking.hotspot` | Prepared NetworkManager AP settings |
+| `i18n`, `time`, `console` | Locale, timezone, keymap and font |
+| `networking.hostname`, `networking.firewall`, `networking.hotspot` | Host identity, UFW and prepared NetworkManager AP |
+| `services.timesyncd`, `services.journald`, `services.logind`, `services.fstrim` | Native systemd policy and service state |
 
-Disabled capabilities contribute no desired runtime action and do not undo
-previously managed state.
-
-## Preflight
-
-System preflight is a core deployment stage. It validates ownership, required
-native commands, files, units, and settings before any mutation occurs.
-Conflicts are fatal; core system settings are never skipped as optional modules.
-
-Review live ownership before first enabling a capability. In particular, confirm
-that time synchronization, storage discard policy, console assets, NetworkManager,
-and UFW are compatible with selected declarations.
-
-For firewall changes, inspect current UFW policy from a local recovery-capable
-session before deployment:
+System preflight is a core stage. Missing declared hotspot interfaces, unavailable assets, conflicting providers or ownership, and failed commands stop deployment; they are not optional skips. Before first enabling a capability, inspect current ownership from a local recovery-capable session. In particular, review time providers, storage discard, console assets, NetworkManager and UFW. For firewall policy:
 
 ```bash
 sudo ufw status verbose
 ```
 
-Hotspot-specific adoption behavior is documented in [hotspot](hotspot.md).
+See [hotspot](hotspot.md) for AP adoption. A disabled declaration withdraws management but does not automatically remove existing native files, accounts, packages or service state.
 
-## Pending actions
+## Changes and recovery
 
-Actions that must follow a system write use pending markers under:
+The adapter checks file content, ownership and mode, then uses atomic replacement when a managed file actually differs. It records pending actions under `/var/lib/nix-config/arch/` before mutations and clears each marker only after the associated action succeeds. A healthy rerun neither rewrites identical files nor restarts healthy services. Logind changes wait for a boot boundary instead of restarting active login sessions. The TRIM timer keeps the native schedule and disables catch-up; conflicting timing overrides require operator review.
 
-```text
-/var/lib/nix-config/arch/
-```
+After a failure, correct the reported cause and rerun with markers intact. `just arch-workstation verbose` shows native commands and captured diagnostics; failures retain stdout, stderr and partial timeout output. Never include protected credentials or unrelated application data in a report.
 
-Markers are created before mutation and cleared only after the associated action
-succeeds. Correct any failure and rerun deployment with the marker intact.
-
-Healthy repeated deployments compare content, ownership, mode, and runtime state.
-Unchanged files are not rewritten and healthy services are not restarted merely
-because deployment runs again. Logind changes wait for a boot boundary instead of
-restarting active login sessions.
-
-## Diagnostics
-
-System commands use the shared native adapter. Failed commands report the exact
-command, exit status, stdout, and stderr. Timeout errors preserve partial output.
-
-```bash
-just arch-workstation verbose
-```
-
-Verbose mode prints each native command and its captured output. Unexpected
-adapter exceptions retain their concrete exception type/message and include a
-Python traceback in verbose mode. Configuration conflicts (such as unmanaged
-systemd drop-in files with contradictory keys) explicitly identify the source file
-path, existing value, and expected value.
-
-Keep credentials, private keys, and unrelated application data out of diagnostic
-reports.
-
-## Validate
+Source-only validation:
 
 ```bash
 nix build --no-link --show-trace --print-build-logs \
@@ -83,8 +30,6 @@ nix build --no-link --show-trace --print-build-logs \
   .#checks.x86_64-linux.system-settings-tests \
   .#checks.x86_64-linux.arch-switch-tests \
   .#checks.x86_64-linux.system-firewall-integration
-just check
 ```
 
-Checks use temporary roots, fake native commands, and isolated test environments;
-they do not modify the real workstation.
+These checks use temporary roots, fake commands and an isolated VM. Full repository validation is `just check`.

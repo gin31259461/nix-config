@@ -98,5 +98,5 @@ nix build --no-link --show-trace --print-build-logs \
   .#checks.x86_64-linux.progress-ui
 ```
 
-See the [operator runbook](../../../docs/deployment.md#progress-display) for how
+See the [operator runbook](../../../docs/deployment.md#progress-and-diagnostics) for how
 the workstation commands present progress.

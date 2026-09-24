@@ -1,33 +1,20 @@
-# GitLab Runners
+# GitLab Runner lifecycle
 
-GitLab Runner instances are declared under `services.gitlabRunner.instances`.
-The current Host defines `frontend` and `dotnet`. Each enabled instance owns a
-dedicated service account, subordinate UID/GID ranges, rootless Podman runtime,
-manager container, service, and GitLab registration.
+`services.gitlabRunner.instances` declares independent Runner instances. Each enabled instance owns a dedicated service account, subordinate UID/GID range, rootless Podman runtime, manager container, user service and GitLab registration. The Host's current instances and their requirements live in the Runner declarations, not in this runbook.
 
-Runner lifecycle is completely separate from workstation deployment. `just arch-workstation`
-installs declared native dependencies when run with `update`, but never creates or
-registers Runner instances.
+Runner operations are separate from `just arch-workstation`. The workstation may install declared native dependencies during `update`, but it never reconciles or registers instances. Nix generates each instance's public registration template, non-secret config policy and user service unit. `runnerctl` handles account/runtime checks, registration metadata and token merging at runtime; tokens never enter Git or the Nix store.
 
-## Prepare
+## Reconcile an instance
 
 ```bash
 just prepare-runner frontend
-just prepare-runner dotnet
 ```
 
-Preparation maps to `runnerctl reconcile`. It creates or validates the dedicated
-account, subordinate IDs, runtime directories, rootless Podman socket, manager
-configuration, and user service. Existing resources with conflicting ownership,
-UIDs, groups, or registration state are rejected rather than replaced.
+Substitute a declared instance name. Reconciliation validates the required active network interface, dedicated account, subordinate ranges and rootless Podman socket, then prepares directories, public configuration, manager image and user service. It rejects conflicts rather than replacing unrelated ownership. It does not create a GitLab registration. Manager access is limited to its own rootless socket; jobs run unprivileged in per-job networks and do not receive that socket.
 
-Before reconciliation, the required network interface declared for the instance
-must be active. Current instances require `tailscale0`.
+## Register once
 
-## Initialize registration
-
-Create the Runner in GitLab and obtain its Runner authentication token. Provide
-the token in the process environment only for the registration command:
+Create a Runner in GitLab and obtain its authentication token. Supply it through the process environment for this command only:
 
 ```bash
 read -rsp 'GitLab Runner token: ' GITLAB_RUNNER_TOKEN
@@ -36,59 +23,22 @@ just initialize-runner frontend
 unset GITLAB_RUNNER_TOKEN
 ```
 
-`initialize-runner` preserves `GITLAB_RUNNER_TOKEN` through sudo only for the
-`runnerctl register` invocation. Do not store tokens in `configuration.nix`, Git,
-Nix derivations, command arguments, or logs.
+Registration requires successful reconciliation and rejects a different existing token. `initialize-runner` preserves the token through sudo only for registration. Never put it in configuration, derivations, command arguments or logs. The command suppresses sensitive registration output.
 
-An existing registration with a different token is rejected. Registration
-requires prior reconciliation.
-
-## Verify and inspect
+## Verify, inspect and recover
 
 ```bash
 just verify-runner frontend
 just status-runner frontend
-
-just verify-runner dotnet
-just status-runner dotnet
 ```
 
-Verification checks the dedicated registration, service state, manager image and
-mount isolation, rootless Podman socket, GitLab health, and a disposable job
-network. `status` reports the current account, subordinate IDs, socket, service,
-container, and registration states without printing sensitive metadata.
+Verification checks registration, service, manager image and mount isolation, socket, GitLab health and a disposable job network. Status summarizes state without sensitive metadata. Operations share `/run/lock/nix-config-runner.lock`; managed writes reject symlinks, hard links and unexpected file types. Interrupted reconcile or trust work retains private pending markers inside the instance config directory. Correct the cause and rerun; do not remove registrations, accounts, subordinate-ID entries or markers as a shortcut. Disabling an instance withdraws management and package requirements without deleting runtime state.
 
-Runner commands show the current task and elapsed time, then keep its completion
-result in console history. Registration includes reconciliation and verification;
-completion of one of those tasks does not announce completion of the whole
-registration. Progress uses safe task names only. Registration command output
-remains suppressed to protect tokens, and `status` retains its existing stdout
-summary. See [progress display](deployment.md#progress-display) for terminal
-handoff and plain-output modes.
-
-Jobs run unprivileged, use isolated per-job networks, and do not receive the host
-Podman socket. Manager access is restricted to the instance's own rootless socket.
-
-## Recovery
-
-Runner mutations share `/run/lock/nix-config-runner.lock`. Managed configuration
-writes reject symlinks, hard-linked files, and unexpected file types. Reconcile
-and trust operations retain private pending markers inside the instance config
-directory when interrupted.
-
-Correct the reported cause and rerun the same operation. Do not remove
-registrations, service accounts, subordinate-ID entries, or pending markers merely
-to make a retry succeed.
-
-Disabling an instance withdraws its controller and package requirements. It does
-not delete the account, container, registration, or runtime data.
-
-## Source validation
+Source-only validation:
 
 ```bash
 just check
 nix build --no-link --show-trace --print-build-logs .#runnerctl
 ```
 
-Runner tests use isolated declarations and fake runtime operations; they do not
-register or mutate a live GitLab Runner.
+Tests use isolated declarations and fake operations, not a live GitLab Runner.

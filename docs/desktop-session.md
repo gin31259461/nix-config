@@ -1,38 +1,12 @@
 # Desktop session
 
-UWSM starts Hyprland and owns the graphical session. Arch supplies native desktop
-executables; Home Manager supplies user configuration and user-service policy.
-Keep one startup owner for each application.
+UWSM starts Hyprland and owns the graphical session. Arch supplies native executables; Home Manager supplies managed user configuration and user-service policy. Give each application one startup owner. The desktop and user capability switches in `configuration.nix` choose which contributions appear in the next home generation; disabling one does not erase application data.
 
-## Managed applications
+Noctalia owns the StatusNotifier watcher, and tray consumers start after it. Vicinae uses bounded degraded startup when the watcher is delayed. Vesktop keeps its compatibility flags in its own service. Sunshine uses Wayland `wlr` capture. The development profile uses `pass` through `programs.password-store` with GPG and Git credential helpers. The owning modules define the exact current packages and service units.
 
-Desktop capabilities are selected through `desktop.enable`, program switches and
-`users.users.<name>.modules`. Shared behavior lives under `modules/home/`.
-Disabling a user capability removes its managed Home Manager contribution from
-the next generation; it does not delete application data.
+## Noctalia storage first activation
 
-- **Noctalia**: Starts independently and owns the StatusNotifier watcher. Tray
-  consumers start after the shell.
-- **Vicinae**: Configured with bounded degraded startup so a missing or delayed tray
-  watcher does not block the session.
-- **Vesktop**: Keeps its application-specific compatibility flags in its own service/configuration.
-- **Sunshine**: Configured with `capture = wlr` to stream the Wayland desktop directly
-  without prompting a share picker on login.
-- **Password Store**: Managed via `pass` (`programs.password-store`) in the development
-  profile, integrated with GPG and Git credential helpers.
-
-## Noctalia storage initialization
-
-Noctalia file-backed storage uses a local master key under:
-
-```text
-~/.local/share/noctalia/file-key-v1/master-key
-```
-
-The master key and encrypted application data remain outside Git and the Nix store.
-Back up the key together with the data it protects.
-
-On a new home, stop Noctalia before the first activation:
+Noctalia's file-backed encrypted storage keeps its master key under `~/.local/share/noctalia/file-key-v1/`, outside Git and the Nix store. Back up the key with the data it protects. On a new home, stop Noctalia before the first activation:
 
 ```bash
 systemctl --user stop noctalia.service
@@ -40,18 +14,9 @@ just arch-workstation
 systemctl --user start noctalia.service
 ```
 
-The activation prepares storage once and records its state below
-`~/.local/share/noctalia/file-key-v1/`. Existing clipboard/calendar directories
-that require isolation are moved to their defined archive locations before the
-new storage state is published. Existing archive collisions, symlinks, or
-conflicting overrides stop activation.
+Activation prepares storage once. Existing clipboard and calendar directories that require isolation move to defined archive locations before the new state is published. Archive collisions, symlinks and conflicting overrides stop activation. A `ready` marker with a missing key is not permission to create a replacement: restore the original key. For an interrupted initialization, keep the key, markers and archives intact, stop Noctalia and rerun activation.
 
-A `ready` marker with a missing key is not permission to generate another key.
-Restore the original key from backup. Recover an interrupted initialization by
-keeping the key, markers, and archived data intact, stopping Noctalia, and
-rerunning activation.
-
-## Verify the session
+## Inspect the session
 
 ```bash
 systemctl --user is-active noctalia.service
@@ -60,18 +25,4 @@ busctl --user call org.freedesktop.DBus /org/freedesktop/DBus \
 systemctl --user show noctalia.service -p MainPID
 ```
 
-The watcher PID should correspond to Noctalia. Shell restarts should not
-restart unrelated applications merely to restore tray state.
-
-## Source validation
-
-Graphical-session tests use synthetic Home Manager configurations and do not
-connect to the real desktop. Process overview tests use fake command signals and
-preserve the last valid state when native queries fail. Run:
-
-```bash
-just check
-```
-
-Noctalia preference capture and deployment is documented separately in
-[Noctalia configuration](noctalia-config.md).
+The watcher PID should belong to Noctalia. Shell restarts should not restart unrelated applications merely to restore the tray. The [Noctalia configuration guide](noctalia-config.md) covers preference capture and deployment separately from encrypted storage. Source tests use synthetic Home Manager configurations and fake commands; run `just check` without connecting to the live desktop.

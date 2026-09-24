@@ -1,122 +1,33 @@
-# AI service
+# Local AI service
 
-The AI module runs declared GGUF models through a pinned llama.cpp build and the
-llama-swap router. The current inventory contains one model with multiple
-requestable inference profiles. llama-swap, llama-server, and Caddy listen only
-on loopback. Tailscale Serve publishes the Caddy listener securely to the tailnet.
+The AI capability runs declared GGUF models with a pinned native llama.cpp build behind llama-swap. Nix generates the public router, Caddy and systemd policy; the Arch adapter checks prepared assets, ownership and service state before applying it. Compiled binaries and models remain outside the Nix store under their declared native locations.
 
 ```text
-Tailnet HTTPS -> Tailscale Serve -> 127.0.0.1:11435 Caddy
-                                  -> 127.0.0.1:11434 llama-swap
-                                  -> 127.0.0.1:<dynamic> llama-server
+Tailnet HTTPS → Tailscale Serve → loopback Caddy → loopback llama-swap → loopback llama-server
 ```
 
-Source revision, build policy, model revisions, checksums, and runtime defaults
-are owned by the AI artifact inventory. Models remain under
-`/var/lib/llama/models` and never enter the Nix store. Host-owned profiles expose
-the current model as the base ID plus `:thinking-general`, `:thinking-coding`,
-`:instruct`, and `:preserved-thinking` aliases.
+Caddy forwards only `/health` and `/v1/*`. Management endpoints are not published. The model, profile, revision and checksum inventories belong to the AI module's Nix declarations.
 
-## Prepare
-
-AI native assets are intentionally outside routine workstation deployment.
-Prepare them explicitly:
+## Prepare outside deployment
 
 ```bash
-just prepare-ai
-just prepare-ai build
-just prepare-ai model
+just prepare-ai          # Build and verify every declared asset.
+just prepare-ai build    # Prepare the pinned llama.cpp build.
+just prepare-ai model    # Download and fully verify declared models.
 ```
 
-Equivalent direct commands:
+Preparation uses the declared llama.cpp source revision and reviewed build patch, installs the binary under a revision directory and atomically updates the `current` selector. Model downloads stage by declared identity, pass full SHA-256 verification and publish atomically. A root-owned receipt records each verified model. Routine deployment compares its identity and file metadata without hashing the entire GGUF on every run; `just prepare-ai model` performs explicit full verification and refreshes matching receipts. Unknown staging state, mismatched selectors and checksums require operator review. The build needs the native C++/ROCm/Vulkan toolchain.
 
-```bash
-sudo nix --extra-experimental-features 'nix-command flakes' run .#llama-prepare
-sudo nix --extra-experimental-features 'nix-command flakes' run .#llama-prepare -- --build-only
-sudo nix --extra-experimental-features 'nix-command flakes' run .#llama-prepare -- --model-only
-```
-
-Preparation builds the pinned llama.cpp revision, applies the reviewed grammar
-threshold change, installs it under the declared revision directory, atomically
-updates the `current` selector, and downloads every declared GGUF with the
-Nix-provided Hugging Face `hf download` command. Each model is downloaded into
-an identity-checked staging directory, verified with its declared SHA-256, and
-published atomically. An interrupted download can be retried for the same
-declaration; an unknown or mismatched staging directory requires operator
-review. The build requires the native C++/ROCm/Vulkan development toolchain.
-
-After full SHA-256 verification, preparation writes a root-owned receipt beside
-each model. Routine deployment compares that receipt with the declared artifact
-and the model's device, inode, size, and timestamps. It therefore detects model
-replacement or modification without rereading the complete GGUF on every run.
-Run `just prepare-ai model` to perform an explicit full checksum verification and
-refresh matching receipts.
-
-Preparation reports tasks for the selected build/model mode, including source
-preparation, compilation, checksum verification, and publication. Existing assets
-are reported as checked rather than downloaded or rebuilt. A download finishing
-does not mark preparation complete: checksum verification and receipt publication
-must succeed first. Git, Ninja, and Hugging Face retain their native output while
-the shared task display yields the terminal; completed task results remain in
-the console history. See [progress display](deployment.md#progress-display) for
-plain-output modes and terminal behavior.
-
-Preparation is idempotent for matching owned state. An existing conflicting
-revision, selector, staging path, or model checksum is an error and requires
-operator review.
-
-## Deployment behavior
-
-When AI is enabled but the build or one of its declared models has not been prepared,
-workstation deployment prints a highlighted skip message (plain text in log mode) and continues without
-touching AI files or services:
-
-```text
-SKIP optional module ai: llama.cpp build/model is not prepared; run 'just prepare-ai'
-```
-
-This skip is strictly limited to the explicit `not ready` adapter status. A mismatched
-selector, invalid receipt, unmanaged Caddy ownership, invalid service state, or
-native command failure stops deployment.
-
-After preparation, normal deployment writes the llama-swap JSON/YAML config and
-service unit, converges the router, validates Caddy, checks the local model
-listing endpoint, and reconciles the declared Tailscale Serve route. Caddy only
-proxies `/health` and `/v1/*`; llama-swap management endpoints are never exposed
-through the published listener.
+## Deploy and inspect
 
 ```bash
 just arch-workstation
-```
-
-## Verify
-
-```bash
 curl --fail http://127.0.0.1:11434/v1/models
 curl --fail http://127.0.0.1:11435/v1/models
 sudo tailscale serve status --json
 systemctl status llama-swap.service caddy.service
 ```
 
-For command-level diagnostics, use:
+If the build selector has never been prepared, workstation deployment highlights an optional AI skip and leaves its files and services alone. Once the selector exists, a missing model, invalid build or model receipt, changed checksum, unmanaged Caddy policy, service failure or readiness change after preflight stops the run. Prepared assets are verified before services converge. Use `just arch-workstation verbose` for native command diagnostics.
 
-```bash
-just arch-workstation verbose
-```
-
-The privileged adapter prints each native command and its complete captured
-stdout/stderr. Without verbose mode, failed native commands still report both
-streams.
-
-Disabling `programs.ai.llama.enable` withdraws AI convergence. It does not delete
-prepared binaries, models, system files, pending markers, or Tailscale routes.
-
-## Client tools and skills
-
-The AI module also declares companion client tools and skill presets:
-
-* `programs.ai.codex.enable`: manages the AUR `openai-codex-bin` package.
-* `programs.ai.agy.enable`: master toggle for Antigravity (agy) tools.
-* `programs.ai.agy.pkg.enable`: manages the AUR `antigravity-cli` package.
-* `programs.ai.agy.skills.enable`: projects `.gemini/config/skills/*` into `~/.gemini/config/skills/`.
-* `programs.ai.skillsPresets.enable`: projects `.agents/skills/*` into `~/.agents/skills/`.
+Disabling AI withdraws convergence; it does not remove prepared binaries, models, native files, pending markers or Tailscale routes. The AI capability also declares client tools and skill presets through its public option interface; inspect [configuration](configuration.md) and the owning module for the current switches. [Deployment](deployment.md) describes shared progress and recovery.
