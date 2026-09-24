@@ -43,6 +43,7 @@ assert
   optional.files.journald
   == "[Journal]\nMaxRetentionSec=30day\nStorage=persistent\nSystemMaxUse=1024M\n";
 assert optional.files.logind == "[Login]\nHandlePowerKey=ignore\n";
+assert optional.trimDropin == "[Timer]\nPersistent=false\n";
 assert valid { hotspot = ap; };
 assert lib.all (override: !(valid { hotspot = ap // override; })) [
   { password = "forbidden-fixture-field"; }

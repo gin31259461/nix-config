@@ -203,7 +203,7 @@ class Files:
             return True
         return False
 
-    def timer_dropin(self):
+    def timer_dropin(self, content):
         target = "/etc/systemd/system/fstrim.timer.d/60-nix-config.conf"
         self.read(target)
         for base in ("/usr/lib", "/usr/local/lib", "/run", "/etc"):
@@ -227,7 +227,7 @@ class Files:
                             raise Conflict(
                                 f"conflicting TRIM timer persistence override in {name} (Persistent={persistent_val})"
                             )
-        return target, "[Timer]\nPersistent=false\n"
+        return target, content
 
     def marker(self, action):
         return f"/var/lib/nix-config/arch/system-{action}.pending"

@@ -1,5 +1,6 @@
 """Prepared AP adoption, public-only changes, and interrupted activation recovery."""
 
+import json
 import os
 from pathlib import Path
 import sys
@@ -58,10 +59,13 @@ class Fake:
             out = '[{"addr_info":[{"local":"192.0.2.1","prefixlen":24}]}]'
         elif args[0] == "iw":
             out = f"\tssid Fixture\n\tchannel {self.channel} (5180 MHz)\n"
-        elif args[:4] == ("ip", "link", "show", "dev"):
-            if not self.uplink_exists:
-                return SimpleNamespace(stdout="", returncode=1)
-            out = ""
+        elif args[:4] == ("ip", "-j", "link", "show"):
+            names = []
+            if self.device_exists:
+                names.append({"ifname": "wifi0"})
+            if self.uplink_exists:
+                names.append({"ifname": "eth0"})
+            out = json.dumps(names)
         elif args[0] == "ip":
             out = ""
         elif "UUID,NAME" in args:
@@ -222,20 +226,16 @@ class Tests(unittest.TestCase):
             ),
         )
 
-    def test_missing_interface_skips_gracefully(self):
-        # Missing wireless device
-        self.native.device_exists = False
-        self.assertFalse(self.ap.preflight())
-        self.ap.converge()
-        self.assertEqual(self.mutations(), [])
-        self.native.device_exists = True
-
-        # Missing uplink device
-        self.native.uplink_exists = False
-        self.assertFalse(self.ap.preflight())
-        self.ap.converge()
-        self.assertEqual(self.mutations(), [])
-        self.native.uplink_exists = True
+    def test_missing_declared_interfaces_fail_before_mutation(self):
+        for attribute, name in (("device_exists", "wifi0"), ("uplink_exists", "eth0")):
+            with self.subTest(attribute=attribute):
+                setattr(self.native, attribute, False)
+                with self.assertRaisesRegex(Conflict, name):
+                    self.ap.preflight()
+                with self.assertRaisesRegex(Conflict, name):
+                    self.ap.converge()
+                self.assertEqual(self.mutations(), [])
+                setattr(self.native, attribute, True)
 
 
 if __name__ == "__main__":

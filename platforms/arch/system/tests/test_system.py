@@ -351,6 +351,7 @@ class SystemTests(unittest.TestCase):
 
     def test_trim_timer_only_and_encryption_gate(self):
         self.d["trim"] = {"enable": True}
+        self.d["trimDropin"] = "[Timer]\nPersistent=false\n"
         self.native.disks[0]["type"] = "crypt"
         with self.assertRaises(Conflict):
             self.system.converge()
@@ -511,6 +512,7 @@ class SystemTests(unittest.TestCase):
 
     def test_trim_pending_retry_and_no_catchup(self):
         self.d["trim"] = {"enable": True}
+        self.d["trimDropin"] = "[Timer]\nPersistent=false\n"
         self.native.fail = ("systemctl", "restart")
         with self.assertRaises(Conflict):
             self.system.converge()

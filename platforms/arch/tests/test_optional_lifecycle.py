@@ -110,6 +110,23 @@ class OptionalLifecycleTests(unittest.TestCase):
             ],
         )
 
+    def test_ready_module_cannot_become_a_skip_during_convergence(self):
+        for key, label in (
+            ("ai_converge_not_ready", "AI preparation changed after preflight"),
+            (
+                "personal_agent_converge_not_ready",
+                "Personal Agent configuration changed after preflight",
+            ),
+        ):
+            with self.subTest(key=key):
+                self.state[key] = True
+                self.save()
+                result = self.invoke(code=1)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn(label, result.stderr)
+                self.assertNotIn("SKIP optional module", result.stderr)
+                self.state.pop(key)
+
 
 if __name__ == "__main__":
     unittest.main()

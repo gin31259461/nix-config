@@ -40,10 +40,11 @@ let
         HandleLidSwitch = config.power.lidSwitch;
       };
     };
+  trimDropin = "[Timer]\nPersistent=false\n";
 in
 {
-  inherit files;
+  inherit files trimDropin;
   manifest = pkgs.writeText "arch-system-settings.json" (
-    builtins.toJSON (settings // { inherit files; })
+    builtins.toJSON (settings // { inherit files trimDropin; })
   );
 }

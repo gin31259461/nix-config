@@ -441,10 +441,10 @@ if ((!ai_skipped)); then
   else
     ai_status=$?
     if ((ai_status == 20)); then
-      optional_skip 'ai' "prepared assets disappeared during deployment; rerun 'just prepare-ai'"
-    else
-      exit "$ai_status"
+      printf '%s\n' 'AI preparation changed after preflight; deployment stopped' >&2
+      exit 1
     fi
+    exit "$ai_status"
   fi
 fi
 if searxng_settings converge; then
@@ -458,10 +458,10 @@ if ((!personal_agent_skipped)); then
   else
     personal_agent_status=$?
     if ((personal_agent_status == 20)); then
-      optional_skip 'personal-agent' 'runtime configuration disappeared during deployment'
-    else
-      exit "$personal_agent_status"
+      printf '%s\n' 'Personal Agent configuration changed after preflight; deployment stopped' >&2
+      exit 1
     fi
+    exit "$personal_agent_status"
   fi
 fi
 progress_finish 'done'

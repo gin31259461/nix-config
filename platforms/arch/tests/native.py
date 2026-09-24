@@ -44,8 +44,20 @@ if command == "python":
     assert len(args) == 3 or args[3:] == ["--verbose"]
     if args[0] == "/fixture/ai-adapter" and state.get("ai_not_ready"):
         sys.exit(20)
+    if (
+        args[0] == "/fixture/ai-adapter"
+        and args[2] == "converge"
+        and state.get("ai_converge_not_ready")
+    ):
+        sys.exit(20)
     if args[0] == "/fixture/personal-agent-adapter" and state.get(
         "personal_agent_not_ready"
+    ):
+        sys.exit(20)
+    if (
+        args[0] == "/fixture/personal-agent-adapter"
+        and args[2] == "converge"
+        and state.get("personal_agent_converge_not_ready")
     ):
         sys.exit(20)
 elif command == "id":

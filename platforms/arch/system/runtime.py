@@ -236,7 +236,7 @@ class System:
             if not f.read("/proc/sys/kernel/random/boot_id").strip():
                 raise Conflict("boot identity is unavailable")
         if d.get("trim") is not None:
-            f.timer_dropin()
+            f.timer_dropin(d["trimDropin"])
             self.check_trim()
             if installed:
                 self.ready_unit("fstrim.timer")
@@ -364,7 +364,7 @@ class System:
                 print("Console configuration is prepared for the next boot.")
             f.clear("console")
         if d.get("trim") is not None:
-            path, text = f.timer_dropin()
+            path, text = f.timer_dropin(d["trimDropin"])
             self.write(path, text, "trim")
             pending = f.pending("trim")
             if pending:

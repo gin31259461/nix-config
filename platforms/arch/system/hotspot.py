@@ -4,7 +4,6 @@ import ipaddress
 import json
 import re
 import shlex
-import sys
 
 from files import Conflict
 
@@ -237,7 +236,20 @@ class Hotspot:
             raise Conflict("hotspot and uplink interfaces must differ")
         self.system.ready_unit("NetworkManager.service")
 
-        # Detect missing hardware before requiring NetworkManager connection configuration.
+        # A missing declared interface is a core configuration error. Query the
+        # complete link inventory so native command failures remain distinguishable
+        # from absent hardware and retain their command diagnostics.
+        links = json.loads(self.system.run("ip", "-j", "link", "show").stdout)
+        if not isinstance(links, list) or any(
+            not isinstance(link, dict) or not isinstance(link.get("ifname"), str)
+            for link in links
+        ):
+            raise Conflict("invalid native link inventory")
+        available = {link["ifname"] for link in links}
+        for role, name in (("wireless", d["interface"]), ("uplink", d["uplink"])):
+            if name not in available:
+                raise Conflict(f"declared hotspot {role} interface is missing: {name}")
+
         dev_res = self.system.run(
             "nmcli",
             "-g",
@@ -245,22 +257,7 @@ class Hotspot:
             "device",
             "show",
             d["interface"],
-            check=False,
         )
-        if dev_res.returncode != 0:
-            msg = f"SKIP hotspot: wireless interface '{d['interface']}' not found on this machine"
-            formatted = f"\033[1;33m{msg}\033[0m" if sys.stderr.isatty() else msg
-            print(formatted, file=sys.stderr)
-            return False
-
-        uplink_res = self.system.run(
-            "ip", "link", "show", "dev", d["uplink"], check=False
-        )
-        if uplink_res.returncode != 0:
-            msg = f"SKIP hotspot: uplink interface '{d['uplink']}' not found on this machine"
-            formatted = f"\033[1;33m{msg}\033[0m" if sys.stderr.isatty() else msg
-            print(formatted, file=sys.stderr)
-            return False
 
         # List only identifiers, then inspect an explicit public-property allowlist.
         lines = self.system.run(
@@ -292,8 +289,7 @@ class Hotspot:
         return True
 
     def converge(self):
-        if not self.preflight():
-            return
+        self.preflight()
         changes = []
         for field, expected in self.properties().items():
             actual = self.read(field)
