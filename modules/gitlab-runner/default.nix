@@ -43,7 +43,10 @@ in
           ${progress.python}/bin/python ${./tests}/test_runnerctl.py ${
             pkgs.writeText "runner-test-config.json" (
               builtins.toJSON {
-                instances = fixtures;
+                instances = import ./render-artifacts.nix {
+                  inherit platform;
+                  instances = fixtures;
+                };
                 inherit platform;
               }
             )

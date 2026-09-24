@@ -5,8 +5,12 @@
   progress ? import ../../lib/cli/progress { inherit pkgs; },
 }:
 let
+  manifestInstances = import ./render-artifacts.nix { inherit platform instances; };
   config = pkgs.writeText "gitlab-runner-instances.json" (
-    builtins.toJSON { inherit instances platform; }
+    builtins.toJSON {
+      instances = manifestInstances;
+      inherit platform;
+    }
   );
 in
 pkgs.writeShellApplication {

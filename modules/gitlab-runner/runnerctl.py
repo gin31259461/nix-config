@@ -463,7 +463,7 @@ def _reconcile_impl(
             service_name = instance["runner"]["serviceName"]
             unit_changed = atomic_write(
                 unit_dir / f"{service_name}.service",
-                render_service(instance, entry.pw_uid, platform["podman"]),
+                render_service(instance),
                 mode=0o600,
                 uid=entry.pw_uid,
                 gid=entry.pw_gid,

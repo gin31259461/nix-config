@@ -203,6 +203,9 @@ class RunnerControlTests(unittest.TestCase):
                 )
             )
             instance["runner"]["memory"] = "8g"
+            instance["artifacts"]["registrationTemplate"] = instance["artifacts"][
+                "registrationTemplate"
+            ].replace('memory = "4g"', 'memory = "8g"')
             fail_restart = True
             failure_output = StringIO()
             with redirect_stderr(failure_output):
@@ -345,6 +348,9 @@ class RunnerControlTests(unittest.TestCase):
     def test_registered_config_uses_the_managed_ca_when_declared(self) -> None:
         instance = copy.deepcopy(self.instances["frontend"])
         instance["gitlab"]["caCertificate"] = "/nix/store/public-runner-ca.crt"
+        instance["artifacts"]["configPolicy"]["caLine"] = (
+            '  tls-ca-file = "/etc/gitlab-runner/certs/gitlab.example.crt"\n'
+        )
 
         rendered = self.runnerctl.render_config(instance, {"token": "test-only-value"})
 
@@ -425,11 +431,7 @@ class RunnerControlTests(unittest.TestCase):
 
     def test_manager_mounts_socket_but_job_configuration_does_not(self) -> None:
         instance = self.instances["frontend"]
-        manager = self.runnerctl.render_service(
-            instance,
-            instance["account"]["uid"],
-            self.document["platform"]["podman"],
-        )
+        manager = self.runnerctl.render_service(instance)
         job = self.runnerctl.render_registration_template(instance)
         self.assertIn("podman.sock:/run/podman/podman.sock:rw", manager)
         self.assertNotIn("podman.sock:/run/podman/podman.sock:rw", job)

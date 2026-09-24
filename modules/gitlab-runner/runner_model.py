@@ -31,10 +31,6 @@ def toml_string(value: str) -> str:
     return json.dumps(value, ensure_ascii=False)
 
 
-def toml_array(values: list[str]) -> str:
-    return json.dumps(values, ensure_ascii=False)
-
-
 def gitlab_hostname(instance: dict[str, Any]) -> str:
     hostname = urlparse(instance["gitlab"]["url"]).hostname
     if hostname is None:
@@ -171,111 +167,36 @@ def validate_instances(instances: dict[str, Any]) -> None:
 
 
 def render_registration_template(instance: dict[str, Any]) -> str:
-    runner = instance["runner"]
-    dns = instance["network"].get("dns")
-    lines = [
-        "[[runners]]",
-        f"  name = {toml_string(runner['name'])}",
-        '  executor = "docker"',
-        '  environment = ["FF_NETWORK_PER_BUILD=1"]',
-        "",
-        "  [runners.docker]",
-        '    host = "unix:///run/podman/podman.sock"',
-        f"    image = {toml_string(runner['defaultJobImage'])}",
-        "    privileged = false",
-        f"    cpus = {toml_string(runner['cpus'])}",
-        f"    memory = {toml_string(runner['memory'])}",
-        f"    shm_size = {runner['shmSizeBytes']}",
-        f"    pull_policy = {toml_string(runner['pullPolicy'])}",
-        '    volumes = ["/cache"]',
-        f"    allowed_images = {toml_array(runner['allowedImages'])}",
-        f"    allowed_services = {toml_array(runner['allowedServices'])}",
-    ]
-    if dns:
-        lines.append(f"    dns = [{toml_string(dns)}]")
-    return "\n".join(lines) + "\n"
+    return instance["artifacts"]["registrationTemplate"]
 
 
 def render_config(instance: dict[str, Any], metadata: dict[str, str]) -> str:
-    runner = instance["runner"]
+    policy = instance["artifacts"]["configPolicy"]
+    config = policy["configPrefix"]
     if "token" not in metadata:
-        return (
-            f"concurrent = {runner['concurrent']}\n"
-            "check_interval = 3\n"
-            "shutdown_timeout = 30\n"
-        )
-
-    gitlab = instance["gitlab"]
-    template = render_registration_template(instance).splitlines()
-    lines = [
-        f"concurrent = {runner['concurrent']}",
-        "check_interval = 3",
-        "shutdown_timeout = 30",
-        "",
-        "[[runners]]",
-        f"  name = {toml_string(runner['name'])}",
-        f"  url = {toml_string(gitlab['url'])}",
-    ]
+        return config
+    registration = policy["registrationPrefix"]
+    fields = []
     if "id" in metadata:
-        lines.append(f"  id = {metadata['id']}")
-    lines.append(f"  token = {toml_string(metadata['token'])}")
+        fields.append(f"  id = {metadata['id']}")
+    fields.append(f"  token = {toml_string(metadata['token'])}")
     for field in ("token_obtained_at", "token_expires_at"):
         if field in metadata:
-            lines.append(f"  {field} = {metadata[field]}")
-    if gitlab.get("caCertificate"):
-        certificate = f"/etc/gitlab-runner/certs/{gitlab_hostname(instance)}.crt"
-        lines.append(f"  tls-ca-file = {toml_string(certificate)}")
-    lines.extend(template[3:])
-    return "\n".join(lines) + "\n"
+            fields.append(f"  {field} = {metadata[field]}")
+    registration = registration.replace("@REGISTRATION_METADATA@", "\n".join(fields), 1)
+    return (
+        config
+        + "\n"
+        + registration
+        + policy["caLine"]
+        + "\n"
+        + "\n".join(render_registration_template(instance).splitlines()[3:])
+        + "\n"
+    )
 
 
-def render_service(instance: dict[str, Any], uid: int, podman_path: str) -> str:
-    account = instance["account"]
-    runner = instance["runner"]
-    runtime_dir = f"/run/user/{uid}"
-    config_dir = f"{account['home']}/gitlab-runner/config"
-    cache_dir = f"{account['home']}/gitlab-runner/cache"
-    socket = f"{runtime_dir}/podman/podman.sock"
-    dns_argument = ""
-    if instance["network"].get("dns"):
-        dns_argument = f"  --dns {instance['network']['dns']} \\\n"
-    return f"""[Unit]
-Description=GitLab Runner manager for {runner["serviceName"]}
-Wants=network-online.target
-After=network-online.target podman.socket
-Requires=podman.socket
-
-[Service]
-Type=simple
-Environment=XDG_RUNTIME_DIR={runtime_dir}
-Environment=DBUS_SESSION_BUS_ADDRESS=unix:path={runtime_dir}/bus
-ExecStartPre=-{podman_path} rm --force {runner["serviceName"]}
-ExecStart={podman_path} run \\
-  --rm \\
-  --name {runner["serviceName"]} \\
-  --network host \\
-  --image-volume=ignore \\
-  --security-opt label=disable \\
-  --stop-signal SIGQUIT \\
-  --volume {config_dir}:/etc/gitlab-runner:rw \\
-  --volume {cache_dir}:/cache:rw \\
-  --volume {socket}:/run/podman/podman.sock:rw \\
-  --env DOCKER_HOST=unix:///run/podman/podman.sock \\
-{dns_argument}  {runner["managerImage"]} \\
-  run \\
-  --user=gitlab-runner \\
-  --working-directory=/home/gitlab-runner
-ExecStop=-{podman_path} stop --time 30 {runner["serviceName"]}
-ExecStopPost=-{podman_path} rm --force {runner["serviceName"]}
-Restart=always
-RestartSec=5
-TimeoutStartSec=120
-TimeoutStopSec=45
-Delegate=yes
-
-[Install]
-WantedBy=default.target
-"""
+def render_service(instance: dict[str, Any]) -> str:
+    return instance["artifacts"]["serviceUnit"]
 
 
 def manager_matches(instance, uid, state, image_id):
