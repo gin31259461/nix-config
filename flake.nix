@@ -62,6 +62,13 @@
         inherit lib;
         config = archHost.ai;
       };
+      archAi = import ./platforms/arch/ai {
+        inherit lib pkgs;
+        config = archHost.ai;
+        artifacts = ai.artifacts;
+        hardware = archHost.hardware;
+        tailscale = capabilities.tailscale;
+      };
       virtualization = import ./modules/virtualization {
         inherit lib;
         config = archHost.virtualization;
@@ -158,7 +165,10 @@
           deploymentName
           ;
       })
-      // (import ./platforms/arch/checks.nix { inherit pkgs arch-switch llama-prepare; })
+      // (import ./platforms/arch/checks.nix {
+        inherit pkgs arch-switch llama-prepare;
+        aiManifest = archAi.manifest;
+      })
       // (import ./modules/home/checks.nix {
         inherit pkgs inputs;
         home = archHomes.${homeConfigurationName};

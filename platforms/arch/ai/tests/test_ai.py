@@ -7,9 +7,11 @@ import os
 from pathlib import Path
 import sys
 import tempfile
+from typing import Any, cast
 import unittest
 
 SOURCE = Path(sys.argv.pop()).resolve()
+PACKAGE_CADDY = Path(sys.argv.pop()).resolve()
 spec = importlib.util.spec_from_file_location("ai_runtime", SOURCE)
 assert spec is not None and spec.loader is not None
 runtime = importlib.util.module_from_spec(spec)
@@ -175,6 +177,23 @@ class AITests(unittest.TestCase):
                 },
             },
         }
+        site = ":11435 {\n    bind 127.0.0.1\n    @api path /health /v1/*\n    handle @api { reverse_proxy 127.0.0.1:11434 }\n    respond 404\n}\n"
+        package_caddy = PACKAGE_CADDY.read_text()
+        self.desired["generated"] = {
+            "switcherConfig": json.dumps(self.desired["switcher"]),
+            "switcherUnit": "[Unit]\nDescription=Nix-config llama-swap model router\n[Service]\nEnvironment=LD_LIBRARY_PATH=/opt/llama/current/lib:/opt/llama/current/lib64\nExecStart=/nix/store/llama-swap/bin/llama-swap --config /etc/llama-swap/config.yaml --listen 127.0.0.1:11434\n",
+            "caddyMain": '{\n    admin "unix//run/caddy/admin.socket"\n}\nimport /etc/caddy/conf.d/*\n',
+            "caddySite": site,
+            "packageCaddy": package_caddy,
+            "packageCaddyWithSite": package_caddy.replace(
+                "# Import additional caddy config files in /etc/caddy/conf.d/\n",
+                site
+                + "\n# Import additional caddy config files in /etc/caddy/conf.d/\n",
+            ),
+            "legacyPreset": "",
+            "legacyDropin": "",
+        }
+        self.generated = cast(dict[str, Any], self.desired["generated"])
         model = self.root / "var/lib/llama/models/model.gguf"
         receipt = self.root / "var/lib/llama/models/model.gguf.nix-config-receipt"
         receipt.write_text(
@@ -203,8 +222,8 @@ class AITests(unittest.TestCase):
         )
         self.assertIn("--config /etc/llama-swap/config.yaml", unit)
         self.assertIn("--listen 127.0.0.1:11434", unit)
-        self.assertIn("@api path /health /v1/*", runtime.CADDY_SITE)
-        self.assertIn("respond 404", runtime.CADDY_SITE)
+        self.assertIn("@api path /health /v1/*", self.generated["caddySite"])
+        self.assertIn("respond 404", self.generated["caddySite"])
         self.assertTrue(any(c[:2] == ("caddy", "reload") for c in self.native.calls))
         self.assertFalse(any((self.root / "var/lib/nix-config/arch").iterdir()))
 
@@ -281,8 +300,10 @@ class AITests(unittest.TestCase):
 
     def test_adopts_exact_package_caddyfile(self):
         path = self.root / "etc/caddy/Caddyfile"
-        path.write_text(runtime.PACKAGE_CADDY)
-        self.assertEqual(self.ai().caddy_main(), runtime.CADDY_MAIN)
+        path.write_text(self.generated["packageCaddy"])
+        self.assertEqual(self.ai().caddy_main(), self.generated["caddyMain"])
+        path.write_text(self.generated["packageCaddyWithSite"])
+        self.assertEqual(self.ai().caddy_main(), self.generated["caddyMain"])
 
 
 if __name__ == "__main__":

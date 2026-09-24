@@ -10,71 +10,8 @@ sys.path.insert(0, str(Path(__file__).parents[1] / "system"))
 from files import Conflict, Files  # noqa: E402
 from native import Native  # noqa: E402
 
-PACKAGE_CADDY = """# The Caddyfile is an easy way to configure your Caddy web server.
-#
-# https://caddyserver.com/docs/caddyfile
-#
-# The configuration below serves a welcome page over HTTP on port 80.
-# To use your own domain name (with automatic HTTPS), first make
-# sure your domain's A/AAAA DNS records are properly pointed to
-# this machine's public IP, then replace the line below with your
-# domain name.
-#
-# https://caddyserver.com/docs/caddyfile/concepts#addresses
-{
-\t# Restrict the admin interface to a local unix file socket whose directory
-\t# is restricted to caddy:caddy. By default the TCP socket allows arbitrary
-\t# modification for any process and user that has access to the local
-\t# interface. If admin over TCP is turned on one should make sure
-\t# implications are well understood.
-\tadmin "unix//run/caddy/admin.socket"
-}
-
-http:// {
-\t# Set this path to your site's directory.
-\troot * /usr/share/caddy
-
-\t# Enable the static file server.
-\tfile_server
-
-\t# Another common task is to set up a reverse proxy:
-\t# reverse_proxy localhost:8080
-
-\t# Or serve a PHP site through php-fpm:
-\t# php_fastcgi localhost:9000
-
-\t# Refer to the directive documentation for more options.
-\t# https://caddyserver.com/docs/caddyfile/directives
-}
-
-# Import additional caddy config files in /etc/caddy/conf.d/
-import /etc/caddy/conf.d/*
-"""
-CADDY_MAIN = """{
-\tadmin "unix//run/caddy/admin.socket"
-}
-
-import /etc/caddy/conf.d/*
-"""
-CADDY_SITE = """:11435 {
-\tbind 127.0.0.1
-
-\t@api path /health /v1/*
-\thandle @api {
-\t\treverse_proxy 127.0.0.1:11434 {
-\t\t\theader_up Host 127.0.0.1:11434
-\t\t}
-\t}
-
-\trespond 404
-}
-"""
 SWITCHER_CONFIG = "/etc/llama-swap/config.yaml"
 SWITCHER_UNIT = "/etc/systemd/system/llama-swap.service"
-PACKAGE_CADDY_WITH_SITE = PACKAGE_CADDY.replace(
-    "# Import additional caddy config files in /etc/caddy/conf.d/\n",
-    CADDY_SITE + "\n# Import additional caddy config files in /etc/caddy/conf.d/\n",
-)
 
 
 class AI:
@@ -128,11 +65,15 @@ class AI:
         return state
 
     def caddy_main(self):
+        generated = self.desired["generated"]
         current = self.files.read("/etc/caddy/Caddyfile")
-        if current == CADDY_MAIN:
+        if current == generated["caddyMain"]:
             return current
-        if not current or current in (PACKAGE_CADDY, PACKAGE_CADDY_WITH_SITE):
-            return CADDY_MAIN
+        if not current or current in (
+            generated["packageCaddy"],
+            generated["packageCaddyWithSite"],
+        ):
+            return generated["caddyMain"]
         if (
             'admin "unix//run/caddy/admin.socket"' in current
             and "import /etc/caddy/conf.d/*" in current
@@ -140,97 +81,6 @@ class AI:
         ):
             return current
         raise Conflict("existing Caddyfile requires explicit adoption")
-
-    def caddy_site(self):
-        d = self.desired
-        return CADDY_SITE.replace(":11435", f":{d['localPort']}").replace(
-            "127.0.0.1:11434", f"127.0.0.1:{d['server']['port']}"
-        )
-
-    def switcher_config(self):
-        switcher = self.desired["switcher"]
-        return {
-            "startPort": switcher["startPort"],
-            "includeAliasesInList": switcher["includeAliasesInList"],
-            "groups": switcher["groups"],
-            "models": switcher["models"],
-        }
-
-    def switcher_unit(self):
-        switcher = self.desired["switcher"]
-        library_prefix = self.desired["source"]["installPrefix"] + "/current"
-        return f"""[Unit]
-Description=Nix-config llama-swap model router
-After=network-online.target
-Wants=network-online.target
-
-[Service]
-Environment=LD_LIBRARY_PATH={library_prefix}/lib:{library_prefix}/lib64
-ExecStart={switcher["binary"]} --config {SWITCHER_CONFIG} --listen {switcher["listen"]}
-Restart=on-failure
-RestartSec=3
-
-[Install]
-WantedBy=multi-user.target
-"""
-
-    def preset(self):
-        d = self.desired
-        model = d["model"]
-        return f"""version = 1
-
-[*]
-parallel = {model["parallel"]}
-cont-batching = true
-jinja = true
-
-[{model["id"]}]
-model = {model["path"]}
-device = {model["device"]}
-ctx-size = {model["contextSize"]}
-fit = true
-fit-target = {model["fitTarget"]}
-fit-ctx = {model["contextSize"]}
-flash-attn = on
-cache-type-k = {model["cacheTypeK"]}
-cache-type-v = {model["cacheTypeV"]}
-batch-size = {model["batchSize"]}
-ubatch-size = {model["microBatchSize"]}
-load-on-startup = true
-"""
-
-    def dropin(self):
-        d = self.desired
-        prefix, server = d["source"]["installPrefix"] + "/current", d["server"]
-        model = d["model"]
-        chat_template_kwargs = {
-            key: model[option]
-            for key, option in (
-                ("reasoning_effort", "reasoningEffort"),
-                ("enable_thinking", "enableThinking"),
-                ("preserve_thinking", "preserveThinking"),
-            )
-            if model.get(option) is not None
-        }
-        chat_template_kwargs = json.dumps(
-            chat_template_kwargs, separators=(",", ":")
-        ).replace('"', '\\"')
-        reasoning_effort = (
-            f" --reasoning-effort {model['reasoningEffort']}"
-            if model.get("reasoningEffort") is not None
-            else ""
-        )
-        return f"""[Unit]
-After=network-online.target
-
-[Service]
-Environment=LD_LIBRARY_PATH={prefix}/lib:{prefix}/lib64
-ExecStart=
-ExecStart={prefix}/bin/llama-server --models-preset /etc/llama/server/models.ini --models-max {server["modelsMax"]} --host {server["host"]} --port {server["port"]} --no-webui --temp {model["temperature"]} --top-p {model["topP"]} --top-k {model["topK"]} --min-p {model["minP"]} --presence-penalty {model["presencePenalty"]} --repeat-penalty {model["repetitionPenalty"]}{reasoning_effort} --chat-template-kwargs {chat_template_kwargs}
-SupplementaryGroups=render video
-Restart=on-failure
-RestartSec=3
-"""
 
     def preflight(self, installed=False):
         d, f = self.desired, self.files
@@ -285,9 +135,10 @@ RestartSec=3
         legacy_dropin = f.read(
             "/etc/systemd/system/llama-server.service.d/60-nix-config.conf"
         )
-        if legacy_preset and legacy_preset != self.preset():
+        generated = d["generated"]
+        if legacy_preset and legacy_preset != generated["legacyPreset"]:
             raise Conflict("legacy llama-server preset requires explicit adoption")
-        if legacy_dropin and legacy_dropin != self.dropin():
+        if legacy_dropin and legacy_dropin != generated["legacyDropin"]:
             raise Conflict("legacy llama-server drop-in requires explicit adoption")
         if f.read("/etc/systemd/system/llama-server.service.d/60-local.conf"):
             raise Conflict(
@@ -358,9 +209,11 @@ RestartSec=3
         if not preflighted and not self.preflight(installed=True):
             print("AI services skipped: selected model is not prepared.")
             return
-        config = json.dumps(self.switcher_config(), indent=2, sort_keys=True) + "\n"
-        config_changed = self.write(SWITCHER_CONFIG, config, "ai-llama")
-        unit_changed = self.write(SWITCHER_UNIT, self.switcher_unit(), "ai-llama")
+        generated = d["generated"]
+        config_changed = self.write(
+            SWITCHER_CONFIG, generated["switcherConfig"], "ai-llama"
+        )
+        unit_changed = self.write(SWITCHER_UNIT, generated["switcherUnit"], "ai-llama")
         pending = f.pending("ai-llama")
         if config_changed or unit_changed or pending:
             self.run("systemctl", "daemon-reload")
@@ -385,7 +238,7 @@ RestartSec=3
             self.write("/etc/caddy/Caddyfile", self.caddy_main(), "ai-caddy")
             self.write(
                 "/etc/caddy/conf.d/nix-config-llama.caddy",
-                self.caddy_site(),
+                generated["caddySite"],
                 "ai-caddy",
             )
             pending = f.pending("ai-caddy")

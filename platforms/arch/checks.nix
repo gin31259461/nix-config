@@ -1,6 +1,7 @@
 {
   pkgs,
   llama-prepare,
+  aiManifest,
   progress ? import ../../lib/cli/progress { inherit pkgs; },
   ...
 }:
@@ -21,7 +22,7 @@
         touch "$out"
       '';
   ai-services-tests = pkgs.runCommand "ai-services-tests" { nativeBuildInputs = [ pkgs.python3 ]; } ''
-    python ${./ai/tests/test_ai.py} ${
+    python ${./ai/tests/test_ai.py} ${./ai/package-caddy.Caddyfile} ${
       pkgs.lib.fileset.toSource {
         root = ./.;
         fileset = pkgs.lib.fileset.unions [
@@ -33,6 +34,12 @@
     }/ai/runtime.py
     touch "$out"
   '';
+  ai-generated-artifacts =
+    pkgs.runCommand "ai-generated-artifacts" { nativeBuildInputs = [ pkgs.python3 ]; }
+      ''
+        python ${./ai/tests/test_generated.py} ${aiManifest} ${./ai/package-caddy.Caddyfile}
+        touch "$out"
+      '';
   personal-agent-tests =
     pkgs.runCommand "personal-agent-tests" { nativeBuildInputs = [ pkgs.python3 ]; }
       ''
