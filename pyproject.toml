@@ -6,6 +6,8 @@ dependencies = ["tomli-w", "rich"]
 
 [tool.pyright]
 include = ["checks", "lib", "modules", "platforms"]
+venvPath = "."
+venv = ".venv"
 typeCheckingMode = "standard"
 useLibraryCodeForTypes = true
 executionEnvironments = [

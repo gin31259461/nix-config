@@ -164,9 +164,22 @@ for the composition model. Keep one owner per package, account, file and service
 | `profiles/`, `homes/` | Reusable and user-specific Home Manager composition. |
 | `checks/` | Shared checks and isolated fixtures. |
 
-Feature tests also live beside their owning modules and adapters. Use
-`nix develop` for the Python, Pyright, Ruff and Just development environment. For
-composition or adapter changes, run:
+Feature tests also live beside their owning modules and adapters. For Python
+tooling and LSP support, enter the Nix development shell:
+
+```bash
+nix develop
+```
+
+Alternatively, if you prefer a local virtual environment for editor LSP integration,
+create `.venv` (already configured in [pyproject.toml](pyproject.toml) for Pyright detection and ignored by Git):
+
+```bash
+uv venv .venv
+uv pip install tomli-w rich pyright ruff
+```
+
+For composition or adapter changes, run:
 
 ```bash
 just check-fast
