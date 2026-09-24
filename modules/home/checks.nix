@@ -99,13 +99,46 @@ in
         pkgs.lib.hasInfix "exec /usr/bin/uwsm start hyprland.desktop"
           home.config.home.file.".zprofile".text;
     assert !(home.config.xdg.configFile ? nvim) || !home.config.xdg.configFile.nvim.recursive;
-    assert !(home.config.xdg.configFile ? hypr) || home.config.xdg.configFile.hypr.recursive;
+    assert
+      !(home.config.xdg.configFile ? hypr)
+      || home.config.xdg.configFile.hypr.recursive
+      || ((home._module.args.user.development.hyprlandPath or null) != null);
     assert builtins.all (
       name:
       (!pkgs.lib.hasPrefix ".agents/skills/" name && !pkgs.lib.hasPrefix ".gemini/config/skills/" name)
       || !home.config.home.file.${name}.recursive
     ) (builtins.attrNames home.config.home.file);
     pkgs.writeText "home-projection-interface" "passed";
+  home-development-mode =
+    let
+      devHome = (import ../../lib/mk-home-configuration.nix { inherit inputs; }) {
+        system = pkgs.stdenv.hostPlatform.system;
+        hostName = "dev-fixture";
+        platform = "arch";
+        hardware = {
+          graphics = "generic";
+          openrazer = false;
+        };
+        username = "tester";
+        user = {
+          homeDirectory = "/home/tester";
+          stateVersion = "26.05";
+          profiles = [ "dev" ];
+          modules = [
+            "hyprland"
+          ];
+          homeModules = [ ];
+          development = {
+            neovimPath = "/home/tester/src/neovim";
+            hyprlandPath = "/home/tester/src/hyprland";
+          };
+        };
+      };
+    in
+    assert !devHome.config.xdg.configFile.hypr.recursive;
+    assert devHome.config.xdg.configFile.hypr.source != inputs.hypr-config;
+    assert devHome.config.xdg.configFile.nvim.source != inputs.nvim-config;
+    pkgs.writeText "home-development-mode" "passed";
   arch-graphical-session = pkgs.runCommand "arch-graphical-session-check" { } ''
     units=${home.activationPackage}/home-files/.config/systemd/user
     profile=${home.config.home.path}

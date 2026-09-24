@@ -21,6 +21,12 @@ let
   resolve =
     registry: kind: name:
     if builtins.hasAttr name registry then registry.${name} else throw "unknown ${kind}: ${name}";
+  userNormalized = user // {
+    development = {
+      neovimPath = user.development.neovimPath or null;
+      hyprlandPath = user.development.hyprlandPath or null;
+    };
+  };
 in
 assert inputs.nixpkgs.lib.assertMsg (platform == "arch") "unsupported platform: ${platform}";
 inputs.home-manager.lib.homeManagerConfiguration {
@@ -34,14 +40,15 @@ inputs.home-manager.lib.homeManagerConfiguration {
       hardware
       capabilities
       ;
+    user = userNormalized;
   };
 
   modules = [
     {
       home = {
         inherit username;
-        homeDirectory = user.homeDirectory;
-        stateVersion = user.stateVersion;
+        homeDirectory = userNormalized.homeDirectory;
+        stateVersion = userNormalized.stateVersion;
       };
 
       programs.home-manager.enable = true;
@@ -53,7 +60,7 @@ inputs.home-manager.lib.homeManagerConfiguration {
       config = ai;
     }).homeModule
   ]
-  ++ [ (user.homeConfig or { }) ]
+  ++ [ (userNormalized.homeConfig or { }) ]
   ++ [
     ({ lib, ... }: {
       options.workstation.capabilities = lib.mkOption {
@@ -69,18 +76,18 @@ inputs.home-manager.lib.homeManagerConfiguration {
         internal = true;
       };
       config.workstation.capabilities = lib.genAttrs [ "noctalia-config" ] (name: {
-        enable = builtins.elem name user.modules;
+        enable = builtins.elem name userNormalized.modules;
       });
     })
   ]
   ++ [
     ../modules/home/noctalia-config
   ]
-  ++ user.homeModules
+  ++ userNormalized.homeModules
   ++ map (resolve profileRegistry "profile") (
     builtins.filter (
       name: capabilities == null || capabilities.desktop.enable || name != "workstation"
-    ) user.profiles
+    ) userNormalized.profiles
   )
-  ++ map (resolve moduleRegistry "home module") user.modules;
+  ++ map (resolve moduleRegistry "home module") userNormalized.modules;
 }

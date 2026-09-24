@@ -55,6 +55,14 @@ let
       profiles = switches (builtins.attrNames (import ../profiles));
       modules = switches (builtins.attrNames (import ../modules/home));
       homeModules = option (types.listOf types.path) [ ] "Explicit user Home Manager module paths.";
+      development = section {
+        neovimPath =
+          option (types.nullOr types.str) null
+            "Absolute path to a local Neovim config git worktree.";
+        hyprlandPath =
+          option (types.nullOr types.str) null
+            "Absolute path to a local Hyprland config git worktree.";
+      };
       home =
         option types.deferredModule { }
           "Home Manager overrides merged after reusable configuration.";

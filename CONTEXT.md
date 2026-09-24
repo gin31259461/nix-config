@@ -18,7 +18,7 @@ Nix generates fixed content such as Home Manager files, systemd units, drop-ins,
 
 This separation borrows the declarative file-rendering idea from [nix-maid](https://viperml.codeberg.page/nix-maid/api.html) without adding it as a dependency or a second Home Manager layer. The existing feature modules own generated artifacts, and adapters retain Arch-specific reconciliation.
 
-Home Manager commonly realizes static home files through links to the store. Arch-native files are copied or merged into `/etc` with native ownership and mode, while prepared llama.cpp binaries and GGUF models stay outside the store. Hyprland and Neovim source trees also stay outside managed runtime paths and are pinned as external flake inputs.
+Home Manager commonly realizes static home files through links to the store. Arch-native files are copied or merged into `/etc` with native ownership and mode, while prepared llama.cpp binaries and GGUF models stay outside the store. Hyprland and Neovim source trees also stay outside managed runtime paths: by default they are pinned as external flake inputs, or can be projected from local worktrees using user `development` options (`development.neovimPath`, `development.hyprlandPath`) via out-of-store symlinks.
 
 ## Deployment lifecycle
 

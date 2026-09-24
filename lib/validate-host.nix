@@ -38,16 +38,33 @@ let
   users = lib.mapAttrs (
     name: rawUser:
     let
-      user = fields "user ${name}" [
-        "description"
-        "homeDirectory"
-        "stateVersion"
-        "admin"
-        "groups"
-        "profiles"
-        "modules"
-        "homeModules"
-      ] rawUser;
+      rawDev = rawUser.development or { };
+      dev = fields "user ${name}.development" [
+        "neovimPath"
+        "hyprlandPath"
+      ] rawDev;
+      user =
+        fields "user ${name}"
+          [
+            "description"
+            "homeDirectory"
+            "stateVersion"
+            "admin"
+            "groups"
+            "profiles"
+            "modules"
+            "homeModules"
+            "development"
+          ]
+          (
+            rawUser
+            // {
+              development = {
+                neovimPath = dev.neovimPath or null;
+                hyprlandPath = dev.hyprlandPath or null;
+              };
+            }
+          );
     in
     assert lib.assertMsg (named name) "invalid login username";
     assert lib.assertMsg (builtins.isString user.description) "user.description must be a string";
@@ -68,6 +85,16 @@ let
     assert lib.assertMsg (
       builtins.isList user.homeModules && lib.all builtins.isPath user.homeModules
     ) "homeModules must contain Nix paths";
+    assert lib.assertMsg (
+      user.development.neovimPath == null
+      || (builtins.isString user.development.neovimPath && lib.hasPrefix "/" user.development.neovimPath)
+    ) "development.neovimPath must be an absolute path or null";
+    assert lib.assertMsg (
+      user.development.hyprlandPath == null
+      || (
+        builtins.isString user.development.hyprlandPath && lib.hasPrefix "/" user.development.hyprlandPath
+      )
+    ) "development.hyprlandPath must be an absolute path or null";
     user
   ) host.users;
 in

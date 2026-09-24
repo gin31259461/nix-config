@@ -26,3 +26,22 @@ systemctl --user show noctalia.service -p MainPID
 ```
 
 The watcher PID should belong to Noctalia. Shell restarts should not restart unrelated applications merely to restore the tray. The [Noctalia configuration guide](noctalia-config.md) covers preference capture and deployment separately from encrypted storage. Source tests use synthetic Home Manager configurations and fake commands; run `just check` without connecting to the live desktop.
+
+## Live configuration development mode
+
+By default, Neovim and Hyprland configurations are immutable inputs pinned in `flake.nix` (`nvim-config` and `hypr-config`), projected into `~/.config/nvim` and `~/.config/hypr` through Home Manager with safety preflights that reject projections targeting Git worktrees or backup suffixes.
+
+To enable live local editing directly against local Git worktrees without store rebuilds or activation preflight errors, declare user `development` absolute paths in `configuration.nix`:
+
+```nix
+users.users.abnertu.development = {
+  neovimPath = "/home/abnertu/path/to/nvim-config";
+  hyprlandPath = "/home/abnertu/path/to/hypr-config";
+};
+```
+
+When a development path is set:
+- Home Manager uses `mkOutOfStoreSymlink` to link directly to the specified worktree path instead of the pinned Nix store derivation.
+- Projection safety checks for that target are bypassed so Home Manager does not reject linking to a local Git worktree.
+- Changes in the local worktree take effect immediately in live editor or window manager reload cycles without requiring `just arch-workstation` or `home-switch`.
+- Setting a path back to `null` (or omitting it) restores the pinned external flake input and strict worktree protection.

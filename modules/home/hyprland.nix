@@ -1,21 +1,32 @@
 {
+  config,
   inputs,
+  user ? { },
   ...
 }:
 let
   uwsm = "/usr/bin/uwsm";
+  hyprlandPath = user.development.hyprlandPath or null;
+  targets = if hyprlandPath != null then [ ] else [ "hypr" ];
 in
 {
   imports = [
     (import ./projection-safety.nix {
-      targets = [ "hypr" ];
+      inherit targets;
       activationName = "checkHyprProjection";
     })
   ];
-  xdg.configFile."hypr" = {
-    source = inputs.hypr-config;
-    recursive = true;
-  };
+  xdg.configFile."hypr" =
+    if hyprlandPath != null then
+      {
+        source = config.lib.file.mkOutOfStoreSymlink hyprlandPath;
+        recursive = false;
+      }
+    else
+      {
+        source = inputs.hypr-config;
+        recursive = true;
+      };
 
   home.file.".zprofile".text = ''
     if ${uwsm} check may-start; then

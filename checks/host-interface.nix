@@ -119,6 +119,62 @@ assert
       };
     }
   ));
+assert evaluate (
+  raw
+  // {
+    users = raw.users // {
+      abnertu = raw.users.abnertu // {
+        development = {
+          neovimPath = "/home/abnertu/src/neovim";
+          hyprlandPath = "/home/abnertu/src/hyprland";
+        };
+      };
+    };
+  }
+);
+assert
+  !(evaluate (
+    raw
+    // {
+      users = raw.users // {
+        abnertu = raw.users.abnertu // {
+          development = {
+            neovimPath = "relative/path";
+            hyprlandPath = null;
+          };
+        };
+      };
+    }
+  ));
+assert
+  !(evaluate (
+    raw
+    // {
+      users = raw.users // {
+        abnertu = raw.users.abnertu // {
+          development = {
+            neovimPath = null;
+            hyprlandPath = 123;
+          };
+        };
+      };
+    }
+  ));
+assert
+  !(evaluate (
+    raw
+    // {
+      users = raw.users // {
+        abnertu = raw.users.abnertu // {
+          development = {
+            neovimPath = null;
+            hyprlandPath = null;
+            unknown = "invalid";
+          };
+        };
+      };
+    }
+  ));
 assert withoutRunners.packages == { };
 assert withoutRunners.apps == { };
 assert withoutRunners.requiredPackages == [ ];

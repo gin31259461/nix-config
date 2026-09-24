@@ -21,11 +21,11 @@ Work in this operator-controlled Arch Linux checkout. Read [CONTEXT.md](CONTEXT.
 
 ## Protected state and desktop
 
-**Never read or print credentials, private keys, password stores, Runner tokens, Noctalia keys or mutable application data.** Keep them outside Git and derivations. Tokens must not appear in command arguments or unredacted logs; use synthetic fixtures. Keep UWSM as the Hyprland entry point and one startup owner per application. Pass (`programs.password-store`) owns normal user credential storage. Develop Hyprland and Neovim source outside managed runtime paths and adopt published revisions through intentional lock updates.
+**Never read or print credentials, private keys, password stores, Runner tokens, Noctalia keys or mutable application data.** Keep them outside Git and derivations. Tokens must not appear in command arguments or unredacted logs; use synthetic fixtures. Keep UWSM as the Hyprland entry point and one startup owner per application. Pass (`programs.password-store`) owns normal user credential storage. Hyprland and Neovim source trees stay outside managed runtime paths and can either be pinned via flake inputs (adopting published revisions through intentional lock updates) or configured through user `development` paths (`development.hyprlandPath`, `development.neovimPath`) for live local worktrees.
 
 ## Validation and documentation
 
-Use temporary paths, fake native commands and isolated VMs; test behavior rather than copying inventories into assertions. For composition or adapter changes, run from the repository root:
+Format Nix source with `nixfmt <files>` directly (or `find ... -name '*.nix' -print0 | xargs -0 nixfmt`); DO NOT use `nix fmt`, use `nixfmt`. Use temporary paths, fake native commands and isolated VMs; test behavior rather than copying inventories into assertions. For composition or adapter changes, run from the repository root:
 
 ```bash
 just check-fast

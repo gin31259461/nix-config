@@ -55,6 +55,7 @@ let
       _: user:
       (builtins.removeAttrs user [ "home" ])
       // {
+        development = user.development;
         profiles = selected user.profiles;
         modules = lib.optionals cfg.desktop.enable (selected user.modules);
       }
