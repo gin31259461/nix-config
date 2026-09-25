@@ -166,7 +166,6 @@
       "obs-pipewire-audio-capture"
       "onedrive-abraunegg"
       "onlyoffice-bin"
-      "powerpanel"
       "ttf-victor-mono"
       "zen-browser-bin"
     ]

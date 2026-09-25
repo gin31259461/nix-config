@@ -74,6 +74,7 @@ assert evaluate (
     "gitlabRunners"
     "personalAgent"
     "systemSettings"
+    "powerpanel"
   ]
 );
 assert !(evaluate (raw // { typo = true; }));

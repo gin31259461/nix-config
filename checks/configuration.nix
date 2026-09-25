@@ -30,6 +30,7 @@ let
       services.logind.enable = false;
       services.fstrim.enable = false;
       services.powerProfilesDaemon.enable = false;
+      services.powerpanel.enable = false;
       console.enable = false;
       time.enable = false;
       i18n.enable = false;
@@ -40,6 +41,11 @@ let
     inherit lib;
     inherit (disabled.host) hardware systemSettings;
     inherit (disabled) capabilities;
+    moduleAurPackages =
+      (import ../modules/powerpanel {
+        inherit lib pkgs;
+        config = disabled.host.powerpanel;
+      }).aurPackages;
   };
   home = (import ../lib/mk-home-configuration.nix { inherit inputs; }) {
     inherit (disabled.host)
@@ -202,6 +208,12 @@ assert override.host.systemSettings.firewall.rules == [ ];
 assert disabled.host.gitlabRunners == { };
 assert !disabled.host.personalAgent.enable;
 assert !disabled.host.searxng.enable;
+assert !disabled.host.powerpanel.enable;
+assert base.host.powerpanel.enable;
+assert !base.host.powerpanel.powerfailShutdown;
+assert base.host.powerpanel.runtimeThreshold == 300;
+assert base.host.powerpanel.lowbattShutdown;
+assert !(builtins.elem "powerpanel" packages.aur);
 assert !overriddenHome.config.programs.git.enable;
 assert lib.all
   (name: lib.any (package: (package.pname or "") == name) overriddenHome.config.home.packages)
@@ -241,6 +253,8 @@ assert !(builtins.hasAttr "noctalia/config.toml" home.config.xdg.configFile);
 assert lib.all (module: !(valid module)) [
   { networking.firewal.enable = true; }
   { services.fstrim.enable = "yes"; }
+  { services.powerpanel.runtimeThreshold = -1; }
+  { services.powerpanel.lowbattThreshold = 100; }
   { networking.hostname.name = "../bad"; }
   {
     networking.firewall.rules = [

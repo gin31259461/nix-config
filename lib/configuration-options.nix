@@ -142,6 +142,7 @@ in
       enable = enable "SearXNG metasearch engine";
       port = option types.port 8888 "Loopback SearXNG port.";
     };
+    powerpanel = import ../modules/powerpanel/options.nix { inherit lib; };
   };
   programs = {
     ai = import ../modules/ai/options.nix { inherit lib; };

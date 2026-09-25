@@ -497,6 +497,29 @@ class ArchSwitchTests(unittest.TestCase):
             )
         )
 
+    def test_powerpanel_converges_and_restarts_service(self):
+        conf = self.root / "fixture-pwrstatd.conf"
+        conf.write_text("powerfail-shutdown = no\nruntime-threshold = 300\n")
+        self.state["services"]["system:pwrstatd.service"] = {
+            "enabled": True,
+            "active": True,
+        }
+        self.save()
+        source = self.script.read_text()
+        self.script.write_text(
+            f"manage_powerpanel=1\npowerpanel_conf={shlex.quote(str(conf))}\n" + source
+        )
+        self.invoke()
+        installed = self.root / "etc/pwrstatd.conf"
+        self.assertTrue(installed.is_file())
+        self.assertEqual(installed.read_text(), conf.read_text())
+        self.assertTrue(
+            any(
+                call == ["systemctl", "restart", "pwrstatd.service"]
+                for call in self.commands()
+            )
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

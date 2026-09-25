@@ -73,6 +73,10 @@
         inherit lib;
         config = archHost.virtualization;
       };
+      powerpanel = import ./modules/powerpanel {
+        inherit lib pkgs;
+        config = archHost.powerpanel;
+      };
       systemSettings = import ./platforms/arch/system {
         inherit lib pkgs;
         config = archHost.systemSettings;
@@ -84,7 +88,7 @@
         inherit capabilities;
         modulePackages = runners.requiredPackages ++ virtualization.requiredPackages;
         systemSettings = archHost.systemSettings;
-        moduleAurPackages = ai.aurPackages;
+        moduleAurPackages = ai.aurPackages ++ powerpanel.aurPackages;
       };
       arch-switch = import ./platforms/arch/package.nix {
         inherit
@@ -93,9 +97,10 @@
           deploymentUser
           capabilities
           systemSettings
+          powerpanel
           ;
-        moduleGroups = virtualization.loginGroups;
-        moduleSystemUnits = virtualization.systemUnits;
+        moduleGroups = virtualization.loginGroups ++ powerpanel.loginGroups;
+        moduleSystemUnits = virtualization.systemUnits ++ powerpanel.systemUnits;
         username = deployment.username;
         packages = nativePackages;
         hardware = archHost.hardware;

@@ -364,6 +364,9 @@ if ((${manage_network:-1})); then
 fi
 ensure_file "$files/container-network-modules.conf" "$fs_root/etc/modules-load.d/nix-config-podman.conf"
 ensure_file "$files/sysctl.conf" "$fs_root/etc/sysctl.d/99-nix-config.conf"
+if ((${manage_powerpanel:-0})); then
+  ensure_file "$powerpanel_conf" "$fs_root/etc/pwrstatd.conf" pwrstatd
+fi
 if ((${manage_desktop:-1})); then
   sed "s/@USER@/$login_user/g" "$files/tty1-autologin.conf" >"$work_dir/autologin.conf"
   ensure_file "$work_dir/autologin.conf" "$fs_root/etc/systemd/system/getty@tty1.service.d/override.conf" units
@@ -475,6 +478,13 @@ fi
 if [[ -e $root_state/nix-daemon.pending ]]; then
   root systemctl restart nix-daemon.service
   root rm -- "$root_state/nix-daemon.pending"
+  actions=$((actions + 1))
+fi
+if [[ -e $root_state/pwrstatd.pending ]]; then
+  if native systemctl is-active --quiet pwrstatd.service; then
+    root systemctl restart pwrstatd.service
+  fi
+  root rm -- "$root_state/pwrstatd.pending"
   actions=$((actions + 1))
 fi
 # Compare runtime values too: unchanged files must not conceal runtime drift.

@@ -6,7 +6,7 @@
 | --- | --- |
 | `i18n`, `time`, `console` | Locale, timezone, keymap and font |
 | `networking.hostname`, `networking.firewall`, `networking.hotspot` | Host identity, UFW and prepared NetworkManager AP |
-| `services.timesyncd`, `services.journald`, `services.logind`, `services.fstrim` | Native systemd policy and service state |
+| `services.timesyncd`, `services.journald`, `services.logind`, `services.fstrim`, `services.powerpanel` | Native systemd policy, UPS daemon configuration, and service state |
 
 System preflight is a core stage. Missing declared hotspot interfaces, unavailable assets, conflicting providers or ownership, and failed commands stop deployment; they are not optional skips. Before first enabling a capability, inspect current ownership from a local recovery-capable session. In particular, review time providers, storage discard, console assets, NetworkManager and UFW. For firewall policy:
 
@@ -15,6 +15,13 @@ sudo ufw status verbose
 ```
 
 See [hotspot](hotspot.md) for AP adoption. A disabled declaration withdraws management but does not automatically remove existing native files, accounts, packages or service state.
+
+### PowerPanel (CyberPower UPS)
+
+`services.powerpanel` manages CyberPower UPS control via `/etc/pwrstatd.conf`, the `powerpanel` AUR package, and `pwrstatd.service`.
+- Auto-shutdown upon outage is based on Remaining Runtime (`powerfailShutdown = false`, `runtimeThreshold = 300`, `lowbattShutdown = true`), avoiding shutting down immediately on power failure.
+- The deployment user is automatically added to the `power` login group, allowing non-root execution of `pwrstat -status` and `pwrstat -config`.
+- Changes to `/etc/pwrstatd.conf` record a pending marker and automatically restart `pwrstatd.service`.
 
 ## Changes and recovery
 

@@ -23,6 +23,7 @@
   },
   moduleGroups ? [ ],
   moduleSystemUnits ? [ ],
+  powerpanel ? null,
   progress ? import ../../lib/cli/progress { inherit pkgs; },
 }:
 let
@@ -125,6 +126,12 @@ pkgs.writeShellApplication {
       if capabilities.desktop.enable && capabilities.programs.sunshine.enable then "1" else "0"
     }
     readonly manage_initramfs=${if capabilities.initramfs then "1" else "0"}
+    readonly manage_powerpanel=${
+      if powerpanel != null && (powerpanel.enable or false) then "1" else "0"
+    }
+    readonly powerpanel_conf=${
+      if powerpanel == null then pkgs.writeText "empty-pwrstatd.conf" "" else powerpanel.configFile
+    }
     readonly expected_user=${lib.escapeShellArg username}
     pacman_packages=(${lib.escapeShellArgs packages.pacman})
     lizardbyte_package_names=(${lib.escapeShellArgs packages.lizardbyte})

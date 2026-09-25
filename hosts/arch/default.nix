@@ -54,4 +54,5 @@
   services.personalAgent.enable = lib.mkDefault true;
   services.personalAgent.searxng.enable = lib.mkDefault true;
   services.searxng.enable = lib.mkDefault true;
+  services.powerpanel.enable = lib.mkDefault true;
 }

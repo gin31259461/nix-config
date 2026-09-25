@@ -51,6 +51,7 @@ let
       enable = cfg.services.searxng.enable;
       inherit (cfg.services.searxng) port;
     };
+    powerpanel = cfg.services.powerpanel;
     users = lib.mapAttrs (
       _: user:
       (builtins.removeAttrs user [ "home" ])
