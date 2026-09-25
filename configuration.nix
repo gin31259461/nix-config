@@ -19,6 +19,11 @@
   #   };
   # };
 
+  # users.users.abnertu.development = {
+  #   neovimPath = "/home/abnertu/codebase/orbitvim";
+  #   hyprlandPath = "/home/abnertu/codebase/hypr";
+  # };
+
   # Example home configuration override:
   # users.users.abnertu.home.programs.git.settings.init.defaultBranch = "main";
 }

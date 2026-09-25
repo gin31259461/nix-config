@@ -26,6 +26,7 @@ SECTIONS = frozenset(
         "widget",
         "dock",
         "desktop",
+        "desktop_widgets",
         "shell",
         "osd",
         "notification",

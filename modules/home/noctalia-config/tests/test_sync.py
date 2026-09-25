@@ -106,6 +106,43 @@ class SyncTests(unittest.TestCase):
             any(argv[:2] == ["/usr/bin/nix", "run"] for argv in self.commands)
         )
 
+    def test_capture_includes_desktop_widgets(self):
+        self.exported.update(
+            {
+                "desktop_widgets": {
+                    "schema_version": 2,
+                    "widget_order": ["desktop-widget-1"],
+                    "widget": {
+                        "desktop-widget-1": {
+                            "type": "clock",
+                            "settings": {"clock_style": "digital"},
+                        }
+                    },
+                }
+            }
+        )
+        self.instance.capture()
+        captured = sync.parse(self.target.read_bytes())
+        self.assertIn("desktop_widgets", captured)
+        self.assertEqual(captured["desktop_widgets"]["schema_version"], 2)
+
+    def test_capture_filters_desktop_widgets_with_review_keys(self):
+        self.exported.update(
+            {
+                "desktop_widgets": {
+                    "widget": {
+                        "custom": {
+                            "type": "custom",
+                            "settings": {"command": "sh /tmp/run.sh"},
+                        }
+                    }
+                }
+            }
+        )
+        self.instance.capture()
+        captured = sync.parse(self.target.read_bytes())
+        self.assertNotIn("desktop_widgets", captured)
+
     def test_capture_repeat_is_idempotent(self):
         self.instance.capture()
         before = self.target.stat()
