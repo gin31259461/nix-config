@@ -4,7 +4,7 @@
 
 ## Moonlit desktop
 
-The reviewed snapshot declares `Pictures/Wallpapers/Noctalia/moonlight.png` as the default wallpaper, uses its dark palette, and arranges the top bar, attached Control Center, notifications, and three desktop widgets. Widget coordinates target the current `HDMI-A-1` output at 1920×1080 and scale 1. Reposition them in the source snapshot if the output or scale changes. The media widget hides without a player; the calendar shows a month grid because calendar event synchronization is disabled in the storage policy.
+The reviewed snapshot declares `Pictures/Wallpapers/Noctalia/moonlight.png` as the default wallpaper, uses its dark palette, and arranges the top bar, a floating Control Center at the top right, notifications, and Media and Calendar desktop cards. Widget coordinates target the current `HDMI-A-1` output at 1920×1080 and scale 1. Reposition them in the source snapshot if the output or scale changes. The Media card remains visible without a player, but needs an active MPRIS player for artwork and track controls. The Calendar card shows a month grid and an empty event area until calendar event synchronization is configured separately.
 
 The single snapshot remains the owner of Noctalia visual preferences. Its `wallpaper` section is eligible for reviewed capture and controlled deployment. GUI wallpaper selection writes an override that takes precedence over the declared default; `deploy --dry-run` detects conflicts, and the existing `--replace-overrides` procedure below clears only owned sections while Noctalia is stopped. Do not copy the downloaded plan's additional TOML files into the live config directory, where they would duplicate snapshot ownership.
 

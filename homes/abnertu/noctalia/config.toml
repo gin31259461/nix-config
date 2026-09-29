@@ -1,17 +1,104 @@
 [bar.default]
-position = "top"
-enabled = true
-thickness = 36
-margin_edge = 4
-margin_ends = 12
-background_opacity = 0.76
-shadow = true
+background_opacity = 0.29999999329447746
 capsule = false
+capsule_border = "outline"
 capsule_radius = 10
 capsule_thickness = 0.78
-start = ["launcher", "workspaces", "taskbar"]
-center = ["clock-main"]
-end = ["media-mini", "cpu", "ram", "network", "volume", "battery", "tray", "notifications", "control-center", "session"]
+center = [
+    "clock-main",
+]
+enabled = true
+end = [
+    "group:g2",
+    "group:g1",
+    "group:g3",
+]
+margin_edge = 2
+margin_ends = 12
+position = "top"
+shadow = true
+start = [
+    "group:g4",
+    "group:g5",
+]
+thickness = 36
+
+[[bar.default.capsule_group]]
+accordion = false
+accordion_direction = "end"
+enabled = true
+fill = "surface_variant"
+id = "g1"
+members = [
+    "network",
+    "volume",
+    "battery",
+]
+opacity = 0.0
+padding = 30.0
+radius = 10.0
+widget_spacing = 25
+
+[[bar.default.capsule_group]]
+accordion = false
+accordion_direction = "end"
+enabled = true
+fill = "surface_variant"
+id = "g2"
+members = [
+    "audio_visualizer",
+    "cpu",
+    "ram",
+]
+opacity = 0.0
+padding = 6.0
+radius = 10.0
+
+[[bar.default.capsule_group]]
+accordion = false
+accordion_direction = "end"
+enabled = true
+fill = "surface_variant"
+id = "g3"
+members = [
+    "tray",
+    "control-center",
+    "session",
+]
+opacity = 0.0
+padding = 6.0
+radius = 10.0
+widget_spacing = 15
+
+[[bar.default.capsule_group]]
+accordion = false
+accordion_direction = "end"
+enabled = true
+fill = "surface_variant"
+id = "g4"
+members = [
+    "launcher",
+    "notifications",
+]
+opacity = 0.0
+padding = 6.0
+radius = 10.0
+
+[[bar.default.capsule_group]]
+accordion = false
+accordion_direction = "end"
+border = ""
+enabled = true
+fill = "surface"
+id = "g5"
+members = [
+    "workspaces",
+    "taskbar",
+]
+opacity = 1.0
+padding = 10.0
+radius = 10.0
+widget_spacing = 25
 
 [brightness]
 enable_ddcutil = true
@@ -19,106 +106,88 @@ minimum_brightness = 0.19999999552965164
 sync_all_monitors = true
 
 [control_center]
+show_session_button = true
+show_shortcut_labels = false
 sidebar = "compact"
 sidebar_section = "compact"
-width = 700
-show_shortcut_labels = false
-show_session_button = true
+width = 600
 
 [control_center.calendar]
-show_events_card = false
+show_events_card = true
 show_week_numbers = false
 
 [desktop_widgets]
 enabled = true
 schema_version = 2
-widget_order = ["media_main", "calendar_main", "sysmon_main"]
+widget_order = [
+    "media_main",
+    "calendar_main",
+]
 
 [desktop_widgets.grid]
-visible = true
 cell_size = 16
 major_interval = 4
-
-[desktop_widgets.widget.media_main]
-type = "media_player"
-output = "HDMI-A-1"
-cx = 1710.0
-cy = 250.0
-box_width = 320.0
-box_height = 300.0
-placement_width = 1920.0
-placement_height = 1080.0
-rotation = 0.0
-
-[desktop_widgets.widget.media_main.settings]
-layout = "vertical"
-color = "on_surface"
-shadow = true
-hide_when_no_media = true
-background = true
-background_color = "surface"
-background_opacity = 0.72
-background_radius = 18.0
-background_padding = 16.0
+visible = true
 
 [desktop_widgets.widget.calendar_main]
-type = "calendar"
+box_height = 400.0
+box_width = 380.0
+cx = 270.0
+cy = 796.0
 output = "HDMI-A-1"
-cx = 1670.0
-cy = 760.0
-box_width = 430.0
-box_height = 300.0
-placement_width = 1920.0
 placement_height = 1080.0
+placement_width = 1920.0
 rotation = 0.0
+type = "calendar"
 
 [desktop_widgets.widget.calendar_main.settings]
-show_events = false
-show_week_numbers = false
-font_family = "Inter, Noto Sans CJK TC"
 background = true
 background_color = "surface"
 background_opacity = 0.72
-background_radius = 18.0
 background_padding = 14.0
+background_radius = 18.0
+font_family = "Inter, Noto Sans CJK TC"
+show_events = true
+show_week_numbers = false
 
-[desktop_widgets.widget.sysmon_main]
-type = "sysmon"
+[desktop_widgets.widget.media_main]
+box_height = 400.0
+box_width = 224.0
+cx = 208.0
+cy = 348.0
 output = "HDMI-A-1"
-cx = 270.0
-cy = 875.0
-box_width = 480.0
-box_height = 170.0
-placement_width = 1920.0
 placement_height = 1080.0
+placement_width = 1920.0
 rotation = 0.0
+type = "media_player"
 
-[desktop_widgets.widget.sysmon_main.settings]
-display = "graph"
-stat = "cpu_usage"
-stat2 = "cpu_temp"
-color = "primary"
-color2 = "secondary"
-show_label = true
-shadow = true
+[desktop_widgets.widget.media_main.settings]
 background = true
 background_color = "surface"
-background_opacity = 0.66
+background_opacity = 0.72
+background_padding = 16.0
 background_radius = 18.0
-background_padding = 14.0
+color = "on_surface"
+hide_when_no_media = false
+layout = "vertical"
+shadow = true
 
 [dock]
-enabled = false
+enabled = true
+icon_size = 40
+reserve_space = false
+show_dots = true
+smart_auto_hide = true
 
 [notification]
-enable_daemon = true
-show_app_name = true
-position = "top_right"
-layer = "top"
-scale = 0.95
 background_opacity = 0.84
 border = true
+enable_daemon = true
+layer = "top"
 offset_x = 16
+position = "top_right"
+scale = 0.95
+show_app_name = true
 
 [osd.kinds]
 keyboard_layout = false
@@ -126,121 +195,154 @@ lock_keys = false
 media = false
 
 [shell]
+app_icon_colorize = false
+button_borders = true
+card_borders = true
 clipboard_enabled = false
 corner_radius_scale = 1.2
-button_borders = true
+date_format = "%a, %b %d"
+font_family = "Inter, Noto Sans CJK TC"
 input_borders = true
 popup_borders = true
-card_borders = true
 popup_shadows = true
-font_family = "Inter, Noto Sans CJK TC"
-time_format = "{:%H:%M}"
-date_format = "%a, %b %d"
 settings_window_translucent = true
-app_icon_colorize = false
+time_format = "{:%H:%M}"
 
 [shell.animation]
 enabled = true
 speed = 1.1
 
-[shell.shadow]
-direction = "down"
-alpha = 0.42
-
 [shell.panel]
-transparency_mode = "glass"
 borders = true
-shadow = true
-list_item_background = false
-floating_layer = "overlay"
-launcher_placement = "floating"
 clipboard_placement = "floating"
 control_center_placement = "attached"
-wallpaper_placement = "attached"
-session_placement = "attached"
-launcher_position = "center"
+control_center_position = "top_right"
+floating_layer = "overlay"
 floating_offset = 10
+launcher_placement = "floating"
+launcher_position = "center"
+list_item_background = false
 open_near_click_control_center = true
+session_placement = "attached"
+shadow = true
+transparency_mode = "glass"
+wallpaper_placement = "attached"
+
+[shell.shadow]
+alpha = 0.42
+direction = "down"
 
 [theme]
 mode = "dark"
+pure_black_dark = false
 shell_mode = "dark"
 source = "wallpaper"
 wallpaper_scheme = "m3-content"
-pure_black_dark = false
 
 [theme.templates]
-builtin_ids = ["hyprland"]
+builtin_ids = [
+    "btop",
+    "cava",
+    "gtk3",
+    "gtk4",
+    "ghostty",
+    "hyprland",
+    "kitty",
+    "qt",
+]
 community_ids = []
 
 [wallpaper]
+edge_smoothness = 0.25
 enabled = true
 fill_mode = "crop"
-transition = ["fade", "zoom"]
+transition = [
+    "fade",
+    "zoom",
+]
 transition_duration = 900
-edge_smoothness = 0.25
 
 [wallpaper.default]
 path = "/home/abnertu/Pictures/Wallpapers/Noctalia/moonlight.png"
 
+[widget.audio_visualizer]
+color_2 = "tertiary"
+mirrored = false
+show_when_idle = true
+
+[widget.battery]
+display_mode = "graphic"
+
 [widget.clock-main]
-type = "clock"
-format = "{:%a, %b %d  %H:%M}"
 capsule = true
+capsule_border = "outline"
 capsule_fill = "surface_variant"
 capsule_opacity = 0.42
+capsule_padding = 16
 font_scale = 0.95
+format = "{:%a, %b %d  %H:%M}"
+type = "clock"
 
 [widget.control-center]
 glyph = "hyprland"
+icon_color = "tertiary"
 
 [widget.cpu]
-type = "sysmon"
-stat = "cpu_usage"
-visualization = "none"
 show_value = true
+stat = "cpu_usage"
+type = "sysmon"
+visualization = "none"
 
 [widget.launcher]
 glyph = "apps-filled"
 
 [widget.media-mini]
-type = "media"
-hide_artist = false
-min_length = 100
-max_length = 170
 art_size = 18
 capsule = true
 capsule_opacity = 0.35
+hide_artist = false
+max_length = 170
+min_length = 100
+type = "media"
 
 [widget.ram]
-type = "sysmon"
-stat = "ram_pct"
-visualization = "none"
 show_value = true
+stat = "ram_pct"
+type = "sysmon"
+visualization = "none"
 
 [widget.taskbar]
-type = "taskbar"
-pinned = ["zen", "kitty", "thunar"]
-pinned_opacity = 0.55
-group_by_workspace = false
-show_all_outputs = false
-only_active_workspace = false
-icon_scale = 0.92
-item_spacing = 5
-show_window_title = true
-window_title_max_width = 80
-taskbar_max_width = 520
-show_active_indicator = true
 active_indicator_color = "primary"
 active_opacity = 1.0
+group_by_workspace = false
+icon_scale = 1.2000000000000002
 inactive_opacity = 0.78
+item_spacing = 5
+only_active_workspace = false
+pinned = [
+    "zen",
+    "kitty",
+    "thunar",
+]
+pinned_opacity = 0.55
+show_active_indicator = true
+show_all_outputs = false
+show_window_title = true
+taskbar_max_width = 520
+type = "taskbar"
+window_title_max_width = 80
+
+[widget.tray]
+drawer = true
+drawer_columns = 5
+drawer_item_size = 20.0
 
 [widget.workspaces]
-type = "workspaces"
-style = "regular"
-show_labels = true
-show_icons = false
+capsule = false
+capsule_opacity = 0.45
 label_source = "id"
 max_label_chars = 2
-capsule = true
-capsule_opacity = 0.45
+show_icons = false
+show_labels = true
+style = "regular"
+type = "workspaces"
