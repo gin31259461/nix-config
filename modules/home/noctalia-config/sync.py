@@ -131,10 +131,12 @@ class CommandTimeout(RuntimeError):
 COMMAND_TIMEOUTS = {"query": 30, "deployment": 3600}
 
 
-def execute(argv):
+def execute(argv, env=None, cwd=None):
     deployment = argv[0] == "/usr/bin/nix" or Path(argv[0]).name == "activate"
     timeout = COMMAND_TIMEOUTS["deployment" if deployment else "query"]
     environment = dict(os.environ)
+    if env:
+        environment.update(env)
     if Path(argv[0]).name == "activate":
         for name in (
             "HOME_MANAGER_BACKUP_EXT",
@@ -146,6 +148,7 @@ def execute(argv):
     process = subprocess.Popen(
         argv,
         env=environment,
+        cwd=cwd,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         start_new_session=True,
@@ -190,7 +193,7 @@ class Sync:
         require(bool(re.fullmatch(r"[a-z_][a-z0-9_-]*", user)), "Invalid login user")
         self.repo, self.run = repo, run
         self.target = repo / "homes" / user / "noctalia/config.toml"
-        self.config, self.settings = config, state / "settings.toml"
+        self.config, self.state, self.settings = config, state, state / "settings.toml"
         self.control = control
         self.home_configuration = home_configuration
         self.pending = control / "pending.json"
@@ -282,10 +285,112 @@ class Sync:
             "An interrupted deployment exists; use deploy --recover",
         )
 
-    def capture(self, dry_run=False):
+    def render_themes(self, exported, dry_run=False):
+        theme = exported.get("theme", {})
+        source = theme.get("source", "wallpaper")
+
+        args = ["/usr/bin/noctalia", "theme"]
+
+        if source == "wallpaper":
+            wallpaper_conf = exported.get("wallpaper", {}).get("default", {})
+            path = wallpaper_conf.get("path")
+            if not path:
+                return []
+            args.append(str(path))
+            scheme = theme.get("wallpaper_scheme", "m3-content")
+            args.extend(["--scheme", scheme])
+        elif source in ("builtin", "community"):
+            palette_name = theme.get("community_palette") or theme.get("builtin")
+            palette_path = None
+            if palette_name:
+                candidates = [
+                    self.state / "community-palettes" / f"{palette_name}.json",
+                    self.state
+                    / "community-palettes"
+                    / f"{palette_name.replace(' ', '%20')}.json",
+                ]
+                for candidate in candidates:
+                    if candidate.exists():
+                        palette_path = candidate
+                        break
+            if palette_path:
+                args.extend(["--theme-json", str(palette_path)])
+            else:
+                return []
+        else:
+            return []
+
+        mode = theme.get("mode", "dark")
+        if mode == "dark":
+            args.append("--dark")
+        elif mode == "light":
+            args.append("--light")
+
+        if theme.get("pure_black_dark"):
+            args.append("--pure-black")
+
+        with tempfile.TemporaryDirectory(prefix="noctalia-themes-") as tmpdir:
+            tmp_path = Path(tmpdir)
+            env = {
+                "HOME": tmpdir,
+                "XDG_CONFIG_HOME": tmpdir,
+                "NOCTALIA_CONFIG_HOME": tmpdir,
+            }
+
+            try:
+                self.run(list(args) + ["--builtin-config"], env=env)
+            except Exception as error:
+                print(
+                    f"Warning: Failed to render built-in templates: {error}",
+                    file=sys.stderr,
+                )
+                return []
+
+            discord_dir = self.state / "community-templates/discord"
+            discord_template = discord_dir / "template.toml"
+            if discord_template.exists():
+                (tmp_path / "vesktop/themes").mkdir(parents=True, exist_ok=True)
+                try:
+                    self.run(
+                        list(args) + ["-c", str(discord_template)],
+                        env=env,
+                        cwd=discord_dir,
+                    )
+                except Exception as error:
+                    print(
+                        f"Warning: Failed to render community template 'discord': {error}",
+                        file=sys.stderr,
+                    )
+
+            config_dest = self.repo / "files/home/.config"
+            updated = []
+            for root, _, files in os.walk(tmp_path):
+                for f in files:
+                    src_file = Path(root) / f
+                    rel_path = src_file.relative_to(tmp_path)
+                    name = rel_path.name.lower()
+                    if not (
+                        "noctalia" in name
+                        or rel_path.parts[:2] == ("vesktop", "themes")
+                    ):
+                        continue
+                    dest_file = config_dest / rel_path
+                    if dest_file.is_file():
+                        raw = src_file.read_bytes()
+                        if raw != read(dest_file):
+                            updated.append((dest_file, rel_path, raw))
+
+            if not dry_run:
+                for dest_file, _, raw in updated:
+                    atomic_write(dest_file, raw, stat.S_IMODE(dest_file.stat().st_mode))
+
+            return [rel for _, rel, _ in updated]
+
+    def capture(self, dry_run=False, skip_themes=False):
         self.preflight()
         original = read(self.target)
-        data, skipped = select(self.export())
+        exported = self.export()
+        data, skipped = select(exported)
         require(bool(data), "No eligible preferences; repository file left unchanged")
         self.validate(data)
         print("Capture sections: " + ", ".join(sorted(data)))
@@ -294,6 +399,16 @@ class Sync:
             + ", ".join(name for name in skipped if name in SECTIONS)
             + f"; {sum(name not in SECTIONS for name in skipped)} unsupported sections"
         )
+        theme_updates = []
+        if not skip_themes:
+            theme_updates = self.render_themes(exported, dry_run=True)
+            if theme_updates:
+                prefix = "Would update" if dry_run else "Updated"
+                print(
+                    f"{prefix} terminal/app themes: "
+                    + ", ".join(str(p) for p in sorted(theme_updates))
+                )
+
         if dry_run:
             return
         with self.locked():
@@ -303,6 +418,8 @@ class Sync:
                 "Repository preferences changed during capture; retry",
             )
             atomic_write(self.target, encode(data), 0o644)
+            if not skip_themes and theme_updates:
+                self.render_themes(exported, dry_run=False)
         print(
             "Preferences captured. Review locally before committing; no Git index changes made."
         )
@@ -478,6 +595,7 @@ def main():
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--replace-overrides", action="store_true")
     parser.add_argument("--recover", action="store_true")
+    parser.add_argument("--skip-themes", action="store_true")
     args = parser.parse_args()
     home = Path.home()
     config_root = Path(
@@ -508,7 +626,7 @@ def main():
             "Override replacement/recovery are deploy-only operations",
         )
         if args.operation == "capture":
-            sync.capture(args.dry_run)
+            sync.capture(args.dry_run, skip_themes=args.skip_themes)
         else:
             require(
                 not os.environ.get("NOCTALIA_CONFIG_HOME")

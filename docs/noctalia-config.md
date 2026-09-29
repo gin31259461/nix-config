@@ -23,9 +23,10 @@ Run from this checkout:
 ```bash
 nix run .#noctalia-config -- capture --dry-run
 nix run .#noctalia-config -- capture
+nix run .#noctalia-config -- capture --skip-themes
 ```
 
-Capture exports effective settings, filters to owned UI sections, validates a temporary candidate and atomically updates the snapshot only when content differs. It does not stage, commit or push. Review the Git diff before committing: user labels, paths and other supported UI values may still be private. Validation warnings stop capture. To inspect live validation locally, run `/usr/bin/noctalia config validate`; keep its output private if it contains personal values.
+Capture exports effective settings, filters to owned UI sections, validates a temporary candidate and atomically updates the snapshot only when content differs. It also evaluates active wallpaper and palette settings to synchronize checked-in terminal and application themes under `files/home/.config/` (pass `--skip-themes` to capture only TOML preferences). It does not stage, commit or push. Review the Git diff before committing: user labels, paths and other supported UI values may still be private. Validation warnings stop capture. To inspect live validation locally, run `/usr/bin/noctalia config validate`; keep its output private if it contains personal values.
 
 ## Deploy preferences
 
