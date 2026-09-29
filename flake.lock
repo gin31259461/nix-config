@@ -24,11 +24,11 @@
     "hypr-config": {
       "flake": false,
       "locked": {
-        "lastModified": 1789921206,
-        "narHash": "sha256-21J9r4OQ6fev6YBLYjbjbIGrUoITeG9r5kKxJxn73wc=",
+        "lastModified": 1790672074,
+        "narHash": "sha256-b9wGu0fjoG2DYBgRxSYLdTu8NkB8ZIUPVTpv48kOfTM=",
         "owner": "Orbit-Lua",
         "repo": "hypr",
-        "rev": "4bb8fd3771ff9ba9f745b09e64aaa2f6feab5106",
+        "rev": "3553b9c879bde4f2a87071c1cce71ff617ee797c",
         "type": "github"
       },
       "original": {
@@ -56,11 +56,11 @@
     "nvim-config": {
       "flake": false,
       "locked": {
-        "lastModified": 1789783810,
-        "narHash": "sha256-U2JaktWyowjjgw4Ddm1K+fM3q9SbaTlhuajtVlB6QY4=",
+        "lastModified": 1790643989,
+        "narHash": "sha256-MIZ4u5JIllV3upTvbUZjuWb70rdc6DW2rbu1zHHpICg=",
         "owner": "Orbit-Lua",
         "repo": "orbitvim",
-        "rev": "fcc5296820c22ec5aff6357d15df153194a56a20",
+        "rev": "3d9efc1f69af4a0837536809e3e7942add9dfca7",
         "type": "github"
       },
       "original": {
