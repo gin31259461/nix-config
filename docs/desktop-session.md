@@ -40,6 +40,8 @@ users.users.abnertu.development = {
 };
 ```
 
+The moonlit desktop's Hyprland appearance, persistent workspaces 1–5, Noctalia layer blur, and `SUPER+SHIFT+P` Control Center binding live in the external Hyprland worktree. Its own README and key hints describe the bindings. The Noctalia wallpaper, bar and widgets remain in this repository's [Noctalia guide](noctalia-config.md). The development link makes source edits available to Hyprland; a compositor reload is a separate live action.
+
 When a development path is set:
 - Home Manager uses `mkOutOfStoreSymlink` to link directly to the specified worktree path instead of the pinned Nix store derivation.
 - Projection safety checks for that target are bypassed so Home Manager does not reject linking to a local Git worktree.

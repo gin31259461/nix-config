@@ -2,6 +2,20 @@
 
 `noctalia-config` moves reviewed UI preferences between live Noctalia settings and the repository snapshot at `homes/abnertu/noctalia/config.toml`. Home Manager manages the corresponding home link. The tool does not own the encrypted storage key or application data; see [desktop session](desktop-session.md).
 
+## Moonlit desktop
+
+The reviewed snapshot declares `Pictures/Wallpapers/Noctalia/moonlight.png` as the default wallpaper, uses its dark palette, and arranges the top bar, attached Control Center, notifications, and three desktop widgets. Widget coordinates target the current `HDMI-A-1` output at 1920×1080 and scale 1. Reposition them in the source snapshot if the output or scale changes. The media widget hides without a player; the calendar shows a month grid because calendar event synchronization is disabled in the storage policy.
+
+The single snapshot remains the owner of Noctalia visual preferences. Its `wallpaper` section is eligible for reviewed capture and controlled deployment. GUI wallpaper selection writes an override that takes precedence over the declared default; `deploy --dry-run` detects conflicts, and the existing `--replace-overrides` procedure below clears only owned sections while Noctalia is stopped. Do not copy the downloaded plan's additional TOML files into the live config directory, where they would duplicate snapshot ownership.
+
+The Hyprland palette template remains enabled for the local development worktree. Other Noctalia app templates are disabled here because Kitty, Ghostty, GTK and Qt configuration files are managed by Home Manager. Their checked-in terminal themes provide readable static colors; enabling a template requires a writable output path and an explicit ownership change. Noctalia's palette and terminal themes therefore need a visual check after wallpaper changes.
+
+Validate source without reading live Noctalia state:
+
+```bash
+noctalia config validate homes/abnertu/noctalia/config.toml
+```
+
 ## Capture a reviewed snapshot
 
 Run from this checkout:

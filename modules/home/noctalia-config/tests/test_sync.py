@@ -126,6 +126,36 @@ class SyncTests(unittest.TestCase):
         self.assertIn("desktop_widgets", captured)
         self.assertEqual(captured["desktop_widgets"]["schema_version"], 2)
 
+    def test_wallpaper_is_reviewed_and_deployed_without_touching_other_state(self):
+        wallpaper = {
+            "enabled": True,
+            "fill_mode": "crop",
+            "default": {
+                "path": "/home/test/Pictures/Wallpapers/Noctalia/moonlight.png"
+            },
+        }
+        self.exported["wallpaper"] = wallpaper
+        self.instance.capture()
+        self.assertEqual(sync.parse(self.target.read_bytes())["wallpaper"], wallpaper)
+        self.settings.write_text(
+            '[wallpaper.default]\npath="/tmp/old.png"\n[weather]\ncity="fixture"\n'
+        )
+        with self.assertRaisesRegex(RuntimeError, "override conflicts"):
+            self.instance.deploy()
+        self.instance.deploy(replace=True)
+        self.assertEqual(
+            sync.parse(self.settings.read_bytes()), {"weather": {"city": "fixture"}}
+        )
+        self.assertEqual(self.exported["wallpaper"], wallpaper)
+
+    def test_wallpaper_commands_are_excluded_from_capture(self):
+        self.exported["wallpaper"] = {
+            "default": {"path": "/tmp/moonlight.png"},
+            "action": "exec fixture",
+        }
+        self.instance.capture()
+        self.assertNotIn("wallpaper", sync.parse(self.target.read_bytes()))
+
     def test_capture_filters_desktop_widgets_with_review_keys(self):
         self.exported.update(
             {

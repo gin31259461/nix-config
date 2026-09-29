@@ -2,6 +2,7 @@
   pkgs,
   home,
   inputs,
+  user,
 }:
 let
   lib = pkgs.lib;
@@ -102,7 +103,7 @@ in
     assert
       !(home.config.xdg.configFile ? hypr)
       || home.config.xdg.configFile.hypr.recursive
-      || ((home._module.args.user.development.hyprlandPath or null) != null);
+      || ((user.development.hyprlandPath or null) != null);
     assert builtins.all (
       name:
       (!pkgs.lib.hasPrefix ".agents/skills/" name && !pkgs.lib.hasPrefix ".gemini/config/skills/" name)

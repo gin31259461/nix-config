@@ -22,6 +22,7 @@ import tomli_w
 SECTIONS = frozenset(
     {
         "theme",
+        "wallpaper",
         "bar",
         "widget",
         "dock",

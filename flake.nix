@@ -177,6 +177,7 @@
       // (import ./modules/home/checks.nix {
         inherit pkgs inputs;
         home = archHomes.${homeConfigurationName};
+        user = deploymentUser;
       })
       // runners.checks;
 
