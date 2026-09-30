@@ -188,7 +188,15 @@ def execute(argv, env=None, cwd=None):
 
 class Sync:
     def __init__(
-        self, repo, user, home_configuration, config, state, control, run=execute
+        self,
+        repo,
+        user,
+        home_configuration,
+        config,
+        state,
+        control,
+        run=execute,
+        builtin_palettes=None,
     ):
         require(bool(re.fullmatch(r"[a-z_][a-z0-9_-]*", user)), "Invalid login user")
         self.repo, self.run = repo, run
@@ -197,6 +205,7 @@ class Sync:
         self.control = control
         self.home_configuration = home_configuration
         self.pending = control / "pending.json"
+        self.builtin_palettes = builtin_palettes
 
     def validate(self, data):
         with tempfile.TemporaryDirectory(prefix="noctalia-validate-") as directory:
@@ -290,6 +299,7 @@ class Sync:
         source = theme.get("source", "wallpaper")
 
         args = ["/usr/bin/noctalia", "theme"]
+        palette = None
 
         if source == "wallpaper":
             wallpaper_conf = exported.get("wallpaper", {}).get("default", {})
@@ -299,8 +309,15 @@ class Sync:
             args.append(str(path))
             scheme = theme.get("wallpaper_scheme", "m3-content")
             args.extend(["--scheme", scheme])
-        elif source in ("builtin", "community"):
-            palette_name = theme.get("community_palette") or theme.get("builtin")
+        elif source == "builtin":
+            if self.builtin_palettes is None:
+                raise RuntimeError("Built-in palette catalog is missing")
+            palettes = json.loads(self.builtin_palettes.read_text())
+            palette_name = theme.get("builtin", "Noctalia")
+            palette = palettes.get(palette_name)
+            require(palette is not None, "Unsupported built-in Noctalia palette")
+        elif source == "community":
+            palette_name = theme.get("community_palette")
             palette_path = None
             if palette_name:
                 candidates = [
@@ -331,10 +348,16 @@ class Sync:
 
         with tempfile.TemporaryDirectory(prefix="noctalia-themes-") as tmpdir:
             tmp_path = Path(tmpdir)
+            if palette is not None:
+                palette_path = tmp_path / "palette.json"
+                palette_path.write_text(json.dumps(palette))
+                args.extend(["--theme-json", str(palette_path)])
             env = {
                 "HOME": tmpdir,
                 "XDG_CONFIG_HOME": tmpdir,
+                "XDG_STATE_HOME": tmpdir,
                 "NOCTALIA_CONFIG_HOME": tmpdir,
+                "NOCTALIA_STATE_HOME": tmpdir,
             }
 
             try:
@@ -377,6 +400,10 @@ class Sync:
                     dest_file = config_dest / rel_path
                     if dest_file.is_file():
                         raw = src_file.read_bytes()
+                        if rel_path.suffix == ".css":
+                            raw = re.sub(
+                                rb"[ \t]+(?=\r?$)", b"", raw, flags=re.MULTILINE
+                            )
                         if raw != read(dest_file):
                             updated.append((dest_file, rel_path, raw))
 
@@ -591,6 +618,7 @@ def main():
     parser.add_argument("operation", choices=("capture", "deploy"))
     parser.add_argument("--user", required=True, help=argparse.SUPPRESS)
     parser.add_argument("--home-configuration", required=True, help=argparse.SUPPRESS)
+    parser.add_argument("--builtin-palettes", type=Path, help=argparse.SUPPRESS)
     parser.add_argument("--repo", type=Path, default=Path.cwd())
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--replace-overrides", action="store_true")
@@ -619,6 +647,7 @@ def main():
         config_root / "noctalia",
         state_root / "noctalia",
         control,
+        builtin_palettes=args.builtin_palettes,
     )
     try:
         require(

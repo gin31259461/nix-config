@@ -233,10 +233,11 @@ alpha = 0.42
 direction = "down"
 
 [theme]
+builtin = "Tokyo-Night"
 mode = "dark"
 pure_black_dark = false
 shell_mode = "dark"
-source = "wallpaper"
+source = "builtin"
 wallpaper_scheme = "m3-content"
 
 [theme.templates]
@@ -263,7 +264,13 @@ transition = [
 transition_duration = 900
 
 [wallpaper.default]
-path = "/home/abnertu/Pictures/Wallpapers/Noctalia/moonlight.png"
+path = "/home/abnertu/Pictures/Wallpapers/arch-building-with-girl-5.png"
+
+[wallpaper.last]
+path = "/home/abnertu/Pictures/Wallpapers/arch-building-with-girl-5.png"
+
+[wallpaper.monitors.HDMI-A-1]
+path = "/home/abnertu/Pictures/Wallpapers/arch-building-with-girl-5.png"
 
 [widget.audio_visualizer]
 color_2 = "tertiary"

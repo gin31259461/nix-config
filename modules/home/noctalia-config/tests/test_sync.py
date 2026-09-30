@@ -11,6 +11,7 @@ import sys
 import tempfile
 import unittest
 
+builtin_palettes = Path(sys.argv.pop(1))
 spec = importlib.util.spec_from_file_location("sync", sys.argv.pop())
 assert spec is not None and spec.loader is not None
 sync = importlib.util.module_from_spec(spec)
@@ -47,6 +48,7 @@ class SyncTests(unittest.TestCase):
             self.state,
             self.control,
             self.run_fake,
+            builtin_palettes=builtin_palettes,
         )
         self.instance.stopped = self.stopped
 
@@ -267,6 +269,38 @@ class SyncTests(unittest.TestCase):
         self.instance.capture()
         self.assertEqual(kitty_file.read_bytes(), b"tokyo-kitty")
         self.assertTrue(any("--theme-json" in argv for argv in theme_args))
+
+    def test_capture_renders_builtin_palette_without_community_cache(self):
+        self.exported["theme"] = {
+            "source": "builtin",
+            "builtin": "Tokyo-Night",
+            "mode": "dark",
+        }
+        kitty_file = self.repo / "files/home/.config/kitty/themes/noctalia.conf"
+        kitty_file.parent.mkdir(parents=True, exist_ok=True)
+        kitty_file.write_bytes(b"old-kitty")
+
+        gtk_file = self.repo / "files/home/.config/gtk-4.0/noctalia.css"
+        gtk_file.parent.mkdir(parents=True, exist_ok=True)
+        gtk_file.write_bytes(b"old-gtk")
+
+        def fake_theme(argv, env, cwd):
+            self.assertIn("--theme-json", argv)
+            palette = Path(argv[argv.index("--theme-json") + 1])
+            self.assertEqual(
+                json.loads(palette.read_text())["dark"]["mPrimary"], "#7AA2F7"
+            )
+            output = Path(env["XDG_CONFIG_HOME"]) / "kitty/themes/noctalia.conf"
+            output.parent.mkdir(parents=True, exist_ok=True)
+            output.write_bytes(b"tokyo-kitty")
+            gtk_output = Path(env["XDG_CONFIG_HOME"]) / "gtk-4.0/noctalia.css"
+            gtk_output.parent.mkdir(parents=True, exist_ok=True)
+            gtk_output.write_bytes(b".color { color: blue; \n}\n")
+
+        self.theme_handler = fake_theme
+        self.instance.capture()
+        self.assertEqual(kitty_file.read_bytes(), b"tokyo-kitty")
+        self.assertEqual(gtk_file.read_bytes(), b".color { color: blue;\n}\n")
 
     def test_wallpaper_commands_are_excluded_from_capture(self):
         self.exported["wallpaper"] = {

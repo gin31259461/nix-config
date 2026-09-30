@@ -14,6 +14,7 @@ pkgs.writeShellApplication {
   text = ''
     exec ${python}/bin/python ${./sync.py} \
       --user ${pkgs.lib.escapeShellArg username} \
-      --home-configuration ${pkgs.lib.escapeShellArg homeConfiguration} "$@"
+      --home-configuration ${pkgs.lib.escapeShellArg homeConfiguration} \
+      --builtin-palettes ${./builtin-palettes.json} "$@"
   '';
 }

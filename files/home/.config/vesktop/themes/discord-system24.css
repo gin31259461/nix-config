@@ -15,7 +15,7 @@ body {
   letter-spacing: normal;
   font-size: 14px;
   --gap: 12px;
-  
+
   --divider-thickness: 1px;
   --border-thickness: 1px;
 
@@ -46,27 +46,27 @@ body {
   --radius-xxl: 0px !important;
   --radius-round: 0px !important;
 
-  --text-0: #131316;
-  --text-1: #e5e1e5;
-  --text-2: color-mix(in srgb, #e5e1e5 90%, transparent);
-  --text-3: color-mix(in srgb, #e5e1e5 75%, transparent);
-  --text-4: color-mix(in srgb, #e5e1e5 60%, transparent);
-  --text-5: color-mix(in srgb, #e5e1e5 45%, transparent);
+  --text-0: #1a1b26;
+  --text-1: #c0caf5;
+  --text-2: color-mix(in srgb, #c0caf5 90%, transparent);
+  --text-3: color-mix(in srgb, #c0caf5 75%, transparent);
+  --text-4: color-mix(in srgb, #c0caf5 60%, transparent);
+  --text-5: color-mix(in srgb, #c0caf5 45%, transparent);
 
-  --bg-1: #131316;
-  --bg-2: #47464e;
-  --bg-3: #47464e;
-  --bg-4: #131316;
+  --bg-1: #1a1b26;
+  --bg-2: #24283b;
+  --bg-3: #24283b;
+  --bg-4: #1a1b26;
 
-  --hover: #47464e;
-  --active: #47464e;
-  --message-hover: #47464e;
+  --hover: #24283b;
+  --active: #24283b;
+  --message-hover: #24283b;
 
-  --accent-1: #c5c2f3;
+  --accent-1: #7aa2f7;
   --accent-2: var(--accent-1);
-  --accent-3: #c7c4da;
-  --accent-4: #47464e;
-  --accent-5: #eeb6d7;
+  --accent-3: #bb9af7;
+  --accent-4: #24283b;
+  --accent-5: #9ece6a;
   --accent-6: var(--accent-1);
 
   --border-light: color-mix(in srgb, var(--accent-1) 10%, transparent);
@@ -80,11 +80,11 @@ body {
   --list-active: var(--accent-1);
   --pill-active: var(--accent-1);
 
-  --online: #c5c2f3;
-  --idle: #eeb6d7;
-  --dnd: #ffb4ab;
-  --streaming: #c7c4da;
-  --offline: #928f99;
+  --online: #7aa2f7;
+  --idle: #9ece6a;
+  --dnd: #f7768e;
+  --streaming: #bb9af7;
+  --offline: #5d6682;
 }
 
 /* --- GLOBAL RESET --- */
@@ -124,7 +124,7 @@ body {
   border-color: var(--bg-2) !important;
 }
 
-[class*="bannerButton"], 
+[class*="bannerButton"],
 [class*="bannerColor"] {
   color: var(--text-1) !important;
 }
@@ -292,13 +292,13 @@ body {
 
 /* --- CHANNELS LIST --- */
 [class*="link_"] * {
-  color: #e5e1e5 !important;
+  color: #c0caf5 !important;
   opacity: 0.65 !important;
 }
 
 [class*="modeUnread_"] [class*="link_"] *,
 [class*="modeUnreadImportant_"] [class*="link_"] * {
-  color: #e5e1e5 !important;
+  color: #c0caf5 !important;
   opacity: 1 !important;
 }
 
@@ -308,24 +308,24 @@ body {
 }
 
 [class*="modeSelected_"] [class*="link_"] * {
-  color: #e5e1e5 !important;
+  color: #c0caf5 !important;
   opacity: 1 !important;
 }
 
 [class*="modeMuted_"] [class*="link_"] * {
-  color: #e5e1e5 !important;
+  color: #c0caf5 !important;
   opacity: 0.30 !important;
 }
 
 /* --- DIRECT MESSAGES --- */
 [class*="privateChannels_"] [class*="channel_"] * {
-  color: #e5e1e5 !important;
+  color: #c0caf5 !important;
   opacity: 0.95 !important;
 }
 
 [class*="privateChannels_"] [class*="selected_"] *,
 [class*="privateChannels_"] [class*="channel_"]:hover * {
-  color: #e5e1e5 !important;
+  color: #c0caf5 !important;
   opacity: 1 !important;
 }
 

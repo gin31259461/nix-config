@@ -77,36 +77,36 @@ body {
   --colors: on; /* off: discord default colors, on: midnight custom colors */
 
   /* text colors */
-  --text-0: #131316; /* text on colored elements */
-  --text-1: #e5e1e5; /* other normally white text */
-  --text-2: #e5e1e5; /* headings and important text */
-  --text-3: #c8c5cf; /* normal text */
-  --text-4: #928f99; /* icon buttons and channels */
-  --text-5: #47464e; /* muted channels/chats and timestamps */
+  --text-0: #1a1b26; /* text on colored elements */
+  --text-1: #c0caf5; /* other normally white text */
+  --text-2: #c0caf5; /* headings and important text */
+  --text-3: #9aa5ce; /* normal text */
+  --text-4: #5d6682; /* icon buttons and channels */
+  --text-5: #3d4355; /* muted channels/chats and timestamps */
 
   /* background and dark colors */
-  --bg-1: #0e0e11; /* dark buttons when clicked */
-  --bg-2: #1c1b1e; /* dark buttons */
-  --bg-3: #201f22; /* spacing, secondary elements */
-  --bg-4: #131316; /* main background color */
-  --hover: #e5e1e515; /* channels and buttons when hovered */
-  --active: #353437; /* channels and buttons when clicked or selected */
-  --active-2: #131316; /* extra state for transparent buttons */
-  --message-hover: #47464e40; /* messages when hovered */
+  --bg-1: #1c1d2a; /* dark buttons when clicked */
+  --bg-2: #1f2130; /* dark buttons */
+  --bg-3: #24283b; /* spacing, secondary elements */
+  --bg-4: #1a1b26; /* main background color */
+  --hover: #c0caf515; /* channels and buttons when hovered */
+  --active: #333954; /* channels and buttons when clicked or selected */
+  --active-2: #1a1b26; /* extra state for transparent buttons */
+  --message-hover: #24283b40; /* messages when hovered */
 
   /* accent colors */
-  --accent-1: #c5c2f3; /* links and other accent text */
-  --accent-2: #52507a; /* small accent elements */
-  --accent-3: #c7c4da; /* accent buttons */
-  --accent-4: #b6b3c8; /* accent buttons when hovered */
-  --accent-5: #c7c4da; /* accent buttons when clicked */
-  --accent-new: #ffb4ab; /* stuff that's normally red like mute/deafen buttons */
+  --accent-1: #7aa2f7; /* links and other accent text */
+  --accent-2: #0940b5; /* small accent elements */
+  --accent-3: #bb9af7; /* accent buttons */
+  --accent-4: #dfd0fb; /* accent buttons when hovered */
+  --accent-5: #bb9af7; /* accent buttons when clicked */
+  --accent-new: #f7768e; /* stuff that's normally red like mute/deafen buttons */
 
-    --mention: linear-gradient(to right, color-mix(in hsl, #52507a, transparent 90%) 40%, transparent); /* background of messages that mention you */
-  --mention-hover: linear-gradient(to right, color-mix(in hsl, #52507a, transparent 95%) 40%, transparent); /* background of messages that mention you when hovered */
+    --mention: linear-gradient(to right, color-mix(in hsl, #0940b5, transparent 90%) 40%, transparent); /* background of messages that mention you */
+  --mention-hover: linear-gradient(to right, color-mix(in hsl, #0940b5, transparent 95%) 40%, transparent); /* background of messages that mention you when hovered */
 
-    --reply: linear-gradient(to right, color-mix(in hsl, #724763, transparent 90%) 40%, transparent); /* background of messages that reply to you */
-  --reply-hover: linear-gradient(to right, color-mix(in hsl, #724763, transparent 95%) 40%, transparent); /* background of messages that reply to you when hovered */
+    --reply: linear-gradient(to right, color-mix(in hsl, #44691c, transparent 90%) 40%, transparent); /* background of messages that reply to you */
+  --reply-hover: linear-gradient(to right, color-mix(in hsl, #44691c, transparent 95%) 40%, transparent); /* background of messages that reply to you when hovered */
 
   /* status indicator colors */
   --online: var(--green-2); /* change to #43a25a for default */
@@ -159,7 +159,7 @@ body {
 }
 
 /* Profile Banners */
-[class*="bannerButton"], 
+[class*="bannerButton"],
 [class*="bannerColor"] {
   color: var(--text-1) !important;
 }
