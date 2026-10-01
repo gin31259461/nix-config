@@ -22,7 +22,7 @@ let
       initramfsImages = cfg.hardware.initramfs.images;
     };
     ai = cfg.programs.ai;
-    virtualization = cfg.virtualisation;
+    virtualization = cfg.virtualization;
     systemSettings = {
       hostname.enable = cfg.networking.hostname.enable;
       firewall = setting cfg.networking.firewall;

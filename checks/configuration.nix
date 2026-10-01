@@ -20,7 +20,7 @@ let
       programs.sunshine.enable = false;
       programs.vesktop.enable = false;
       programs.vicinae.enable = false;
-      virtualisation.enable = false;
+      virtualization.enable = false;
       services.gitlabRunner.enable = false;
       services.personalAgent.enable = false;
       services.searxng.enable = false;
@@ -201,7 +201,7 @@ assert lib.all (text: lib.hasInfix text home.config.programs.zsh.initContent) [
 assert switchesWork;
 assert builtins.length merged.host.systemSettings.firewall.rules == 2;
 assert builtins.attrNames oneRunner.host.gitlabRunners == [ "dotnet" ];
-assert base.config.programs.ai.enable && base.config.virtualisation.kvm.gui.enable;
+assert base.config.programs.ai.enable && base.config.virtualization.kvm.gui.enable;
 assert base.host.systemSettings.trim.enable;
 assert override.host.name == "overridden" && override.host.systemSettings.timeZone == "UTC";
 assert override.host.systemSettings.firewall.rules == [ ];

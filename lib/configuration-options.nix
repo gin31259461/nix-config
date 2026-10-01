@@ -160,6 +160,6 @@ in
     "overview"
     "tailscaleTray"
   ];
-  virtualisation = import ../modules/virtualization/options.nix { inherit lib; };
+  virtualization = import ../modules/virtualization/options.nix { inherit lib; };
   users.users = option (types.attrsOf user) { } "Existing human login accounts.";
 }
