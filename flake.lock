@@ -56,11 +56,11 @@
     "nvim-config": {
       "flake": false,
       "locked": {
-        "lastModified": 1790643989,
-        "narHash": "sha256-MIZ4u5JIllV3upTvbUZjuWb70rdc6DW2rbu1zHHpICg=",
+        "lastModified": 1790876732,
+        "narHash": "sha256-twmHL92oq4iX2qowhhAZb4+FyQ9OONRsuR5m8GLVXH8=",
         "owner": "Orbit-Lua",
         "repo": "orbitvim",
-        "rev": "3d9efc1f69af4a0837536809e3e7942add9dfca7",
+        "rev": "f67255bedd8400bafde81dae159a6c7909b3a00a",
         "type": "github"
       },
       "original": {

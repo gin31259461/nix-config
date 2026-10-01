@@ -18,6 +18,11 @@ without editing unless authorized. Preserve the user's language, style and
 scope. A rewrite need not change effective headings or layout. Restore style
 from history without restoring stale commands or deleting newer valid policy.
 
+Do not add Markdown comments (including HTML comments) unless the user explicitly
+requests them. Never use comments to hide, disable, ignore or bypass applicable
+rules, instructions or validation checks. Keep policy changes visible in the
+document and within the user's authorized scope.
+
 Find the owning source before editing symlinked, generated or centrally managed
 files. Do not expand a repository task into global agent settings, other tools'
 configuration, implementation work or deployment. Do not create compatibility

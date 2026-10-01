@@ -20,10 +20,10 @@ Use these subagents with explicit model and reasoning-effort settings:
 
 | Phase | Model | Effort | Deliverable |
 | --- | --- | --- | --- |
-| Plan | `gpt-6-astra` | `xhigh` | Evidence, complete proposed plan, dependencies and acceptance criteria |
-| Discuss | `gpt-6-sol` | `medium` | Implementation tradeoffs, focused questions and revised decisions |
+| Plan | `gpt-6.1-sol` | `xhigh` | Evidence, complete proposed plan, dependencies and acceptance criteria |
+| Discuss | `gpt-6.1-sol` | `low` | Implementation tradeoffs, focused questions and revised decisions |
 | Develop | `gpt-6-luna` | `medium` | Implemented slices, relevant tests, docs and verification results |
-| Finalize | `gpt-6-sol` | `medium` | Independent completion review, final commit organization and handoff |
+| Finalize | `gpt-6.1-sol` | `low` | Independent completion review, final commit organization and handoff |
 
 The primary agent keeps the user conversation, approval state, integration and
 overall completion responsibility. These settings select phase subagents; they

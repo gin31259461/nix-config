@@ -16,6 +16,11 @@ refresh only the requested material for a focused update. Audit produces finding
 without edits unless authorized. A rewrite reassesses substance and organization
 but may preserve an already effective outline.
 
+Do not add Markdown comments (including HTML comments) unless the user explicitly
+requests them. Never use comments to hide, disable, ignore or bypass applicable
+rules, instructions or validation checks. Keep policy changes visible in the
+document and within the user's authorized scope.
+
 Respect the user's audience, language, tone and visual preferences. Otherwise,
 follow the repository's established language and presentation. For restoration,
 use history to recover style while retaining current facts and commands; never
