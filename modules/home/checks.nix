@@ -3,6 +3,7 @@
   home,
   inputs,
   user,
+  adapterPython,
 }:
 let
   lib = pkgs.lib;
@@ -48,7 +49,7 @@ let
 in
 {
   overview-refresh = import ./overview/checks.nix { inherit pkgs; };
-  noctalia-config = import ./noctalia-config/checks.nix { inherit pkgs; };
+  noctalia-config = import ./noctalia-config/checks.nix { inherit pkgs adapterPython; };
   noctalia-storage =
     pkgs.runCommand "noctalia-storage-check" { nativeBuildInputs = [ pkgs.python3 ]; }
       ''

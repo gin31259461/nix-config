@@ -132,7 +132,7 @@
       };
       noctaliaEnabled = builtins.elem "noctalia-config" deploymentUser.modules;
       noctalia-config = import ./modules/home/noctalia-config/package.nix {
-        inherit pkgs;
+        inherit pkgs adapterPython;
         username = deployment.username;
         homeConfiguration = homeConfigurationName;
       };
@@ -155,7 +155,6 @@
       devShells.${system}.default = pkgs.mkShell {
         packages = [
           (pkgs.python3.withPackages (pythonPackages: [
-            pythonPackages.tomli-w
             pythonPackages.rich
             nixAdapter
           ]))
@@ -194,7 +193,7 @@
         aiManifest = archAi.manifest;
       })
       // (import ./modules/home/checks.nix {
-        inherit pkgs inputs;
+        inherit pkgs inputs adapterPython;
         home = archHomes.${homeConfigurationName};
         user = deploymentUser;
       })

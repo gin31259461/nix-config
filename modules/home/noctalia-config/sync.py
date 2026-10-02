@@ -13,9 +13,8 @@ import stat
 import subprocess
 import sys
 import tempfile
-import tomllib
 
-import tomli_w
+from nix_adapter import dump_toml, parse_toml
 
 
 # Whole sections are owned together. Unknown/new sections require code review.
@@ -57,11 +56,11 @@ def safe_path(path):
 
 
 def encode(data):
-    return tomli_w.dumps(data).encode()
+    return dump_toml(data).encode()
 
 
 def parse(raw):
-    return tomllib.loads(raw.decode())
+    return parse_toml(raw)
 
 
 def read(path):

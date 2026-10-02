@@ -3,6 +3,7 @@
   lib,
   pkgs,
   hostName,
+  inputs,
   ...
 }:
 {
@@ -15,6 +16,7 @@
     home.packages = [
       (import ./package.nix {
         inherit pkgs;
+        adapterPython = inputs.nix-adapter.packages.${pkgs.stdenv.hostPlatform.system}.adapterPython;
         username = config.home.username;
         homeConfiguration = "${config.home.username}@${hostName}";
       })

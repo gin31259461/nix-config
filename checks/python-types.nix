@@ -5,7 +5,6 @@
 }:
 let
   python = pkgs.python3.withPackages (packages: [
-    packages.tomli-w
     packages.rich
     nixAdapter
   ]);
