@@ -1,0 +1,4 @@
+# Exclude test files, fixtures, and harnesses from GitHub language statistics
+**/tests/** linguist-detectable=false
+*test*.py linguist-detectable=false
+platforms/arch/tests/native.py linguist-detectable=false
