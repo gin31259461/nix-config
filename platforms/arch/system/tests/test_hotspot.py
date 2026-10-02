@@ -10,7 +10,7 @@ from typing import Any, cast
 import unittest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from nix_adapter import Conflict, Files
+from nix_adapter import Conflict, FakeNative, FakeProcess, Files
 from hotspot import Hotspot, canonical_rule, firewall_rules
 from runtime import System
 
@@ -29,9 +29,9 @@ DESIRED = dict(
 UUID = "11111111-1111-1111-1111-111111111111"
 
 
-class Fake:
+class Fake(FakeNative):
     def __init__(self):
-        self.calls = []
+        super().__init__()
         self.exists = True
         self.duplicate = False
         self.active = True
@@ -48,10 +48,7 @@ class Fake:
             "802-11-wireless-security.key-mgmt": "wpa-psk",
         }
 
-    def available(self, command):
-        return True
-
-    def run(self, *args, check=True):
+    def run(self, *args, check=True, **kwargs):
         self.calls.append(args)
         if args[0] == "systemctl":
             out = "LoadState=loaded\nActiveState=active\nUnitFileState=enabled"
@@ -72,7 +69,7 @@ class Fake:
             out = f"{UUID}:fixture-ap\n" * (2 if self.duplicate else int(self.exists))
         elif "GENERAL.CON-UUID" in args:
             if not self.device_exists:
-                return SimpleNamespace(stdout="", returncode=1)
+                return FakeProcess(stdout="", returncode=1)
             out = self.device_uuid
         elif "--active" in args:
             out = UUID if self.active else ""
@@ -90,7 +87,7 @@ class Fake:
             out = ""
         else:
             raise AssertionError(args)
-        return SimpleNamespace(stdout=out, returncode=0)
+        return FakeProcess(stdout=out, returncode=0)
 
 
 class Tests(unittest.TestCase):

@@ -10,7 +10,7 @@ import tempfile
 from typing import Any, cast
 import unittest
 
-from nix_adapter import Files
+from nix_adapter import FakeNative, FakeProcess, Files
 
 SOURCE = Path(sys.argv.pop()).resolve()
 PACKAGE_CADDY = Path(sys.argv.pop()).resolve()
@@ -20,14 +20,9 @@ runtime = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(runtime)
 
 
-class Result:
-    def __init__(self, stdout="", returncode=0):
-        self.stdout, self.returncode = stdout, returncode
-
-
-class Native:
+class Native(FakeNative):
     def __init__(self):
-        self.calls = []
+        super().__init__()
         self.services = {
             "llama-swap.service": {
                 "LoadState": "loaded",
@@ -42,13 +37,10 @@ class Native:
         }
         self.serve = "{}"
 
-    def available(self, _):
-        return True
-
-    def run(self, *args, check=True):
+    def run(self, *args, check=True, **kwargs):
         self.calls.append(args)
         if args[:2] == ("systemctl", "show"):
-            return Result(
+            return FakeProcess(
                 "\n".join(f"{k}={v}" for k, v in self.services[args[2]].items())
             )
         if args[:2] in (
@@ -61,14 +53,14 @@ class Native:
                 "enabled" if key == "UnitFileState" else "active"
             )
         if args[:4] == ("tailscale", "serve", "status", "--json"):
-            return Result(self.serve)
+            return FakeProcess(self.serve)
         if args[:2] == ("stat", "--format=%a:%U:%G"):
-            return Result("750:caddy:caddy\n")
+            return FakeProcess("750:caddy:caddy\n")
         if args[:2] == ("stat", "--format=%F"):
-            return Result("socket\n")
+            return FakeProcess("socket\n")
         if args[:3] == ("tailscale", "serve", "--bg"):
             self.serve = json.dumps({"443": "http://127.0.0.1:11435"})
-        return Result()
+        return FakeProcess()
 
 
 class AITests(unittest.TestCase):

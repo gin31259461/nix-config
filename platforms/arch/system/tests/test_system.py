@@ -7,20 +7,28 @@ import os
 from pathlib import Path
 import sys
 import tempfile
-from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from firewall import status
-from nix_adapter import Conflict, Files, Native, ini, locale_gen, replace_keys
+from nix_adapter import (
+    Conflict,
+    FakeNative,
+    FakeProcess,
+    Files,
+    Native,
+    ini,
+    locale_gen,
+    replace_keys,
+)
 from runtime import System
 
 
-class Fake:
+class Fake(FakeNative):
     def __init__(self, files):
+        super().__init__()
         self.files = files
-        self.calls = []
         self.fail: tuple[str, ...] | None = None
         self.locales = ["C", "en_US.utf8", "zh_TW.utf8"]
         self.zone = "UTC"
@@ -37,9 +45,6 @@ class Fake:
             {"name": "vda", "type": "disk", "disc-max": 4096, "mountpoints": ["/"]}
         ]
 
-    def available(self, command):
-        return True
-
     def unit(self, name):
         return self.units.setdefault(
             name,
@@ -50,7 +55,7 @@ class Fake:
             },
         )
 
-    def run(self, *args, check=True):
+    def run(self, *args, check=True, **kwargs):
         self.calls.append(args)
         if self.fail and args[: len(self.fail)] == self.fail:
             raise Conflict("injected native failure")
@@ -138,7 +143,7 @@ class Fake:
             raise AssertionError(args)
         if code and check:
             raise Conflict("fake native failed")
-        return SimpleNamespace(stdout=out, returncode=code)
+        return FakeProcess(stdout=out, returncode=code)
 
 
 class SystemTests(unittest.TestCase):
@@ -531,7 +536,7 @@ class SystemTests(unittest.TestCase):
     def test_native_errors_preserve_output(self):
         with patch(
             "nix_adapter.native.subprocess.run",
-            return_value=SimpleNamespace(
+            return_value=FakeProcess(
                 returncode=1, stdout="private fixture", stderr="private fixture"
             ),
         ) as run:

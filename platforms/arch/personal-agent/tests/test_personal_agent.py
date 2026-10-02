@@ -1,10 +1,10 @@
 import importlib.util
 from pathlib import Path
-import subprocess
 import sys
 import tempfile
 import unittest
 
+from nix_adapter import FakeProcess
 
 SOURCE = Path(sys.argv.pop()).resolve()
 spec = importlib.util.spec_from_file_location("personal_agent_adapter", SOURCE)
@@ -53,7 +53,7 @@ class FakeRun:
             output = '{"results":[{"title":"Personal Agent"}]}\n'
         if code and not allow_failure:
             raise adapter.Conflict(f"synthetic failure: {argv[0]}")
-        return subprocess.CompletedProcess(argv, code, output, "")
+        return FakeProcess(output, "", code)
 
 
 class PersonalAgentTests(unittest.TestCase):

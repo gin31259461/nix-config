@@ -1,10 +1,10 @@
 import importlib.util
 from pathlib import Path
-import subprocess
 import sys
 import tempfile
 import unittest
 
+from nix_adapter import FakeProcess
 
 SOURCE = Path(sys.argv.pop()).resolve()
 spec = importlib.util.spec_from_file_location("searxng_adapter", SOURCE)
@@ -34,7 +34,7 @@ class FakeRun:
             output = '{"results":[{"title":"SearXNG"}]}\n'
         if code and not allow_failure:
             raise adapter.Conflict(f"synthetic failure: {argv[0]}")
-        return subprocess.CompletedProcess(argv, code, output, "")
+        return FakeProcess(output, "", code)
 
 
 class SearxngTests(unittest.TestCase):
@@ -96,7 +96,7 @@ class SearxngTests(unittest.TestCase):
         def empty_search(*argv, allow_failure=False):
             result = original_run(*argv, allow_failure=allow_failure)
             if argv[0].endswith("curl"):
-                return subprocess.CompletedProcess(argv, 0, '{"results":[]}\n', "")
+                return FakeProcess('{"results":[]}\n')
             return result
 
         subject = self.subject()
