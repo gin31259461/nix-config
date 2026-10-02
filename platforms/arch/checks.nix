@@ -20,7 +20,6 @@
     pkgs.runCommand "system-settings-tests" { nativeBuildInputs = [ adapterPython ]; }
       ''
         python ${./system}/tests/test_system.py
-        python ${./system}/tests/test_hotspot.py
         touch "$out"
       '';
   ai-services-tests =

@@ -48,6 +48,7 @@ let
   };
   runners = import ../modules/gitlab-runner {
     inherit lib pkgs;
+    gitlab-runner = inputs.gitlab-runner;
     rawInstances = host.gitlabRunners;
   };
   packages = import ../platforms/arch/packages.nix {

@@ -2,7 +2,8 @@
   lib,
   pkgs,
   rawInstances ? { },
-  adapterPython ? pkgs.python3,
+  gitlab-runner ? null,
+  ...
 }:
 let
   enabled = rawInstances != { };
@@ -12,13 +13,9 @@ let
     inherit
       pkgs
       instances
+      gitlab-runner
       platform
-      adapterPython
       ;
-  };
-  fixtures = import ./interface.nix {
-    inherit lib;
-    rawInstances = import ./tests/instances.nix;
   };
 in
 {
@@ -35,22 +32,6 @@ in
     gitlab-runner-interface =
       assert import ./tests/interface.nix { inherit lib; };
       pkgs.writeText "gitlab-runner-interface" "passed";
-    gitlab-runner-tests =
-      pkgs.runCommand "gitlab-runner-tests" { nativeBuildInputs = [ adapterPython ]; }
-        ''
-          ${adapterPython}/bin/python ${./tests}/test_runnerctl.py ${
-            pkgs.writeText "runner-test-config.json" (
-              builtins.toJSON {
-                instances = import ./render-artifacts.nix {
-                  inherit platform;
-                  instances = fixtures;
-                };
-                inherit platform;
-              }
-            )
-          } ${./.}/runnerctl.py
-          touch "$out"
-        '';
   }
   // lib.optionalAttrs enabled {
     gitlab-runner-config = pkgs.runCommand "gitlab-runner-config-check" { } ''

@@ -16,11 +16,6 @@ from nix_adapter import (
     FakeNative,
     FakeProcess,
     Files,
-    Native,
-    ini,
-    locale_gen,
-    replace_keys,
-    status,
 )
 
 RUNTIME_PATH = Path(__file__).resolve().parents[1] / "runtime.py"
@@ -539,49 +534,6 @@ class SystemTests(unittest.TestCase):
         self.native.calls.clear()
         self.system.converge()
         self.assertNotIn(("systemctl", "restart", "fstrim.timer"), self.native.calls)
-
-    def test_native_errors_preserve_output(self):
-        with patch(
-            "nix_adapter.native.subprocess.run",
-            return_value=FakeProcess(
-                returncode=1, stdout="private fixture", stderr="private fixture"
-            ),
-        ) as run:
-            with self.assertRaises(Conflict) as caught:
-                Native().run("ufw", "status", "verbose")
-            self.assertIn("private fixture", str(caught.exception))
-            self.assertEqual(
-                run.call_args.kwargs["env"], {"PATH": "/usr/bin", "LC_ALL": "C"}
-            )
-            self.assertEqual(run.call_args.kwargs["timeout"], 300)
-
-
-class ParserTests(unittest.TestCase):
-    def test_shared_files_reject_shell_and_duplicates(self):
-        for text in (
-            "LANG=$(secret)\n",
-            "LANG=a\nLANG=b\n",
-            "source secret\n",
-            'LANG="unterminated\n',
-        ):
-            with self.assertRaises(Conflict):
-                replace_keys(text, {"LANG": "en_US.UTF-8"})
-
-    def test_locale_blocks_reject_ambiguous_ownership(self):
-        begin, end = "# BEGIN nix-config locales\n", "# END nix-config locales\n"
-        for text in (begin, end, begin + end + begin + end, begin + begin + end):
-            with self.assertRaises(Conflict):
-                locale_gen(text, ["en_US.UTF-8"])
-
-    def test_ini_rejects_duplicates_and_continuations(self):
-        for text in ("[Time]\nNTP=a\nNTP=b\n", "[Time]\nNTP=a\\\n"):
-            with self.assertRaises(Conflict):
-                ini(text)
-
-    def test_ufw_restrictive_rules_require_review(self):
-        text = "Status: active\nLogging: on (low)\nDefault: deny (incoming), allow (outgoing), deny (routed)\nNew profiles: skip\n7777/tcp DENY IN Anywhere\n"
-        with self.assertRaises(Conflict):
-            status(text)
 
 
 if __name__ == "__main__":

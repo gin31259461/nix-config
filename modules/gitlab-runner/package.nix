@@ -1,8 +1,8 @@
 {
   pkgs,
   instances,
+  gitlab-runner ? null,
   platform ? import ./arch-platform.nix,
-  adapterPython ? pkgs.python3,
 }:
 let
   manifestInstances = import ./render-artifacts.nix { inherit platform instances; };
@@ -12,11 +12,13 @@ let
       inherit platform;
     }
   );
+  runnerctlPackage =
+    if gitlab-runner != null then gitlab-runner.packages.${pkgs.system}.default else pkgs.emptyFile;
 in
 pkgs.writeShellApplication {
   name = "runnerctl";
-  runtimeInputs = [ adapterPython ];
+  runtimeInputs = [ runnerctlPackage ];
   text = ''
-    exec ${adapterPython}/bin/python ${./.}/runnerctl.py --config ${config} "$@"
+    exec runnerctl --config ${config} "$@"
   '';
 }

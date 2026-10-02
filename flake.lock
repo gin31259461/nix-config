@@ -1,5 +1,28 @@
 {
   "nodes": {
+    "gitlab-runner": {
+      "inputs": {
+        "nix-adapter": [
+          "nix-adapter"
+        ],
+        "nixpkgs": [
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1790959014,
+        "narHash": "sha256-DuMgHcq4D1w6y7lsQQGRFNCAKl1vjPiu784nZyuhZoc=",
+        "owner": "gin31259461",
+        "repo": "gitlab-runner",
+        "rev": "f6517d4aea4248253eb2b907e6a26818ee8a4bc9",
+        "type": "github"
+      },
+      "original": {
+        "owner": "gin31259461",
+        "repo": "gitlab-runner",
+        "type": "github"
+      }
+    },
     "home-manager": {
       "inputs": {
         "nixpkgs": [
@@ -164,6 +187,7 @@
     },
     "root": {
       "inputs": {
+        "gitlab-runner": "gitlab-runner",
         "home-manager": "home-manager",
         "hypr-config": "hypr-config",
         "nix-adapter": "nix-adapter",

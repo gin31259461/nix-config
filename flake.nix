@@ -27,6 +27,12 @@
       url = "github:gin31259461/nix-adapter";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+
+    gitlab-runner = {
+      url = "github:gin31259461/gitlab-runner";
+      inputs.nixpkgs.follows = "nixpkgs";
+      inputs.nix-adapter.follows = "nix-adapter";
+    };
   };
 
   outputs =
@@ -67,6 +73,7 @@
           pkgs
           adapterPython
           ;
+        gitlab-runner = inputs.gitlab-runner;
         rawInstances = archHost.gitlabRunners;
       };
       ai = import ./modules/ai {
