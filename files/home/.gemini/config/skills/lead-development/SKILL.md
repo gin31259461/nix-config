@@ -18,12 +18,12 @@ committing unrelated work in the current checkout.
 
 Use these subagents with explicit model settings:
 
-| Phase | Model | Deliverable |
-| --- | --- | --- |
-| Plan | `pro` | Evidence, complete proposed plan, dependencies and acceptance criteria |
-| Discuss | `inherit` | Implementation tradeoffs, focused questions and revised decisions |
-| Develop | `inherit` | Implemented slices, relevant tests, docs and verification results |
-| Finalize | `inherit` | Independent completion review, final commit organization and handoff |
+| Phase | Model | Effort | Deliverable |
+| --- | --- | --- | --- |
+| Plan | `gemini-3.8-flash` | `high` | Evidence, complete proposed plan, dependencies and acceptance criteria |
+| Discuss | `gemini-3.8-flash` | `high` | Implementation tradeoffs, focused questions and revised decisions |
+| Develop | `gemini-3.8-flash` | `high` | Implemented slices, relevant tests, docs and verification results |
+| Finalize | `gemini-3.8-flash` | `high` | Independent completion review, final commit organization and handoff |
 
 The primary agent keeps the user conversation, approval state, integration and
 overall completion responsibility. These settings select phase subagents; they
