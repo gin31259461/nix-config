@@ -63,7 +63,7 @@ class PersonalAgent(BaseServiceAdapter):
         if keys != {"DISCORD_TOKEN", "NOTION_TOKEN"}:
             raise Conflict("Personal Agent secret configuration is incomplete")
 
-    def preflight(self) -> None:
+    def preflight(self, installed: bool = False) -> None:
         if not self.desired.get("enabled"):
             return
         missing = [key for key in ("config", "secrets") if not self.path(key).exists()]

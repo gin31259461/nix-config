@@ -1,27 +1,19 @@
 """Converge Arch-owned llama.cpp, Caddy and Tailscale Serve policy."""
 
-import json
 import os
-import sys
 import time
 from pathlib import Path
 
-from nix_adapter import Conflict, Files, Native
+from nix_adapter import BaseAdapter, Conflict
 
 SWITCHER_CONFIG = "/etc/llama-swap/config.yaml"
 SWITCHER_UNIT = "/etc/systemd/system/llama-swap.service"
 
 
-class AI:
+class AI(BaseAdapter):
     def __init__(self, desired, files=None, native=None):
-        self.desired = desired
-        self.files = files or Files()
-        self.native = native or Native()
-        self.updates = 0
-        self.actions = 0
-
-    def run(self, *args, **kwargs):
-        return self.native.run(*args, **kwargs)
+        root = getattr(files, "root", Path("/")) if files else Path("/")
+        super().__init__(desired=desired, root=root, runner=native, files=files)
 
     @staticmethod
     def model_receipt(model, declaration):
@@ -46,21 +38,6 @@ class AI:
                 "",
             ]
         )
-
-    def unit(self, name):
-        output = self.run(
-            "systemctl", "show", name, "--property=LoadState,ActiveState,UnitFileState"
-        ).stdout
-        return dict(line.split("=", 1) for line in output.splitlines() if "=" in line)
-
-    def require_unit(self, name):
-        state = self.unit(name)
-        if state.get("LoadState") != "loaded" or state.get("UnitFileState") in (
-            "masked",
-            "masked-runtime",
-        ):
-            raise Conflict("required AI system unit is missing or masked")
-        return state
 
     def caddy_main(self):
         generated = self.desired["generated"]
@@ -160,13 +137,6 @@ class AI:
                 raise Conflict("a required native AI command is missing")
             if d["proxy"]:
                 self.require_unit("caddy.service")
-        return True
-
-    def write(self, path, text, action):
-        if self.files.matches(path, text):
-            return False
-        self.files.mark(action)
-        self.updates += int(self.files.write(path, text))
         return True
 
     def ensure_service(self, name, action, restart=False):
@@ -296,28 +266,3 @@ class AI:
         print(
             f"AI services converged: {self.updates} files updated, {self.actions} runtime actions."
         )
-
-
-def main():
-    if (
-        len(sys.argv) != 3
-        or sys.argv[2] not in ("preflight", "converge")
-        or os.geteuid() != 0
-    ):
-        raise Conflict("private AI adapter must be invoked by arch-switch")
-    ai = AI(json.loads(Path(sys.argv[1]).read_text()))
-    ai.preflight() if sys.argv[2] == "preflight" else ai.converge()
-
-
-if __name__ == "__main__":
-    try:
-        main()
-    except Conflict as error:
-        print(f"AI services: {error}.", file=sys.stderr)
-        sys.exit(1)
-    except (OSError, ValueError, KeyError):
-        print(
-            "AI services failed; review native prerequisites and pending actions.",
-            file=sys.stderr,
-        )
-        sys.exit(1)

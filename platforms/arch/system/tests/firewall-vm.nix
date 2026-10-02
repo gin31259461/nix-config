@@ -91,7 +91,7 @@ pkgs.testers.runNixOSTest {
     machine.succeed("iptables -N ts-input; iptables -I INPUT -j ts-input; iptables -N LIBVIRT_FWI; iptables -I FORWARD -j LIBVIRT_FWI")
     machine.succeed("nft add table ip fixture_nat; nft 'add chain ip fixture_nat postrouting { type nat hook postrouting priority srcnat; }'; nft add rule ip fixture_nat postrouting ip saddr 198.51.100.0/24 masquerade")
     machine.succeed("/usr/bin/ufw allow in 12345/tcp")
-    adapter = "${adapterPython}/bin/python3 ${../.}/runtime.py ${manifest} converge"
+    adapter = "${adapterPython}/bin/python3 ${../.}/adapter.py ${manifest} converge"
     result, output = machine.execute(adapter)
     if result:
         print(machine.execute("/usr/bin/ufw status verbose"))

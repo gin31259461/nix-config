@@ -10,6 +10,8 @@ import tempfile
 from typing import Any, cast
 import unittest
 
+from nix_adapter import Files
+
 SOURCE = Path(sys.argv.pop()).resolve()
 PACKAGE_CADDY = Path(sys.argv.pop()).resolve()
 spec = importlib.util.spec_from_file_location("ai_runtime", SOURCE)
@@ -92,7 +94,7 @@ class AITests(unittest.TestCase):
         )
         (self.root / "opt/llama/current").symlink_to("revisions/deadbeef-20000")
         (self.root / "var/lib/llama/models/model.gguf").write_text("model")
-        self.files = runtime.Files(self.root, (os.getuid(), os.getgid()))
+        self.files = Files(self.root, (os.getuid(), os.getgid()))
         self.native = Native()
         self.desired = {
             "llama": True,

@@ -5,14 +5,11 @@ native runner directly; production accepts no root/command overrides.
 """
 
 import hashlib
-import json
 import os
 from pathlib import Path
-import sys
-
 from firewall import Firewall
 from hotspot import Hotspot
-from nix_adapter import Conflict, Files, Native, Systemd, locale_gen, replace_keys
+from nix_adapter import BaseAdapter, Conflict, locale_gen, replace_keys
 from nix_adapter.system import (
     check_discard_support,
     get_hostname,
@@ -23,31 +20,10 @@ from nix_adapter.system import (
 )
 
 
-class System:
+class System(BaseAdapter):
     def __init__(self, desired, files=None, native=None):
-        self.desired = desired
-        self.files = files or Files()
-        self.native = native or Native()
-        self.systemd = Systemd(self.native)
-        self.updates = 0
-        self.actions = 0
-
-    def run(self, *args, **kwargs):
-        return self.native.run(*args, **kwargs)
-
-    def unit(self, name):
-        return self.systemd.show(
-            name, properties=["LoadState", "ActiveState", "UnitFileState"]
-        )
-
-    def ready_unit(self, name):
-        state = self.unit(name)
-        if state.get("LoadState") != "loaded" or state.get("UnitFileState") in (
-            "masked",
-            "masked-runtime",
-        ):
-            raise Conflict("required system unit is missing or masked")
-        return state
+        root = getattr(files, "root", Path("/")) if files else Path("/")
+        super().__init__(desired=desired, root=root, runner=native, files=files)
 
     def service(self, name, action, restart=False):
         state = self.ready_unit(name)
@@ -68,13 +44,6 @@ class System:
             or state.get("UnitFileState") != "enabled"
         ):
             raise Conflict("required system unit did not become ready")
-
-    def write(self, path, text, action):
-        if not self.files.matches(path, text):
-            self.files.mark(action)
-            self.updates += int(self.files.write(path, text))
-            return True
-        return False
 
     def localtime(self):
         return get_timezone(runner=self.native, root=self.files.root)
@@ -366,32 +335,3 @@ class System:
                 print(
                     "Power event configuration pending: reboot required; desktop inhibitors still apply."
                 )
-
-
-def main():
-    if (
-        len(sys.argv) != 3
-        or sys.argv[2] not in ("preflight", "converge")
-        or os.geteuid() != 0
-    ):
-        raise Conflict("private adapter must be invoked by arch-switch")
-    system = System(json.loads(Path(sys.argv[1]).read_text()))
-    if sys.argv[2] == "preflight":
-        system.preflight()
-    else:
-        system.converge()
-
-
-if __name__ == "__main__":
-    try:
-        main()
-    except Conflict as error:
-        print(f"System settings: {error}.", file=sys.stderr)
-        sys.exit(1)
-    except (OSError, ValueError, KeyError):
-        # Fixed diagnostics only: exceptions may contain private native output.
-        print(
-            "System settings failed; review ownership, native prerequisites and pending actions using the operator guide.",
-            file=sys.stderr,
-        )
-        sys.exit(1)

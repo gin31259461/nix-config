@@ -38,7 +38,7 @@ class Searxng(BaseServiceAdapter):
         self.run = run
         super().__init__(desired=desired, root=root, runner=_AdapterRunner(self))
 
-    def preflight(self) -> None:
+    def preflight(self, installed: bool = False) -> None:
         pass
 
     def write_unit(
