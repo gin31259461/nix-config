@@ -44,11 +44,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1790914906,
-        "narHash": "sha256-LpWca4uABsoCp5UJPUMCN3y6NZfOpaO8FJkdIUZDhtI=",
+        "lastModified": 1790920266,
+        "narHash": "sha256-nCEgj7ZSyGXrJGHS9cscEbmV+WzuoFZvYjd7X7SRpfw=",
         "owner": "gin31259461",
         "repo": "nix-adapter",
-        "rev": "0e4bd072f6c34c1fdfa617182d2d16c487b0a8bb",
+        "rev": "50e869679aa4e89bb86acbb2d729ce1f63c924ae",
         "type": "github"
       },
       "original": {
