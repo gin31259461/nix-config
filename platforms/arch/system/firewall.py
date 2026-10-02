@@ -1,51 +1,21 @@
 """Additive UFW convergence; never reset or own other tools' netfilter chains."""
 
-import re
-
 from hotspot import converge_firewall
 from nix_adapter import Conflict, assignments
+from nix_adapter.firewall import (
+    check_kernel_policy,
+    check_kernel_rule,
+    format_port_range,
+    parse_ufw_status,
+)
 
 
 def rule_port(rule):
-    start, end = rule["fromPort"], rule["toPort"]
-    return str(start) if end is None or end == start else f"{start}:{end}"
+    return format_port_range(rule["fromPort"], rule["toPort"])
 
 
-def status(text):
-    if text.strip() == "Status: inactive":
-        return {"active": False, "rules": set()}
-    if not text.startswith("Status: active\n"):
-        raise Conflict("unrecognized UFW status")
-    policy = re.search(
-        r"^Default: (deny|allow|reject) \(incoming\), (deny|allow|reject) \(outgoing\), (deny|allow|reject|disabled) \(routed\)$",
-        text,
-        re.M,
-    )
-    logging = re.search(r"^Logging: (off|on \((low|medium|high|full)\))$", text, re.M)
-    profiles = re.search(r"^New profiles: (skip|allow|deny|reject)$", text, re.M)
-    if not policy or not logging or not profiles:
-        raise Conflict("incomplete UFW status")
-    rules = set()
-    for line in text.splitlines():
-        match = re.fullmatch(
-            r"(\d+(?::\d+)?)/(tcp|udp)\s*(\(v6\))?\s+ALLOW IN\s+Anywhere(?: \(v6\))?\s*(?:#.*)?",
-            line,
-        )
-        if match:
-            port, protocol, v6 = match.groups()
-            rules.add((port, protocol, bool(v6)))
-        elif re.search(r"\b(DENY|REJECT|LIMIT)\b", line):
-            # Do not silently append an ineffective allow after another owner's deny.
-            raise Conflict(
-                "UFW has restrictive rules requiring explicit ownership review"
-            )
-    return {
-        "active": True,
-        "rules": rules,
-        "policy": policy.groups(),
-        "logging": logging[2] or "off",
-        "profiles": profiles[1],
-    }
+# Maintain backwards compatibility for callers/tests importing status
+status = parse_ufw_status
 
 
 class Firewall:
@@ -58,7 +28,7 @@ class Firewall:
         return self.system.run(*args, **kwargs)
 
     def snapshot(self):
-        return status(self.run("ufw", "status", "verbose").stdout)
+        return parse_ufw_status(self.run("ufw", "status", "verbose").stdout)
 
     def preflight(self, installed):
         defaults = assignments(self.files.read("/etc/default/ufw"))
@@ -98,41 +68,18 @@ class Firewall:
             self.snapshot()
 
     def kernel_rule(self, rule, v6):
+        chain = "ufw6-user-input" if v6 else "ufw-user-input"
         port = rule_port(rule)
-        match = (
-            ["-m", "multiport", "--dports", port] if ":" in port else ["--dport", port]
-        )
-        return (
-            self.run(
-                "ip6tables" if v6 else "iptables",
-                "-w",
-                "5",
-                "-C",
-                "ufw6-user-input" if v6 else "ufw-user-input",
-                "-p",
-                rule["protocol"],
-                *match,
-                "-j",
-                "ACCEPT",
-                check=False,
-            ).returncode
-            == 0
+        return check_kernel_rule(
+            chain=chain,
+            protocol=rule["protocol"],
+            port=port,
+            v6=v6,
+            runner=self.system.native,
         )
 
     def kernel_policy(self):
-        for command in ("iptables", "ip6tables"):
-            for chain, policy in (
-                ("INPUT", "DROP"),
-                ("OUTPUT", "ACCEPT"),
-                ("FORWARD", "DROP"),
-            ):
-                result = self.run(command, "-w", "5", "-S", chain, check=False)
-                if (
-                    result.returncode
-                    or f"-P {chain} {policy}" not in result.stdout.splitlines()
-                ):
-                    return False
-        return True
+        return check_kernel_policy(runner=self.system.native)
 
     def converge(self):
         f, d = self.files, self.desired

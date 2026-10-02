@@ -13,6 +13,14 @@ import sys
 from firewall import Firewall
 from hotspot import Hotspot
 from nix_adapter import Conflict, Files, Native, Systemd, locale_gen, replace_keys
+from nix_adapter.system import (
+    check_discard_support,
+    get_hostname,
+    get_timezone,
+    is_ntp_synchronized,
+    set_hostname,
+    set_timezone,
+)
 
 
 class System:
@@ -69,27 +77,7 @@ class System:
         return False
 
     def localtime(self):
-        path = self.files.path("/etc/localtime", symlink_leaf=True)
-        if path.exists() and not path.is_symlink():
-            raise Conflict("localtime is not a zoneinfo symlink")
-        if path.is_symlink():
-            target = os.readlink(path)
-            # Permit the two native absolute/relative zoneinfo link forms only.
-            if not (
-                target.startswith("/usr/share/zoneinfo/")
-                or target.startswith("../usr/share/zoneinfo/")
-            ) or ".." in target.removeprefix("../").split("/"):
-                raise Conflict("localtime has an unexpected symlink target")
-        values = self.run(
-            "timedatectl",
-            "show",
-            "--property=Timezone",
-            "--property=LocalRTC",
-        ).stdout
-        state = dict(line.split("=", 1) for line in values.splitlines() if "=" in line)
-        if state.get("LocalRTC") != "no":
-            raise Conflict("local RTC requires an explicit operator decision")
-        return state.get("Timezone")
+        return get_timezone(runner=self.native, root=self.files.root)
 
     def console(self):
         desired = self.desired["console"]
@@ -136,31 +124,7 @@ class System:
         # Custom servers supplement native defaults; per-link sources are not overridden.
 
     def check_trim(self):
-        data = json.loads(
-            self.run(
-                "lsblk",
-                "--json",
-                "--bytes",
-                "--output",
-                "NAME,TYPE,DISC-MAX,MOUNTPOINTS",
-            ).stdout
-        )
-
-        def walk(devices, encrypted=False):
-            suitable = False
-            for device in devices:
-                crypt = encrypted or device["type"] == "crypt"
-                mounted = any(device.get("mountpoints") or [])
-                if mounted and crypt:
-                    raise Conflict(
-                        "encrypted mounted storage needs a separate discard policy"
-                    )
-                suitable |= mounted and int(device.get("disc-max") or 0) > 0
-                suitable |= walk(device.get("children", []), crypt)
-            return suitable
-
-        if not walk(data["blockdevices"]):
-            raise Conflict("no mounted discard-capable device was found")
+        check_discard_support(runner=self.native)
         # A second custom fstrim timer/cron owner must be resolved by the operator.
         output = self.run(
             "systemctl", "list-timers", "--all", "--no-legend", "--no-pager"
@@ -291,7 +255,7 @@ class System:
                 or not f.metadata_matches("/etc/localtime", symlink=True)
             ):
                 f.mark("timezone")
-                self.run("timedatectl", "set-timezone", d["timeZone"])
+                set_timezone(d["timeZone"], runner=self.native)
                 self.actions += 1
                 if (
                     self.localtime() != d["timeZone"]
@@ -303,15 +267,15 @@ class System:
                 f.clear("timezone")
         if d.get("hostname") is not None:
             for kind in ("--static", "--transient"):
-                actual = self.run("hostnamectl", kind).stdout.strip()
+                actual = get_hostname(runner=self.native, kind=kind)
                 if actual != d["hostname"] or (
                     kind == "--static"
                     and f.read("/etc/hostname").strip() != d["hostname"]
                 ):
                     f.mark("hostname")
-                    self.run("hostnamectl", kind, "set-hostname", d["hostname"])
+                    set_hostname(d["hostname"], runner=self.native, kind=kind)
                     self.actions += 1
-                    if self.run("hostnamectl", kind).stdout.strip() != d["hostname"]:
+                    if get_hostname(runner=self.native, kind=kind) != d["hostname"]:
                         raise Conflict("hostname did not converge")
             if not f.metadata_matches("/etc/hostname"):
                 f.mark("hostname")
@@ -326,12 +290,7 @@ class System:
             pending = f.pending(name)
             if name == "timesyncd":
                 self.service("systemd-timesyncd.service", name, restart=pending)
-                synchronized = (
-                    self.run(
-                        "timedatectl", "show", "--property=NTPSynchronized", "--value"
-                    ).stdout.strip()
-                    == "yes"
-                )
+                synchronized = is_ntp_synchronized(runner=self.native)
                 print(
                     "Time synchronization: synchronized."
                     if synchronized

@@ -2,53 +2,17 @@
 
 from __future__ import annotations
 
-import json
-import os
-from pathlib import Path
-import sys
-import traceback
-
+from nix_adapter import run_adapter_cli
 import runtime
-from nix_adapter import Conflict
-
-OPTIONAL_NOT_READY = 20
-
-
-def _verbose() -> bool:
-    return len(sys.argv) == 4 and sys.argv[3] == "--verbose"
 
 
 def main() -> int:
-    if (
-        len(sys.argv) not in (3, 4)
-        or sys.argv[2] not in ("preflight", "converge")
-        or (len(sys.argv) == 4 and sys.argv[3] != "--verbose")
-        or os.geteuid() != 0
-    ):
-        raise Conflict("private AI adapter must be invoked by arch-switch")
-    if _verbose():
-        os.environ["NIX_CONFIG_VERBOSE"] = "1"
-    ai = runtime.AI(json.loads(Path(sys.argv[1]).read_text()))
-    phase = sys.argv[2]
-    if phase == "preflight":
-        ready = ai.preflight()
-    else:
-        ready = ai.preflight(installed=True)
-        if ready:
-            ai.converge(preflighted=True)
-    if ai.desired.get("llama") and not ready:
-        return OPTIONAL_NOT_READY
-    return 0
+    return run_adapter_cli(
+        lambda desired: runtime.AI(desired),
+        name="AI services",
+        allow_skip=True,
+    )
 
 
 if __name__ == "__main__":
-    try:
-        raise SystemExit(main())
-    except Conflict as error:
-        print(f"AI services: {error}", file=sys.stderr)
-        raise SystemExit(1) from None
-    except (OSError, ValueError, KeyError) as error:
-        print(f"AI services failed: {type(error).__name__}: {error}", file=sys.stderr)
-        if _verbose():
-            traceback.print_exc()
-        raise SystemExit(1) from error
+    raise SystemExit(main())

@@ -3,15 +3,10 @@
 from __future__ import annotations
 
 import json
-import os
 from pathlib import Path
-import stat
 import subprocess
-import sys
-import traceback
 
-
-from nix_adapter import Conflict, Native, Systemd
+from nix_adapter import BaseServiceAdapter, Conflict, Native, run_adapter_cli
 
 
 def execute(
@@ -38,51 +33,29 @@ class _AdapterRunner(Native):
         return self._adapter.run(*argv, allow_failure=not check)
 
 
-class Searxng:
+class Searxng(BaseServiceAdapter):
     def __init__(self, desired: dict[str, object], root: Path = Path("/"), run=execute):
-        self.desired = desired
-        self.root = root
         self.run = run
-        self.systemd = Systemd(_AdapterRunner(self))
-
-    def path(self, key: str) -> Path:
-        value = self.desired[key]
-        if (
-            not isinstance(value, str)
-            or not value.startswith("/")
-            or ".." in Path(value).parts
-        ):
-            raise Conflict("invalid SearXNG manifest path")
-        return self.root / value.lstrip("/")
+        super().__init__(desired=desired, root=root, runner=_AdapterRunner(self))
 
     def preflight(self) -> None:
         pass
 
-    def write_unit(self) -> bool:
-        path = self.path("unitPath")
-        receipt = self.path("receipt")
-        unit = self.desired.get("unit")
-        if not isinstance(unit, str):
+    def write_unit(
+        self,
+        path: Path | None = None,
+        unit: str | None = None,
+        receipt: Path | None = None,
+        pending: Path | None = None,
+        mode: int = 0o644,
+    ) -> bool:
+        p = path or self.path("unitPath")
+        u = unit if unit is not None else self.desired.get("unit")
+        if not isinstance(u, str):
             raise Conflict("SearXNG unit is invalid")
-        if path.exists() and (
-            path.is_symlink() or not path.is_file() or path.stat().st_nlink != 1
-        ):
-            raise Conflict("SearXNG unit has conflicting type")
-        if path.exists() and not receipt.exists() and path.read_text() != unit:
-            raise Conflict("existing SearXNG unit requires removal before adoption")
-        if (
-            path.exists()
-            and path.read_text() == unit
-            and stat.S_IMODE(path.stat().st_mode) == 0o644
-        ):
-            return False
-        self.path("pending").touch()
-        path.parent.mkdir(parents=True, exist_ok=True)
-        temporary = path.with_name(f".{path.name}.pending")
-        temporary.write_text(unit)
-        temporary.chmod(0o644)
-        os.replace(temporary, path)
-        return True
+        r = receipt or self.path("receipt")
+        pend = pending or self.path("pending")
+        return super().write_unit(p, u, r, pend, mode=mode)
 
     def wait_for_readiness(self) -> None:
         curl = self.desired.get("curl")
@@ -145,29 +118,11 @@ class Searxng:
 
 
 def main() -> int:
-    if (
-        len(sys.argv) not in (3, 4)
-        or sys.argv[2] not in ("preflight", "converge")
-        or os.geteuid() != 0
-    ):
-        raise Conflict("private adapter must be invoked by arch-switch")
-    if len(sys.argv) == 4 and sys.argv[3] != "--verbose":
-        raise Conflict("private adapter received an invalid argument")
-    desired = json.loads(Path(sys.argv[1]).read_text())
-    Searxng(desired).preflight() if sys.argv[2] == "preflight" else Searxng(
-        desired
-    ).converge()
-    return 0
+    return run_adapter_cli(
+        lambda desired: Searxng(desired),
+        name="SearXNG",
+    )
 
 
 if __name__ == "__main__":
-    try:
-        raise SystemExit(main())
-    except Conflict as error:
-        print(f"SearXNG: {error}", file=sys.stderr)
-        raise SystemExit(1) from None
-    except (OSError, ValueError, KeyError) as error:
-        print(f"SearXNG failed: {type(error).__name__}", file=sys.stderr)
-        if "--verbose" in sys.argv:
-            traceback.print_exc()
-        raise SystemExit(1) from error
+    raise SystemExit(main())
