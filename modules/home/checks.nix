@@ -51,11 +51,13 @@ in
   overview-refresh = import ./overview/checks.nix { inherit pkgs; };
   noctalia-config = import ./noctalia-config/checks.nix { inherit pkgs adapterPython; };
   noctalia-storage =
-    pkgs.runCommand "noctalia-storage-check" { nativeBuildInputs = [ pkgs.python3 ]; }
-      ''
-        python ${./tests/test_noctalia_storage.py} ${./prepare-noctalia-storage.py}
-        touch "$out"
-      '';
+    let
+      generated = fixture true;
+    in
+    pkgs.runCommand "noctalia-storage-check" { } ''
+      grep -q 'key_source = "file"' ${generated.activationPackage}/home-files/.config/noctalia/storage.toml
+      touch "$out"
+    '';
   graphical-session-ordering =
     pkgs.runCommand "graphical-session-ordering"
       {

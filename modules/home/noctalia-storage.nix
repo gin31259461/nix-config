@@ -5,14 +5,7 @@
   ...
 }:
 let
-  # A dedicated directory must not collide with a pre-existing storage-key file.
   keyFile = "${config.xdg.dataHome}/noctalia/file-key-v1/master-key";
-  prepare =
-    "${pkgs.python3}/bin/python ${./prepare-noctalia-storage.py}"
-    + " --config ${lib.escapeShellArg "${config.xdg.configHome}/noctalia"}"
-    + " --state ${lib.escapeShellArg "${config.xdg.stateHome}/noctalia"}"
-    + " --cache ${lib.escapeShellArg "${config.xdg.cacheHome}/noctalia"}"
-    + " --key ${lib.escapeShellArg keyFile}";
 in
 {
   # Only the runtime filename enters the store, never the generated key.
@@ -25,12 +18,14 @@ in
     enabled = false
   '';
 
-  home.activation.checkNoctaliaStorage = lib.hm.dag.entryBefore [ "checkLinkTargets" ] ''
-    ${prepare} --check
-  '';
-  home.activation.prepareNoctaliaStorage =
+  home.activation.ensureNoctaliaStorageKey =
     lib.hm.dag.entryBetween [ "linkGeneration" ] [ "writeBoundary" ]
       ''
-        run ${prepare} --apply
+        if [ ! -f ${lib.escapeShellArg keyFile} ]; then
+          mkdir -m 0700 -p $(dirname ${lib.escapeShellArg keyFile})
+          ${pkgs.openssl}/bin/openssl rand -hex 32 > ${lib.escapeShellArg keyFile}.tmp
+          chmod 0600 ${lib.escapeShellArg keyFile}.tmp
+          mv -n ${lib.escapeShellArg keyFile}.tmp ${lib.escapeShellArg keyFile}
+        fi
       '';
 }
