@@ -211,6 +211,16 @@ in
       model = artifacts.model;
       localPort = artifacts.proxy.localPort;
       inherit (config.llama.proxy) httpsPort;
+      paths = {
+        switcherConfig = "/etc/llama-swap/config.yaml";
+        switcherUnit = "/etc/systemd/system/llama-swap.service";
+        legacyPreset = "/etc/llama/server/models.ini";
+        legacyDropin = "/etc/systemd/system/llama-server.service.d/60-nix-config.conf";
+        legacyLocalDropin = "/etc/systemd/system/llama-server.service.d/60-local.conf";
+        caddyMain = "/etc/caddy/Caddyfile";
+        caddySite = "/etc/caddy/conf.d/nix-config-llama.caddy";
+        legacyOllamaSite = "/etc/caddy/conf.d/nix-config-ollama.caddy";
+      };
       generated = {
         inherit
           switcherConfig

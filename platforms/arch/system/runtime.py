@@ -53,7 +53,9 @@ class System(BaseAdapter):
         values = {"KEYMAP": desired["keymap"]}
         if desired["font"] is not None:
             values["FONT"] = desired["font"]
-        return replace_keys(self.files.read("/etc/vconsole.conf"), values)
+        return replace_keys(
+            self.files.read(self.path_str("vconsole", "/etc/vconsole.conf")), values
+        )
 
     def check_console_assets(self):
         desired = self.desired["console"]
@@ -147,14 +149,20 @@ class System(BaseAdapter):
             if d.get(capability) is not None:
                 f.pending(action)
         if d.get("locale") is not None:
-            locale_gen(f.read("/etc/locale.gen"), d["locale"]["generated"])
-            replace_keys(f.read("/etc/locale.conf"), {"LANG": d["locale"]["lang"]})
+            locale_gen(
+                f.read(self.path_str("localeGen", "/etc/locale.gen")),
+                d["locale"]["generated"],
+            )
+            replace_keys(
+                f.read(self.path_str("localeConf", "/etc/locale.conf")),
+                {"LANG": d["locale"]["lang"]},
+            )
         if d.get("timeZone") is not None:
             if installed and not f.zone_exists(d["timeZone"]):
                 raise Conflict("declared zoneinfo is unavailable")
             self.localtime()
         if d.get("hostname") is not None:
-            f.read("/etc/hostname")
+            f.read(self.path_str("hostnameFile", "/etc/hostname"))
         for name, text in d.get("files", {}).items():
             f.dropin(name, text)
         if d.get("timeSync") is not None:
@@ -185,9 +193,10 @@ class System(BaseAdapter):
         d, f = self.desired, self.files
         if d.get("locale") is not None:
             value = d["locale"]
+            locale_gen_path = self.path_str("localeGen", "/etc/locale.gen")
             self.write(
-                "/etc/locale.gen",
-                locale_gen(f.read("/etc/locale.gen"), value["generated"]),
+                locale_gen_path,
+                locale_gen(f.read(locale_gen_path), value["generated"]),
                 "locale",
             )
 
@@ -204,14 +213,16 @@ class System(BaseAdapter):
                 self.actions += 1
                 if not wanted <= available():
                     raise Conflict("required locales were not generated")
+            locale_conf_path = self.path_str("localeConf", "/etc/locale.conf")
             self.write(
-                "/etc/locale.conf",
-                replace_keys(f.read("/etc/locale.conf"), {"LANG": value["lang"]}),
+                locale_conf_path,
+                replace_keys(f.read(locale_conf_path), {"LANG": value["lang"]}),
                 "locale",
             )
             f.clear("locale")
         if d.get("timeZone") is not None:
-            target = f.path("/etc/localtime", symlink_leaf=True)
+            localtime_path = self.path_str("localtime", "/etc/localtime")
+            target = f.path(localtime_path, symlink_leaf=True)
             expected = "/usr/share/zoneinfo/" + d["timeZone"]
             matches = target.is_symlink() and os.readlink(target) in (
                 expected,
@@ -221,7 +232,7 @@ class System(BaseAdapter):
                 not matches
                 or self.localtime() != d["timeZone"]
                 or f.pending("timezone")
-                or not f.metadata_matches("/etc/localtime", symlink=True)
+                or not f.metadata_matches(localtime_path, symlink=True)
             ):
                 f.mark("timezone")
                 set_timezone(d["timeZone"], runner=self.native)
@@ -232,23 +243,24 @@ class System(BaseAdapter):
                     or os.readlink(target) not in (expected, ".." + expected)
                 ):
                     raise Conflict("timezone did not converge")
-                self.updates += int(f.repair_metadata("/etc/localtime", symlink=True))
+                self.updates += int(f.repair_metadata(localtime_path, symlink=True))
                 f.clear("timezone")
         if d.get("hostname") is not None:
+            hostname_path = self.path_str("hostnameFile", "/etc/hostname")
             for kind in ("--static", "--transient"):
                 actual = get_hostname(runner=self.native, kind=kind)
                 if actual != d["hostname"] or (
                     kind == "--static"
-                    and f.read("/etc/hostname").strip() != d["hostname"]
+                    and f.read(hostname_path).strip() != d["hostname"]
                 ):
                     f.mark("hostname")
                     set_hostname(d["hostname"], runner=self.native, kind=kind)
                     self.actions += 1
                     if get_hostname(runner=self.native, kind=kind) != d["hostname"]:
                         raise Conflict("hostname did not converge")
-            if not f.metadata_matches("/etc/hostname"):
+            if not f.metadata_matches(hostname_path):
                 f.mark("hostname")
-                self.updates += int(f.repair_metadata("/etc/hostname"))
+                self.updates += int(f.repair_metadata(hostname_path))
             f.clear("hostname")
         for name, text in d.get("files", {}).items():
             target = f.dropin(name, text)
@@ -288,7 +300,8 @@ class System(BaseAdapter):
                         raise Conflict("journald did not become ready")
             f.clear(name)
         if d.get("console") is not None:
-            if self.write("/etc/vconsole.conf", self.console(), "console") or f.pending(
+            vconsole_path = self.path_str("vconsole", "/etc/vconsole.conf")
+            if self.write(vconsole_path, self.console(), "console") or f.pending(
                 "console"
             ):
                 print("Console configuration is prepared for the next boot.")

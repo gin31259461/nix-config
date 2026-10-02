@@ -6,9 +6,6 @@ from pathlib import Path
 
 from nix_adapter import BaseAdapter, Conflict
 
-SWITCHER_CONFIG = "/etc/llama-swap/config.yaml"
-SWITCHER_UNIT = "/etc/systemd/system/llama-swap.service"
-
 
 class AI(BaseAdapter):
     def __init__(self, desired, files=None, native=None):
@@ -41,7 +38,7 @@ class AI(BaseAdapter):
 
     def caddy_main(self):
         generated = self.desired["generated"]
-        current = self.files.read("/etc/caddy/Caddyfile")
+        current = self.files.read(self.path_str("caddyMain", "/etc/caddy/Caddyfile"))
         if current == generated["caddyMain"]:
             return current
         if not current or current in (
@@ -104,26 +101,42 @@ class AI(BaseAdapter):
                 receipt_path
             ) != self.model_receipt(model, declaration):
                 raise Conflict("prepared model receipt does not match the declaration")
-        f.read(SWITCHER_CONFIG)
-        f.read(SWITCHER_UNIT)
-        legacy_preset = f.read("/etc/llama/server/models.ini")
+        f.read(self.path_str("switcherConfig", "/etc/llama-swap/config.yaml"))
+        f.read(self.path_str("switcherUnit", "/etc/systemd/system/llama-swap.service"))
+        legacy_preset = f.read(
+            self.path_str("legacyPreset", "/etc/llama/server/models.ini")
+        )
         legacy_dropin = f.read(
-            "/etc/systemd/system/llama-server.service.d/60-nix-config.conf"
+            self.path_str(
+                "legacyDropin",
+                "/etc/systemd/system/llama-server.service.d/60-nix-config.conf",
+            )
         )
         generated = d["generated"]
         if legacy_preset and legacy_preset != generated["legacyPreset"]:
             raise Conflict("legacy llama-server preset requires explicit adoption")
         if legacy_dropin and legacy_dropin != generated["legacyDropin"]:
             raise Conflict("legacy llama-server drop-in requires explicit adoption")
-        if f.read("/etc/systemd/system/llama-server.service.d/60-local.conf"):
+        if f.read(
+            self.path_str(
+                "legacyLocalDropin",
+                "/etc/systemd/system/llama-server.service.d/60-local.conf",
+            )
+        ):
             raise Conflict(
                 "legacy llama-server drop-in requires explicit operator adoption"
             )
         f.pending("ai-llama")
         if d["proxy"]:
             self.caddy_main()
-            f.read("/etc/caddy/conf.d/nix-config-llama.caddy")
-            if f.read("/etc/caddy/conf.d/nix-config-ollama.caddy"):
+            f.read(
+                self.path_str("caddySite", "/etc/caddy/conf.d/nix-config-llama.caddy")
+            )
+            if f.read(
+                self.path_str(
+                    "legacyOllamaSite", "/etc/caddy/conf.d/nix-config-ollama.caddy"
+                )
+            ):
                 raise Conflict(
                     "legacy Ollama Caddy site requires explicit operator adoption"
                 )
@@ -178,16 +191,25 @@ class AI(BaseAdapter):
             print("AI services skipped: selected model is not prepared.")
             return
         generated = d["generated"]
-        config_changed = self.write(
-            SWITCHER_CONFIG, generated["switcherConfig"], "ai-llama"
+        switcher_config = self.path_str("switcherConfig", "/etc/llama-swap/config.yaml")
+        switcher_unit = self.path_str(
+            "switcherUnit", "/etc/systemd/system/llama-swap.service"
         )
-        unit_changed = self.write(SWITCHER_UNIT, generated["switcherUnit"], "ai-llama")
+        config_changed = self.write(
+            switcher_config, generated["switcherConfig"], "ai-llama"
+        )
+        unit_changed = self.write(switcher_unit, generated["switcherUnit"], "ai-llama")
         pending = f.pending("ai-llama")
         if config_changed or unit_changed or pending:
             self.run("systemctl", "daemon-reload")
             self.actions += 1
-        if f.read("/etc/llama/server/models.ini") or f.read(
-            "/etc/systemd/system/llama-server.service.d/60-nix-config.conf"
+        if f.read(
+            self.path_str("legacyPreset", "/etc/llama/server/models.ini")
+        ) or f.read(
+            self.path_str(
+                "legacyDropin",
+                "/etc/systemd/system/llama-server.service.d/60-nix-config.conf",
+            )
         ):
             legacy_state = self.unit("llama-server.service")
             if legacy_state.get("ActiveState") == "active" or legacy_state.get(
@@ -203,12 +225,12 @@ class AI(BaseAdapter):
         self._curl_ready(d["server"]["port"])
         f.clear("ai-llama")
         if d["proxy"]:
-            self.write("/etc/caddy/Caddyfile", self.caddy_main(), "ai-caddy")
-            self.write(
-                "/etc/caddy/conf.d/nix-config-llama.caddy",
-                generated["caddySite"],
-                "ai-caddy",
+            caddy_file = self.path_str("caddyMain", "/etc/caddy/Caddyfile")
+            caddy_site = self.path_str(
+                "caddySite", "/etc/caddy/conf.d/nix-config-llama.caddy"
             )
+            self.write(caddy_file, self.caddy_main(), "ai-caddy")
+            self.write(caddy_site, generated["caddySite"], "ai-caddy")
             pending = f.pending("ai-caddy")
             runtime_dir = self.run(
                 "stat", "--format=%a:%U:%G", "/run/caddy", check=False
@@ -224,7 +246,7 @@ class AI(BaseAdapter):
                 "caddy",
                 "validate",
                 "--config",
-                "/etc/caddy/Caddyfile",
+                caddy_file,
                 "--adapter",
                 "caddyfile",
             )
@@ -241,7 +263,7 @@ class AI(BaseAdapter):
                     "caddy",
                     "reload",
                     "--config",
-                    "/etc/caddy/Caddyfile",
+                    caddy_file,
                     "--address",
                     "unix//run/caddy/admin.socket",
                 )

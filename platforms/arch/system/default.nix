@@ -41,10 +41,17 @@ let
       };
     };
   trimDropin = "[Timer]\nPersistent=false\n";
+  paths = {
+    vconsole = "/etc/vconsole.conf";
+    localeGen = "/etc/locale.gen";
+    localeConf = "/etc/locale.conf";
+    localtime = "/etc/localtime";
+    hostnameFile = "/etc/hostname";
+  };
 in
 {
   inherit files trimDropin;
   manifest = pkgs.writeText "arch-system-settings.json" (
-    builtins.toJSON (settings // { inherit files trimDropin; })
+    builtins.toJSON (settings // { inherit files trimDropin paths; })
   );
 }
