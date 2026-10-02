@@ -66,6 +66,7 @@ let
     inherit (host) hardware;
     username = host.deployment.username;
     deploymentUser = host.users.${host.deployment.username};
+    adapterPython = inputs.nix-adapter.packages.${host.system}.adapterPython;
   };
   homeMinimal = (import ../lib/mk-home-configuration.nix { inherit inputs; }) {
     inherit (host) system platform hardware;

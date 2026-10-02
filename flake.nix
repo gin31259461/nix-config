@@ -123,7 +123,7 @@
         searxngConfig = archHost.searxng;
       };
       llama-prepare = import ./modules/ai/package.nix {
-        inherit lib pkgs;
+        inherit lib pkgs adapterPython;
         artifacts = ai.artifacts;
       };
       home-switch = import ./lib/deployment/home/package.nix {

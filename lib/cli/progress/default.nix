@@ -4,7 +4,11 @@
 }:
 let
   renderer = pkgs.writeShellScriptBin "progress-renderer" ''
-    exec ${adapterPython}/bin/progress-renderer "$@"
+    if [ -x "${adapterPython}/bin/progress-renderer" ]; then
+      exec ${adapterPython}/bin/progress-renderer "$@"
+    else
+      exit 1
+    fi
   '';
 in
 {

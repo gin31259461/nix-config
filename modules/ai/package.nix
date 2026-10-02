@@ -2,7 +2,8 @@
   lib,
   pkgs,
   artifacts,
-  progress ? import ../../lib/cli/progress { inherit pkgs; },
+  adapterPython ? pkgs.python3,
+  progress ? import ../../lib/cli/progress { inherit pkgs adapterPython; },
 }:
 pkgs.writeShellApplication {
   name = "llama-prepare";
