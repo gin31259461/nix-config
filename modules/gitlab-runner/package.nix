@@ -2,7 +2,7 @@
   pkgs,
   instances,
   platform ? import ./arch-platform.nix,
-  progress ? import ../../lib/cli/progress { inherit pkgs; },
+  adapterPython ? pkgs.python3,
 }:
 let
   manifestInstances = import ./render-artifacts.nix { inherit platform instances; };
@@ -15,9 +15,8 @@ let
 in
 pkgs.writeShellApplication {
   name = "runnerctl";
-  runtimeInputs = [ progress.python ];
+  runtimeInputs = [ adapterPython ];
   text = ''
-    export PYTHONPATH=${progress.pythonPath}
-    exec ${progress.python}/bin/python ${./.}/runnerctl.py --config ${config} "$@"
+    exec ${adapterPython}/bin/python ${./.}/runnerctl.py --config ${config} "$@"
   '';
 }

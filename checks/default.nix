@@ -6,9 +6,6 @@
   deploymentName,
   adapterPython ? pkgs.python3,
 }:
-let
-  progress = import ../lib/cli/progress { inherit pkgs adapterPython; };
-in
 {
   home-source-assets = import ./assets.nix { inherit pkgs; };
   host-interface =
@@ -18,21 +15,6 @@ in
     actionlint ${../.github/workflows/check.yml}
     touch "$out"
   '';
-  progress-ui =
-    pkgs.runCommand "progress-ui-tests"
-      {
-        nativeBuildInputs = [
-          progress.python
-          pkgs.bash
-          pkgs.coreutils
-        ];
-      }
-      ''
-        export PYTHONPATH=${progress.pythonPath}
-        python -m unittest discover -s ${progress.pythonPath}/tests -v
-        python ${./tests/test_progress_contract.py} ${progress.pythonPath}
-        touch "$out"
-      '';
   deployment-ordering =
     pkgs.runCommand "deployment-ordering"
       {

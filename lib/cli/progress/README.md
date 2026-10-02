@@ -10,11 +10,11 @@ recovery. The module owns presentation only.
 From the repository root, enter `nix develop`, then run this synthetic example:
 
 ```bash
-PYTHONPATH="$PWD/lib/cli/progress" python - <<'PY'
+python - <<'PY'
 import subprocess
 import sys
 import time
-from progress import Progress
+from nix_adapter import Progress
 
 with Progress("Example") as progress:
     with progress.task("Check sample inputs", total=3) as task:
@@ -37,7 +37,7 @@ pass command arguments, environment contents, credentials, or registration data.
 
 ## Python interface
 
-Import `Progress` from `progress`. A `Progress` context closes its display on
+Import `Progress` from `nix_adapter`. A `Progress` context closes its display on
 exit; a `task` context records success or failure without suppressing the task's
 exception. `task.update(completed, total=...)` reports measured progress and
 `task.finish("skip")` records an explicit skip. Sequential and nested tasks use
@@ -91,11 +91,10 @@ the presence of `NO_COLOR`, and nonempty `CI` select plain transition records. N
 their own output while the shared display is suspended. The display uses the
 normal terminal scrollback, not an alternate screen.
 
-Run the isolated renderer and bridge tests with:
+The isolated renderer and bridge tests are managed and verified in `nix-adapter`:
 
 ```bash
-nix build --no-link --show-trace --print-build-logs \
-  .#checks.x86_64-linux.progress-ui
+nix flake check github:gin31259461/nix-adapter
 ```
 
 See the [operator runbook](../../../docs/deployment.md#progress-and-diagnostics) for how

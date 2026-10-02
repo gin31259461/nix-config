@@ -9,8 +9,6 @@ let
 in
 {
   inherit renderer;
-  python = adapterPython;
-  pythonPath = ./.;
   shell = ''
     readonly progress_renderer=${renderer}/bin/progress-renderer
     readonly progress_base64=${pkgs.coreutils}/bin/base64
