@@ -4,9 +4,10 @@
   arch-switch,
   archDeployment,
   deploymentName,
+  adapterPython ? pkgs.python3,
 }:
 let
-  progress = import ../lib/cli/progress { inherit pkgs; };
+  progress = import ../lib/cli/progress { inherit pkgs adapterPython; };
 in
 {
   home-source-assets = import ./assets.nix { inherit pkgs; };

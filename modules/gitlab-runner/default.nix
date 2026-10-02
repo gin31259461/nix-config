@@ -2,12 +2,13 @@
   lib,
   pkgs,
   rawInstances ? { },
+  adapterPython ? pkgs.python3,
 }:
 let
   enabled = rawInstances != { };
   instances = import ./interface.nix { inherit lib rawInstances; };
   platform = import ./arch-platform.nix;
-  progress = import ../../lib/cli/progress { inherit pkgs; };
+  progress = import ../../lib/cli/progress { inherit pkgs adapterPython; };
   controller = import ./package.nix {
     inherit
       pkgs

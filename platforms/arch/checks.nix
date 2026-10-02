@@ -3,7 +3,7 @@
   llama-prepare,
   aiManifest,
   adapterPython ? pkgs.python3,
-  progress ? import ../../lib/cli/progress { inherit pkgs; },
+  progress ? import ../../lib/cli/progress { inherit pkgs adapterPython; },
   ...
 }:
 {

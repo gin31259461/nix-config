@@ -12,7 +12,7 @@ import sys
 import traceback
 
 
-from nix_adapter import Conflict, NotReady
+from nix_adapter import Conflict, Native, NotReady, Systemd
 
 
 def execute(
@@ -28,11 +28,23 @@ def execute(
         raise Conflict(f"command failed ({error.returncode}): {argv[0]}") from None
 
 
+class _AdapterRunner(Native):
+    def __init__(self, adapter: PersonalAgent):
+        super().__init__()
+        self._adapter = adapter
+
+    def run(
+        self, *argv: str, check: bool = True, **kwargs
+    ) -> subprocess.CompletedProcess[str]:
+        return self._adapter.run(*argv, allow_failure=not check)
+
+
 class PersonalAgent:
     def __init__(self, desired: dict[str, object], root: Path = Path("/"), run=execute):
         self.desired = desired
         self.root = root
         self.run = run
+        self.systemd = Systemd(_AdapterRunner(self))
 
     def path(self, key: str) -> Path:
         value = self.desired[key]
@@ -191,27 +203,13 @@ class PersonalAgent:
         self.ensure_metadata(self.path("secrets"), "root", "root", 0o600)
         changed = self.write_unit()
         if changed:
-            self.run("systemctl", "daemon-reload")
-        enabled = self.run(
-            "systemctl",
-            "is-enabled",
-            "--quiet",
-            "personal-agent.service",
-            allow_failure=True,
-        )
-        active = self.run(
-            "systemctl",
-            "is-active",
-            "--quiet",
-            "personal-agent.service",
-            allow_failure=True,
-        )
-        if enabled.returncode:
-            self.run("systemctl", "enable", "personal-agent.service")
-        if active.returncode:
-            self.run("systemctl", "start", "personal-agent.service")
+            self.systemd.daemon_reload()
+        if not self.systemd.is_enabled("personal-agent.service"):
+            self.systemd.enable("personal-agent.service")
+        if not self.systemd.is_active("personal-agent.service"):
+            self.systemd.start("personal-agent.service")
         elif changed or retry:
-            self.run("systemctl", "restart", "personal-agent.service")
+            self.systemd.restart("personal-agent.service")
         self.path("receipt").touch()
         self.path("pending").unlink(missing_ok=True)
 

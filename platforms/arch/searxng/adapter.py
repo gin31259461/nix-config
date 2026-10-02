@@ -11,7 +11,7 @@ import sys
 import traceback
 
 
-from nix_adapter import Conflict
+from nix_adapter import Conflict, Native, Systemd
 
 
 def execute(
@@ -27,11 +27,23 @@ def execute(
         raise Conflict(f"command failed ({error.returncode}): {argv[0]}") from None
 
 
+class _AdapterRunner(Native):
+    def __init__(self, adapter: Searxng):
+        super().__init__()
+        self._adapter = adapter
+
+    def run(
+        self, *argv: str, check: bool = True, **kwargs
+    ) -> subprocess.CompletedProcess[str]:
+        return self._adapter.run(*argv, allow_failure=not check)
+
+
 class Searxng:
     def __init__(self, desired: dict[str, object], root: Path = Path("/"), run=execute):
         self.desired = desired
         self.root = root
         self.run = run
+        self.systemd = Systemd(_AdapterRunner(self))
 
     def path(self, key: str) -> Path:
         value = self.desired[key]
@@ -117,21 +129,15 @@ class Searxng:
         retry = self.path("pending").exists()
         changed = self.write_unit()
         if changed:
-            self.run("systemctl", "daemon-reload")
+            self.systemd.daemon_reload()
 
         service = "searxng.service"
-        enabled_state = self.run(
-            "systemctl", "is-enabled", "--quiet", service, allow_failure=True
-        )
-        active = self.run(
-            "systemctl", "is-active", "--quiet", service, allow_failure=True
-        )
-        if enabled_state.returncode:
-            self.run("systemctl", "enable", service)
-        if active.returncode:
-            self.run("systemctl", "start", service)
+        if not self.systemd.is_enabled(service):
+            self.systemd.enable(service)
+        if not self.systemd.is_active(service):
+            self.systemd.start(service)
         elif changed or retry:
-            self.run("systemctl", "restart", service)
+            self.systemd.restart(service)
 
         self.wait_for_readiness()
         self.path("receipt").touch()

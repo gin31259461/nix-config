@@ -40,7 +40,7 @@ from host_io import (
     read_managed,
     remove_managed_file,
 )
-from progress import Progress
+from nix_adapter.progress import Progress
 
 
 @contextmanager

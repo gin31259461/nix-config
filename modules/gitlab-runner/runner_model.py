@@ -12,8 +12,9 @@ from typing import Any
 from urllib.parse import urlparse
 
 
-class RunnerError(RuntimeError):
-    pass
+from nix_adapter.exceptions import Conflict
+
+RunnerError = Conflict
 
 
 FIXED_IMAGE_PATTERN = re.compile(

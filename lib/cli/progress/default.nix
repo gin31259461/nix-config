@@ -1,12 +1,15 @@
-{ pkgs }:
+{
+  pkgs,
+  adapterPython ? pkgs.python3,
+}:
 let
-  python = pkgs.python3.withPackages (packages: [ packages.rich ]);
   renderer = pkgs.writeShellScriptBin "progress-renderer" ''
-    exec ${python}/bin/python ${./progress.py} "$@"
+    exec ${adapterPython}/bin/progress-renderer "$@"
   '';
 in
 {
-  inherit python renderer;
+  inherit renderer;
+  python = adapterPython;
   pythonPath = ./.;
   shell = ''
     readonly progress_renderer=${renderer}/bin/progress-renderer

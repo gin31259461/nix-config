@@ -62,7 +62,11 @@
       nixAdapter = inputs.nix-adapter.packages.${system}.nix-adapter;
       adapterPython = inputs.nix-adapter.packages.${system}.adapterPython;
       runners = import ./modules/gitlab-runner {
-        inherit lib pkgs;
+        inherit
+          lib
+          pkgs
+          adapterPython
+          ;
         rawInstances = archHost.gitlabRunners;
       };
       ai = import ./modules/ai {
@@ -177,6 +181,7 @@
           arch-switch
           archDeployment
           deploymentName
+          adapterPython
           ;
       })
       // (import ./platforms/arch/checks.nix {

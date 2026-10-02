@@ -12,7 +12,7 @@ import sys
 
 from firewall import Firewall
 from hotspot import Hotspot
-from nix_adapter import Conflict, Files, Native, locale_gen, replace_keys
+from nix_adapter import Conflict, Files, Native, Systemd, locale_gen, replace_keys
 
 
 class System:
@@ -20,6 +20,7 @@ class System:
         self.desired = desired
         self.files = files or Files()
         self.native = native or Native()
+        self.systemd = Systemd(self.native)
         self.updates = 0
         self.actions = 0
 
@@ -27,10 +28,9 @@ class System:
         return self.native.run(*args, **kwargs)
 
     def unit(self, name):
-        output = self.run(
-            "systemctl", "show", name, "--property=LoadState,ActiveState,UnitFileState"
-        ).stdout
-        return dict(line.split("=", 1) for line in output.splitlines() if "=" in line)
+        return self.systemd.show(
+            name, properties=["LoadState", "ActiveState", "UnitFileState"]
+        )
 
     def ready_unit(self, name):
         state = self.unit(name)
@@ -45,11 +45,14 @@ class System:
         state = self.ready_unit(name)
         if state.get("UnitFileState") != "enabled":
             self.files.mark(action)
-            self.run("systemctl", "enable", name)
+            self.systemd.enable(name)
             self.actions += 1
         if state.get("ActiveState") != "active" or restart:
             self.files.mark(action)
-            self.run("systemctl", "restart" if restart else "start", name)
+            if restart:
+                self.systemd.restart(name)
+            else:
+                self.systemd.start(name)
             self.actions += 1
         state = self.ready_unit(name)
         if (
@@ -346,7 +349,7 @@ class System:
                         self.run(
                             "systemd-tmpfiles", "--create", "--prefix=/var/log/journal"
                         )
-                    self.run("systemctl", "restart", "systemd-journald.service")
+                    self.systemd.restart("systemd-journald.service")
                     if d["journal"]["storage"] in ("auto", "persistent"):
                         self.run("journalctl", "--flush")
                     self.actions += 1
@@ -369,7 +372,7 @@ class System:
             if pending:
                 # Disable catch-up, so starting an overdue timer cannot request
                 # an immediate full trim during deployment. Keep native schedule.
-                self.run("systemctl", "daemon-reload")
+                self.systemd.daemon_reload()
             self.service("fstrim.timer", "trim", restart=pending)
             f.clear("trim")
         if d.get("firewall") is not None:
