@@ -38,7 +38,6 @@ in
     gitlab-runner-tests =
       pkgs.runCommand "gitlab-runner-tests" { nativeBuildInputs = [ adapterPython ]; }
         ''
-          ${adapterPython}/bin/python ${./tests}/test_host_io.py ${./.}
           ${adapterPython}/bin/python ${./tests}/test_runnerctl.py ${
             pkgs.writeText "runner-test-config.json" (
               builtins.toJSON {

@@ -22,7 +22,13 @@ CONFIG_PATH = Path(sys.argv.pop())
 
 
 def load_runnerctl(path: Path):
-    sys.path.insert(0, str(path.parent))
+    model_path = path.parent / "runner_model.py"
+    model_spec = importlib.util.spec_from_file_location("runner_model", model_path)
+    if model_spec and model_spec.loader:
+        model_module = importlib.util.module_from_spec(model_spec)
+        sys.modules["runner_model"] = model_module
+        model_spec.loader.exec_module(model_module)
+
     spec = importlib.util.spec_from_file_location("runnerctl", path)
     if spec is None or spec.loader is None:
         raise RuntimeError("unable to load runnerctl")

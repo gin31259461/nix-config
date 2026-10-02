@@ -21,6 +21,7 @@ import time
 from typing import Any, Callable
 
 
+from dataclasses import dataclass
 from runner_model import (
     RunnerError,
     validate_instances,
@@ -30,17 +31,58 @@ from runner_model import (
     render_service,
     manager_matches,
 )
-from host_io import (
-    HostPaths,
-    run,
+from nix_adapter import (
     atomic_write,
-    ensure_subordinate_range,
-    operation_lock,
     ensure_directory,
+    ensure_subordinate_range,
+    operation_lock as _operation_lock,
     read_managed,
     remove_managed_file,
 )
 from nix_adapter.progress import Progress
+
+
+@dataclass(frozen=True)
+class HostPaths:
+    """Private filesystem seam; production paths cannot be overridden by CLI."""
+
+    subuid: Path = Path("/etc/subuid")
+    subgid: Path = Path("/etc/subgid")
+    runtime: Path = Path("/run/user")
+
+
+def run(
+    argv: list[str],
+    *,
+    check: bool = True,
+    capture: bool = False,
+    env: dict[str, str] | None = None,
+    timeout: float = 300,
+) -> subprocess.CompletedProcess[str]:
+    try:
+        result = subprocess.run(
+            argv,
+            check=False,
+            text=True,
+            stdout=subprocess.PIPE if capture else None,
+            stderr=subprocess.PIPE if capture else None,
+            env=env,
+            timeout=timeout,
+        )
+    except subprocess.TimeoutExpired:
+        raise RunnerError(f"command timed out after {timeout}s: {argv[0]}") from None
+    if check and result.returncode != 0:
+        raise RunnerError(
+            f"command failed with exit code {result.returncode}: {argv[0]}"
+        )
+    return result
+
+
+@contextmanager
+def operation_lock(path: Path = Path("/run/lock/nix-config-runner.lock")):
+    """Serialize our mutations across instances, including shared sub-ID files."""
+    with _operation_lock(path, label="Runner operation"):
+        yield
 
 
 @contextmanager

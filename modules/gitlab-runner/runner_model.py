@@ -13,6 +13,7 @@ from urllib.parse import urlparse
 
 
 from nix_adapter.exceptions import Conflict
+from nix_adapter.system import ranges_overlap
 
 RunnerError = Conflict
 
@@ -37,12 +38,6 @@ def gitlab_hostname(instance: dict[str, Any]) -> str:
     if hostname is None:
         raise RunnerError("GitLab URL does not contain a hostname")
     return hostname
-
-
-def ranges_overlap(left: dict[str, int], right: dict[str, int]) -> bool:
-    left_end = left["start"] + left["count"] - 1
-    right_end = right["start"] + right["count"] - 1
-    return left["start"] <= right_end and right["start"] <= left_end
 
 
 def validate_instances(instances: dict[str, Any]) -> None:
