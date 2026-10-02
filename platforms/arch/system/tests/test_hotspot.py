@@ -10,7 +10,7 @@ from typing import Any, cast
 import unittest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from files import Conflict, Files
+from nix_adapter import Conflict, Files
 from hotspot import Hotspot, canonical_rule, firewall_rules
 from runtime import System
 

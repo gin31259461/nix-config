@@ -24,6 +24,7 @@
   moduleGroups ? [ ],
   moduleSystemUnits ? [ ],
   powerpanel ? null,
+  adapterPython ? pkgs.python3,
   progress ? import ../../lib/cli/progress { inherit pkgs; },
 }:
 let
@@ -63,15 +64,13 @@ pkgs.writeShellApplication {
     gnused
   ];
   text = ''
-    readonly system_python=${pkgs.python3}/bin/python3
+    readonly system_python=${adapterPython}/bin/python3
     readonly system_adapter=${
       lib.fileset.toSource {
         root = ./system;
         fileset = lib.fileset.unions [
           ./system/adapter.py
           ./system/runtime.py
-          ./system/native.py
-          ./system/files.py
           ./system/firewall.py
           ./system/hotspot.py
         ];
@@ -83,25 +82,23 @@ pkgs.writeShellApplication {
       else
         systemSettings.manifest
     }
-    readonly ai_python=${pkgs.python3}/bin/python3
+    readonly ai_python=${adapterPython}/bin/python3
     readonly ai_adapter=${
       lib.fileset.toSource {
-        root = ./.;
+        root = ./ai;
         fileset = lib.fileset.unions [
           ./ai/adapter.py
           ./ai/runtime.py
-          ./system/native.py
-          ./system/files.py
         ];
       }
-    }/ai/adapter.py
+    }/adapter.py
     readonly ai_manifest=${
       if ai == null then
         pkgs.writeText "unmanaged-ai.json" (builtins.toJSON { llama = false; })
       else
         ai.manifest
     }
-    readonly personal_agent_python=${pkgs.python3}/bin/python3
+    readonly personal_agent_python=${adapterPython}/bin/python3
     readonly personal_agent_adapter=${./personal-agent/adapter.py}
     readonly personal_agent_manifest=${
       if personalAgent == null then
@@ -109,7 +106,7 @@ pkgs.writeShellApplication {
       else
         personalAgent.manifest
     }
-    readonly searxng_python=${pkgs.python3}/bin/python3
+    readonly searxng_python=${adapterPython}/bin/python3
     readonly searxng_adapter=${./searxng/adapter.py}
     readonly searxng_manifest=${searxng.manifest}
     readonly fs_root=""

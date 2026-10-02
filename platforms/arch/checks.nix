@@ -2,11 +2,14 @@
   pkgs,
   llama-prepare,
   aiManifest,
+  adapterPython ? pkgs.python3,
   progress ? import ../../lib/cli/progress { inherit pkgs; },
   ...
 }:
 {
-  system-firewall-integration = import ./system/tests/firewall-vm.nix { inherit pkgs; };
+  system-firewall-integration = import ./system/tests/firewall-vm.nix {
+    inherit pkgs adapterPython;
+  };
   system-settings-interface =
     assert import ./system/tests/interface.nix {
       inherit pkgs;
@@ -14,39 +17,31 @@
     };
     pkgs.writeText "system-settings-interface" "passed";
   system-settings-tests =
-    pkgs.runCommand "system-settings-tests" { nativeBuildInputs = [ pkgs.python3 ]; }
+    pkgs.runCommand "system-settings-tests" { nativeBuildInputs = [ adapterPython ]; }
       ''
         python ${./system}/tests/test_system.py
         python ${./system}/tests/test_hotspot.py
-        python ${./system}/tests/test_native.py ${./system}/native.py
         touch "$out"
       '';
-  ai-services-tests = pkgs.runCommand "ai-services-tests" { nativeBuildInputs = [ pkgs.python3 ]; } ''
-    python ${./ai/tests/test_ai.py} ${./ai/package-caddy.Caddyfile} ${
-      pkgs.lib.fileset.toSource {
-        root = ./.;
-        fileset = pkgs.lib.fileset.unions [
-          ./ai/runtime.py
-          ./system/native.py
-          ./system/files.py
-        ];
-      }
-    }/ai/runtime.py
-    touch "$out"
-  '';
+  ai-services-tests =
+    pkgs.runCommand "ai-services-tests" { nativeBuildInputs = [ adapterPython ]; }
+      ''
+        python ${./ai/tests/test_ai.py} ${./ai/package-caddy.Caddyfile} ${./ai/runtime.py}
+        touch "$out"
+      '';
   ai-generated-artifacts =
-    pkgs.runCommand "ai-generated-artifacts" { nativeBuildInputs = [ pkgs.python3 ]; }
+    pkgs.runCommand "ai-generated-artifacts" { nativeBuildInputs = [ adapterPython ]; }
       ''
         python ${./ai/tests/test_generated.py} ${aiManifest} ${./ai/package-caddy.Caddyfile}
         touch "$out"
       '';
   personal-agent-tests =
-    pkgs.runCommand "personal-agent-tests" { nativeBuildInputs = [ pkgs.python3 ]; }
+    pkgs.runCommand "personal-agent-tests" { nativeBuildInputs = [ adapterPython ]; }
       ''
         python ${./personal-agent/tests/test_personal_agent.py} ${./personal-agent/adapter.py}
         touch "$out"
       '';
-  searxng-tests = pkgs.runCommand "searxng-tests" { nativeBuildInputs = [ pkgs.python3 ]; } ''
+  searxng-tests = pkgs.runCommand "searxng-tests" { nativeBuildInputs = [ adapterPython ]; } ''
     python ${./searxng/tests/test_searxng.py} ${./searxng/adapter.py}
     touch "$out"
   '';

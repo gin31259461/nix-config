@@ -37,6 +37,26 @@
         "type": "github"
       }
     },
+    "nix-adapter": {
+      "inputs": {
+        "nixpkgs": [
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1790910754,
+        "narHash": "sha256-xQGMhR/LtssiL9u4xEUPBjhYGvotTliX69ecqWzidT8=",
+        "owner": "gin31259461",
+        "repo": "nix-adapter",
+        "rev": "47506bc72cafcccda3363221cfb1711bbf24f8fc",
+        "type": "github"
+      },
+      "original": {
+        "owner": "gin31259461",
+        "repo": "nix-adapter",
+        "type": "github"
+      }
+    },
     "nixpkgs": {
       "locked": {
         "lastModified": 1789885152,
@@ -146,6 +166,7 @@
       "inputs": {
         "home-manager": "home-manager",
         "hypr-config": "hypr-config",
+        "nix-adapter": "nix-adapter",
         "nixpkgs": "nixpkgs",
         "nvim-config": "nvim-config",
         "personal-agent": "personal-agent"

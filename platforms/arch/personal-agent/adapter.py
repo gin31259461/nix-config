@@ -12,12 +12,7 @@ import sys
 import traceback
 
 
-class Conflict(Exception):
-    """A safe diagnostic that never contains runtime configuration values."""
-
-
-class NotReady(Exception):
-    """Required operator-owned configuration has never been prepared."""
+from nix_adapter import Conflict, NotReady
 
 
 def execute(

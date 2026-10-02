@@ -2,8 +2,8 @@
 
 import re
 
-from files import Conflict, assignments
 from hotspot import converge_firewall
+from nix_adapter import Conflict, assignments
 
 
 def rule_port(rule):

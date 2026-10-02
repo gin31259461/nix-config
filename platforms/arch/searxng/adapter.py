@@ -11,8 +11,7 @@ import sys
 import traceback
 
 
-class Conflict(Exception):
-    """A safe diagnostic that never contains runtime configuration values."""
+from nix_adapter import Conflict
 
 
 def execute(

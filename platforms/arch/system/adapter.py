@@ -9,7 +9,7 @@ import sys
 import traceback
 
 import runtime
-from files import Conflict
+from nix_adapter import Conflict
 
 
 def _verbose() -> bool:

@@ -5,7 +5,7 @@ import json
 import re
 import shlex
 
-from files import Conflict
+from nix_adapter import Conflict
 
 
 def firewall_rules(desired):

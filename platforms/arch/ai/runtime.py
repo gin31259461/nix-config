@@ -6,9 +6,7 @@ import sys
 import time
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).parents[1] / "system"))
-from files import Conflict, Files  # noqa: E402
-from native import Native  # noqa: E402
+from nix_adapter import Conflict, Files, Native
 
 SWITCHER_CONFIG = "/etc/llama-swap/config.yaml"
 SWITCHER_UNIT = "/etc/systemd/system/llama-swap.service"

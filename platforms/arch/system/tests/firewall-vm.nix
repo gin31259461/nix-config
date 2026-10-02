@@ -1,4 +1,7 @@
-{ pkgs }:
+{
+  pkgs,
+  adapterPython ? pkgs.python3,
+}:
 let
   hotspotManifest = pkgs.writeText "hotspot-fixture.json" (
     builtins.toJSON {
@@ -57,7 +60,7 @@ pkgs.testers.runNixOSTest {
     virtualisation.memorySize = 1024;
     boot.kernel.sysctl."net.ipv4.ip_forward" = 1;
     environment.systemPackages = [
-      pkgs.python3
+      adapterPython
       pkgs.iptables
       pkgs.nftables
       pkgs.iproute2
@@ -88,7 +91,7 @@ pkgs.testers.runNixOSTest {
     machine.succeed("iptables -N ts-input; iptables -I INPUT -j ts-input; iptables -N LIBVIRT_FWI; iptables -I FORWARD -j LIBVIRT_FWI")
     machine.succeed("nft add table ip fixture_nat; nft 'add chain ip fixture_nat postrouting { type nat hook postrouting priority srcnat; }'; nft add rule ip fixture_nat postrouting ip saddr 198.51.100.0/24 masquerade")
     machine.succeed("/usr/bin/ufw allow in 12345/tcp")
-    adapter = "${pkgs.python3}/bin/python3 ${../.}/runtime.py ${manifest} converge"
+    adapter = "${adapterPython}/bin/python3 ${../.}/runtime.py ${manifest} converge"
     result, output = machine.execute(adapter)
     if result:
         print(machine.execute("/usr/bin/ufw status verbose"))
@@ -121,7 +124,7 @@ pkgs.testers.runNixOSTest {
     machine.succeed("ip netns exec client socat TCP4-LISTEN:9999,reuseaddr,fork EXEC:cat >/dev/null 2>&1 &")
     machine.fail("ip netns exec guest sh -c 'echo routed | socat -T2 - TCP4:192.0.2.2:9999,connect-timeout=2' | grep routed")
     # A hotspot needs DHCP/DNS input and scoped forwarding even when NM owns NAT.
-    hotspot_adapter = "PYTHONPATH=${../.} ${pkgs.python3}/bin/python3 ${hotspotDriver} ${manifest} ${hotspotManifest}"
+    hotspot_adapter = "PYTHONPATH=${../.} ${adapterPython}/bin/python3 ${hotspotDriver} ${manifest} ${hotspotManifest}"
     for protocol, port in [("UDP", 67), ("UDP", 53), ("TCP", 53)]:
         listener = f"{protocol}4-RECVFROM:{port}" if protocol == "UDP" else f"TCP4-LISTEN:{port}"
         machine.succeed(f"socat {listener},reuseaddr,fork EXEC:cat >/dev/null 2>&1 &")

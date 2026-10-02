@@ -1,8 +1,13 @@
-{ lib, pkgs }:
+{
+  lib,
+  pkgs,
+  nixAdapter,
+}:
 let
   python = pkgs.python3.withPackages (packages: [
     packages.tomli-w
     packages.rich
+    nixAdapter
   ]);
   source = lib.fileset.toSource {
     root = ../.;

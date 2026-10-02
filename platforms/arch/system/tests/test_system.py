@@ -12,9 +12,9 @@ import unittest
 from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from files import Conflict, Files, ini, locale_gen, replace_keys
 from firewall import status
-from runtime import Native, System
+from nix_adapter import Conflict, Files, Native, ini, locale_gen, replace_keys
+from runtime import System
 
 
 class Fake:
@@ -453,7 +453,7 @@ class SystemTests(unittest.TestCase):
                 raise OSError("fixture failure")
             return original(source, target)
 
-        with patch("files.os.replace", side_effect=replace):
+        with patch("nix_adapter.files.os.replace", side_effect=replace):
             with self.assertRaises(OSError):
                 self.system.converge()
         self.assertTrue(self.files.pending("locale"))
@@ -530,7 +530,7 @@ class SystemTests(unittest.TestCase):
 
     def test_native_errors_preserve_output(self):
         with patch(
-            "native.subprocess.run",
+            "nix_adapter.native.subprocess.run",
             return_value=SimpleNamespace(
                 returncode=1, stdout="private fixture", stderr="private fixture"
             ),

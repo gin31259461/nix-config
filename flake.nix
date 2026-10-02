@@ -22,6 +22,11 @@
       url = "github:gin31259461/personal-agent";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+
+    nix-adapter = {
+      url = "github:gin31259461/nix-adapter";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
   outputs =
@@ -54,6 +59,8 @@
       system = archHost.system;
       pkgs = nixpkgs.legacyPackages.${system};
       personalAgentPackage = inputs.personal-agent.packages.${system}.personal-agent;
+      nixAdapter = inputs.nix-adapter.packages.${system}.nix-adapter;
+      adapterPython = inputs.nix-adapter.packages.${system}.adapterPython;
       runners = import ./modules/gitlab-runner {
         inherit lib pkgs;
         rawInstances = archHost.gitlabRunners;
@@ -98,6 +105,7 @@
           capabilities
           systemSettings
           powerpanel
+          adapterPython
           ;
         moduleGroups = virtualization.loginGroups ++ powerpanel.loginGroups;
         moduleSystemUnits = virtualization.systemUnits ++ powerpanel.systemUnits;
@@ -145,6 +153,7 @@
           (pkgs.python3.withPackages (pythonPackages: [
             pythonPackages.tomli-w
             pythonPackages.rich
+            nixAdapter
           ]))
           pkgs.pyright
           pkgs.ruff
@@ -158,7 +167,7 @@
         capabilities = import ./checks/capabilities.nix { inherit lib pkgs inputs; };
         optional-modules = import ./checks/optional-modules.nix { inherit lib pkgs inputs; };
         source-format = import ./checks/format.nix { inherit lib pkgs; };
-        python-types = import ./checks/python-types.nix { inherit lib pkgs; };
+        python-types = import ./checks/python-types.nix { inherit lib pkgs nixAdapter; };
         arch-home = archHomes.${homeConfigurationName}.activationPackage;
       }
       // (import ./checks {
@@ -171,7 +180,12 @@
           ;
       })
       // (import ./platforms/arch/checks.nix {
-        inherit pkgs arch-switch llama-prepare;
+        inherit
+          pkgs
+          arch-switch
+          llama-prepare
+          adapterPython
+          ;
         aiManifest = archAi.manifest;
       })
       // (import ./modules/home/checks.nix {

@@ -10,10 +10,9 @@ import os
 from pathlib import Path
 import sys
 
-from files import Conflict, Files, locale_gen, replace_keys
 from firewall import Firewall
 from hotspot import Hotspot
-from native import Native
+from nix_adapter import Conflict, Files, Native, locale_gen, replace_keys
 
 
 class System:
