@@ -16,7 +16,7 @@ let
     import json
     import sys
     from runtime import System
-    from firewall import Firewall
+    from nix_adapter import Firewall
     with open(sys.argv[1]) as source:
         desired = json.load(source)
     with open(sys.argv[2]) as source:

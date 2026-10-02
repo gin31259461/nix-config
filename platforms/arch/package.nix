@@ -71,8 +71,6 @@ pkgs.writeShellApplication {
         fileset = lib.fileset.unions [
           ./system/adapter.py
           ./system/runtime.py
-          ./system/firewall.py
-          ./system/hotspot.py
         ];
       }
     }/adapter.py

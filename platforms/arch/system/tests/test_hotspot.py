@@ -1,5 +1,6 @@
 """Prepared AP adoption, public-only changes, and interrupted activation recovery."""
 
+import importlib.util
 import json
 import os
 from pathlib import Path
@@ -9,10 +10,23 @@ from types import SimpleNamespace
 from typing import Any, cast
 import unittest
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from nix_adapter import Conflict, FakeNative, FakeProcess, Files
-from hotspot import Hotspot, canonical_rule, firewall_rules
-from runtime import System
+from nix_adapter import (
+    Conflict,
+    FakeNative,
+    FakeProcess,
+    Files,
+    Hotspot,
+    canonical_rule,
+    firewall_rules,
+)
+
+RUNTIME_PATH = Path(__file__).resolve().parents[1] / "runtime.py"
+spec = importlib.util.spec_from_file_location("runtime", RUNTIME_PATH)
+assert spec is not None and spec.loader is not None
+runtime = importlib.util.module_from_spec(spec)
+sys.modules["runtime"] = runtime
+spec.loader.exec_module(runtime)
+System = runtime.System
 
 
 DESIRED = dict(

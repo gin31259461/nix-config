@@ -1,6 +1,7 @@
 """Stable adapter contracts, using temporary paths and a fake native runner."""
 
 import contextlib
+import importlib.util
 import io
 import json
 import os
@@ -10,8 +11,6 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from firewall import status
 from nix_adapter import (
     Conflict,
     FakeNative,
@@ -21,8 +20,16 @@ from nix_adapter import (
     ini,
     locale_gen,
     replace_keys,
+    status,
 )
-from runtime import System
+
+RUNTIME_PATH = Path(__file__).resolve().parents[1] / "runtime.py"
+spec = importlib.util.spec_from_file_location("runtime", RUNTIME_PATH)
+assert spec is not None and spec.loader is not None
+runtime = importlib.util.module_from_spec(spec)
+sys.modules["runtime"] = runtime
+spec.loader.exec_module(runtime)
+System = runtime.System
 
 
 class Fake(FakeNative):
