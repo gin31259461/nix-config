@@ -6,7 +6,21 @@
   hardware = lib.mapAttrsRecursive (_: lib.mkDefault) (import ./hardware.nix);
   programs.ai.llama = lib.mapAttrsRecursive (_: lib.mkDefault) {
     model = {
-      device = "ROCm0";
+      name = "qwen3.5-4b-q4-k-m";
+      device = "Vulkan0";
+    };
+    concurrentModels = true;
+    maxLoadedModels = 2;
+    memoryBudgetMiB = 11264;
+    models = {
+      "qwen3.5-4b-q4-k-m" = {
+        enable = true;
+        vramEstimateMiB = 6144;
+      };
+      "qwen2.5-coder-3b-q4-k-m" = {
+        enable = true;
+        vramEstimateMiB = 3072;
+      };
     };
     profiles = {
       "thinking-general" = {

@@ -5,6 +5,7 @@
 }:
 let
   python = pkgs.python3.withPackages (packages: [
+    packages.jinja2
     packages.rich
     nixAdapter
   ]);

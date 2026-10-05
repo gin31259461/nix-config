@@ -35,6 +35,12 @@ class PrepareTests(unittest.TestCase):
         hf = fake_bin / "hf"
         hf.write_text(
             f"#!{shutil.which('sh')}\n"
+            'local_dir=0; cache_dir=0; for arg in "$@"; do\n'
+            '  case "$arg" in --local-dir) local_dir=1 ;; --cache-dir) cache_dir=1 ;; esac\n'
+            "done\n"
+            'if [ "$local_dir" = 1 ] && [ "$cache_dir" = 1 ]; then\n'
+            '  echo "Cannot use both --local-dir and --cache-dir" >&2; exit 2\n'
+            "fi\n"
             'file=$3; while [ "$1" != --local-dir ]; do shift; done\n'
             "shift; printf 'pinned model\\n' >\"$1/$file\"\n"
         )
@@ -100,6 +106,29 @@ model_sha256s=({digest} {digest})
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertNotIn("[start] Download", result.stderr)
         self.assertIn("[done] Check model 1 of 2", result.stderr)
+
+    def test_resumes_matching_stage_from_failed_download(self):
+        download_dir = self.model.parent / ".nix-config-model.gguf.download"
+        download_dir.mkdir(parents=True)
+        digest = hashlib.sha256(self.payload).hexdigest()
+        (download_dir / "nix-config-identity").write_text(
+            f"example/model\n{'1' * 40}\nmodel.gguf\n{digest}\n"
+        )
+        result = self.invoke()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(self.model.read_bytes(), self.payload)
+        self.assertTrue(Path(str(self.model) + ".nix-config-receipt").is_file())
+
+    def test_refuses_resume_stage_with_different_identity(self):
+        download_dir = self.model.parent / ".nix-config-model.gguf.download"
+        download_dir.mkdir(parents=True)
+        identity = download_dir / "nix-config-identity"
+        identity.write_text("different declaration\n")
+        result = self.invoke()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("model download stage has a different declaration", result.stderr)
+        self.assertEqual(identity.read_text(), "different declaration\n")
+        self.assertFalse(self.model.exists())
 
     def test_refuses_checksum_mismatch_without_overwrite(self):
         self.model.parent.mkdir()

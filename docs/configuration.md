@@ -34,6 +34,16 @@ nix eval --json .#lib.configurations.arch.networking.firewall
 
 Parent capability switches gate their owned resources. A disabled Arch capability withdraws future management; it does not uninstall a package, retire a service, remove a registration or erase application state. Home Manager applies the next selected generation through its normal transition. An enabled optional module that has never completed required preparation may report `not ready`; invalid prepared state is an error.
 
+AI selection lives under `programs.ai.llama.models.<inventory-key>`;
+`model.name` selects the default agent, while `concurrentModels` and
+`maxLoadedModels` control residency. Each model owns runtime settings; profiles
+own request sampling and thinking. Optional `memoryBudgetMiB` validates the sum
+of per-model `vramEstimateMiB` values without enforcing an allocator cap. Read
+the [AI guide](ai.md) before changing models, offload or context sizes.
+When AI, Codex and llama.cpp are enabled, `programs.ai.codex.localProfile.enable`
+(default `true`) manages `~/.codex/llama-cpp.config.toml` for `codex --profile
+llama-cpp`. Disable it to withdraw management of that file.
+
 ## User and home selection
 
 The default Host selects its existing human account through `deployment.username`. The account must exist on the machine before deployment. For a different login user, change both the selected account and the declared user identity in `configuration.nix`; [Host users](../hosts/arch/users.nix) are the baseline to adapt. Keep reusable home behavior in `profiles/` or home modules and machine-specific differences in `homes/` or the Host. Service accounts are owned by their modules and do not get a human home configuration. Do not bump Home Manager `stateVersion` as a routine update.

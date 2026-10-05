@@ -138,7 +138,6 @@ if ((model)); then
       [[ ! -L $model_dir ]] || { report_error 'model directory must not be a symlink'; exit 1; }
       install -d -m0755 -o0 -g0 "$model_dir"
       download_dir="$model_stage.download"
-      cache_dir="$download_dir/cache"
       [[ ! -e $model_stage && ! -L $model_stage ]] || { report_error 'stale model preparation stage requires operator review'; exit 1; }
       if [[ -e $download_dir || -L $download_dir ]]; then
         [[ -d $download_dir && ! -L $download_dir ]] || { report_error 'model download stage must be a directory'; exit 1; }
@@ -153,8 +152,7 @@ if ((model)); then
       fi
       run_with_progress hf download "$model_repository" "$model_file" \
         --revision "$model_revision" \
-        --local-dir "$download_dir" \
-        --cache-dir "$cache_dir"
+        --local-dir "$download_dir"
       downloaded="$download_dir/$model_file"
       [[ -f $downloaded && ! -L $downloaded ]] || { report_error 'Hugging Face download did not produce the declared file'; exit 1; }
       progress_finish 'done'

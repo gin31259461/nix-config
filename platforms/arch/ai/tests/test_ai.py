@@ -254,6 +254,33 @@ class AITests(unittest.TestCase):
         with self.assertRaisesRegex(runtime.Conflict, "model receipt"):
             self.ai().preflight(installed=True)
 
+    def add_completion_model(self):
+        models = cast(dict[str, dict[str, Any]], self.desired["models"])
+        declaration = dict(models["qwen"])
+        declaration["path"] = "/var/lib/llama/models/completion.gguf"
+        declaration["file"] = "completion.gguf"
+        models["completion"] = declaration
+        return declaration
+
+    def test_second_model_must_exist_before_any_convergence(self):
+        self.add_completion_model()
+        with self.assertRaisesRegex(runtime.Conflict, "assets are incomplete"):
+            self.ai().converge()
+        self.assertEqual(self.native.calls, [])
+
+    def test_second_model_receipt_is_independently_verified(self):
+        declaration = self.add_completion_model()
+        model = self.root / "var/lib/llama/models/completion.gguf"
+        model.write_text("synthetic completion")
+        receipt = Path(str(model) + ".nix-config-receipt")
+        receipt.write_text(runtime.AI.model_receipt(model, declaration))
+        self.assertTrue(self.ai().preflight(installed=True))
+        self.native.calls.clear()
+        model.write_text("drift")
+        with self.assertRaisesRegex(runtime.Conflict, "model receipt"):
+            self.ai().preflight(installed=True)
+        self.assertEqual(self.native.calls, [])
+
     def test_pending_restarts_then_clears(self):
         self.files.mark("ai-llama")
         self.ai().converge()
@@ -271,6 +298,33 @@ class AITests(unittest.TestCase):
         with self.assertRaises(runtime.Conflict):
             self.ai().preflight()
         self.assertFalse((self.root / "etc/llama/server/models.ini").exists())
+
+    def test_known_legacy_policy_is_accepted_but_modified_policy_is_rejected(self):
+        paths = {
+            "legacyPreset": "etc/llama/server/models.ini",
+            "legacyDropin": "etc/systemd/system/llama-server.service.d/60-nix-config.conf",
+        }
+        for field, relative in paths.items():
+            self.generated[field] = f"known historical {field}\n"
+            path = self.root / relative
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(self.generated[field])
+        self.assertTrue(self.ai().preflight())
+        self.native.calls.clear()
+        for field, relative in paths.items():
+            with self.subTest(field=field):
+                path = self.root / relative
+                original = path.read_text()
+                path.write_text(original + "operator customization\n")
+                with self.assertRaisesRegex(
+                    runtime.Conflict, "requires explicit adoption"
+                ):
+                    self.ai().preflight()
+                self.assertEqual(self.native.calls, [])
+                self.assertEqual(
+                    path.read_text(), original + "operator customization\n"
+                )
+                path.write_text(original)
 
     def test_rejects_mismatched_prepared_receipt(self):
         (self.root / "opt/llama/current/nix-config-build").write_text("other 20000\n")

@@ -27,7 +27,19 @@ class GeneratedArtifactsTests(unittest.TestCase):
             generated["switcherUnit"],
         )
         self.assertIn(f"--port {desired['server']['port']}", generated["legacyDropin"])
-        self.assertIn(desired["model"]["path"], generated["legacyPreset"])
+        self.assertIn(desired["legacy"]["model"]["path"], generated["legacyPreset"])
+
+    def test_managed_templates_are_readable_store_assets_in_backend_commands(self):
+        for model in self.desired["models"].values():
+            template = model.get("chatTemplateFile")
+            if template is None:
+                continue
+            with self.subTest(model=model["id"]):
+                self.assertTrue(template.startswith("/nix/store/"))
+                self.assertTrue(Path(template).is_file())
+                command = self.desired["switcher"]["models"][model["id"]]["cmd"]
+                self.assertIn("--chat-template-file", command)
+                self.assertIn(template, command)
 
     def test_caddy_policy_is_loopback_only_and_keeps_package_adoption(self):
         desired = self.desired

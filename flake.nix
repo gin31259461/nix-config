@@ -162,6 +162,7 @@
       devShells.${system}.default = pkgs.mkShell {
         packages = [
           (pkgs.python3.withPackages (pythonPackages: [
+            pythonPackages.jinja2
             pythonPackages.rich
             nixAdapter
           ]))

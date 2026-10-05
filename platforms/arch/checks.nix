@@ -34,6 +34,16 @@
         python ${./ai/tests/test_generated.py} ${aiManifest} ${./ai/package-caddy.Caddyfile}
         touch "$out"
       '';
+  ai-diagnostic-tools =
+    pkgs.runCommand "ai-diagnostic-tools"
+      { nativeBuildInputs = [ (pkgs.python3.withPackages (python: [ python.jinja2 ])) ]; }
+      ''
+        python ${../../modules/ai}/tests/test_chat_template.py
+        python ${../../modules/ai}/tests/test_benchmark.py
+        python ${../../modules/ai}/tests/test_probe.py
+        python ${../../modules/ai}/tests/test_router.py ${pkgs.llama-swap}/bin/llama-swap
+        touch "$out"
+      '';
   personal-agent-tests =
     pkgs.runCommand "personal-agent-tests" { nativeBuildInputs = [ adapterPython ]; }
       ''

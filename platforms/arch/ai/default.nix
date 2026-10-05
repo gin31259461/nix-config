@@ -10,7 +10,17 @@ let
   llama = config.enable && config.llama.enable;
   proxy = llama && config.llama.proxy.enable && tailscale;
   modelProfiles =
-    modelName: lib.filterAttrs (_: profile: profile.model == modelName) artifacts.profiles;
+    modelName:
+    let
+      matching = lib.filterAttrs (_: profile: profile.model == modelName) artifacts.profiles;
+    in
+    matching
+    // lib.optionalAttrs (!(builtins.hasAttr "default" matching)) {
+      default = {
+        model = modelName;
+        artifacts = artifacts.models.${modelName};
+      };
+    };
   profileAlias =
     name: profile:
     if name == "default" then profile.artifacts.id else "${profile.artifacts.id}:${name}";
@@ -43,23 +53,34 @@ let
       paramsById = lib.mapAttrs' (
         name: profile: lib.nameValuePair (profileAlias name profile) (requestParams profile)
       ) profiles;
-      command = lib.concatStringsSep " " [
-        "${artifacts.source.installPrefix}/current/bin/llama-server"
-        "--model ${lib.escapeShellArg runtimeModel.path}"
-        "--host 127.0.0.1"
-        "--port \${PORT}"
-        "--no-webui"
-        "--ctx-size ${toString runtimeModel.contextSize}"
-        "--fit on"
-        "--fit-target ${toString runtimeModel.fitTarget}"
-        "--flash-attn on"
-        "--cache-type-k ${runtimeModel.cacheTypeK}"
-        "--cache-type-v ${runtimeModel.cacheTypeV}"
-        "--batch-size ${toString runtimeModel.batchSize}"
-        "--ubatch-size ${toString runtimeModel.microBatchSize}"
-        "--parallel ${toString runtimeModel.parallel}"
-        "--device ${runtimeModel.device}"
-      ];
+      command = lib.concatStringsSep " " (
+        [
+          "${artifacts.source.installPrefix}/current/bin/llama-server"
+          "--model ${lib.escapeShellArg runtimeModel.path}"
+          "--host 127.0.0.1"
+          "--port \${PORT}"
+          "--no-webui"
+          "--ctx-size ${toString runtimeModel.contextSize}"
+          "--fit ${if runtimeModel.fit or true then "on" else "off"}"
+          "--fit-target ${toString runtimeModel.fitTarget}"
+          "--flash-attn on"
+          "--cache-type-k ${runtimeModel.cacheTypeK}"
+          "--cache-type-v ${runtimeModel.cacheTypeV}"
+          "--batch-size ${toString runtimeModel.batchSize}"
+          "--ubatch-size ${toString runtimeModel.microBatchSize}"
+          "--parallel ${toString runtimeModel.parallel}"
+          "--device ${runtimeModel.device}"
+        ]
+        ++ lib.optional (
+          runtimeModel.chatTemplateFile or null != null
+        ) "--chat-template-file ${lib.escapeShellArg "${runtimeModel.chatTemplateFile}"}"
+        ++ lib.optional (
+          runtimeModel.gpuLayers or null != null
+        ) "--n-gpu-layers ${toString runtimeModel.gpuLayers}"
+        ++ lib.optional (
+          runtimeModel.cpuMoeLayers or null != null
+        ) "--n-cpu-moe ${toString runtimeModel.cpuMoeLayers}"
+      );
     in
     lib.nameValuePair model.id {
       cmd = command;
@@ -72,48 +93,52 @@ let
   switcher = {
     startPort = artifacts.server.port + 1000;
     includeAliasesInList = true;
+    globalTTL = 0;
     groups.default = {
-      swap = true;
-      exclusive = true;
+      swap = !(artifacts.concurrentModels or false);
+      exclusive = !(artifacts.concurrentModels or false);
+      persistent = artifacts.concurrentModels or false;
       members = map (model: model.id) (builtins.attrValues artifacts.models);
     };
     models = switcherModels;
   };
-  model = artifacts.model;
+  legacyModel = artifacts.legacy.model;
+  legacyServer = artifacts.legacy.server;
   prefix = artifacts.source.installPrefix + "/current";
   legacyChatTemplateKwargs =
     "{"
     + lib.concatStringsSep "," (
       lib.filter (value: value != null) [
         (
-          if model.reasoningEffort or null == null then
+          if legacyModel.reasoningEffort or null == null then
             null
           else
-            ''"reasoning_effort":${builtins.toJSON model.reasoningEffort}''
+            ''"reasoning_effort":${builtins.toJSON legacyModel.reasoningEffort}''
         )
         (
-          if model.enableThinking or null == null then
+          if legacyModel.enableThinking or null == null then
             null
           else
-            ''"enable_thinking":${builtins.toJSON model.enableThinking}''
+            ''"enable_thinking":${builtins.toJSON legacyModel.enableThinking}''
         )
         (
-          if model.preserveThinking or null == null then
+          if legacyModel.preserveThinking or null == null then
             null
           else
-            ''"preserve_thinking":${builtins.toJSON model.preserveThinking}''
+            ''"preserve_thinking":${builtins.toJSON legacyModel.preserveThinking}''
         )
       ]
     )
     + "}";
   escapedChatTemplateKwargs = lib.replaceStrings [ "\"" ] [ "\\\"" ] (legacyChatTemplateKwargs);
   reasoningEffort = lib.optionalString (
-    model.reasoningEffort or null != null
-  ) " --reasoning-effort ${model.reasoningEffort}";
+    legacyModel.reasoningEffort or null != null
+  ) " --reasoning-effort ${legacyModel.reasoningEffort}";
   switcherConfig = builtins.toJSON {
     inherit (switcher)
       startPort
       includeAliasesInList
+      globalTTL
       groups
       models
       ;
@@ -165,22 +190,22 @@ let
     version = 1
 
     [*]
-    parallel = ${toString model.parallel}
+    parallel = ${toString legacyModel.parallel}
     cont-batching = true
     jinja = true
 
-    [${model.id}]
-    model = ${model.path}
-    device = ${model.device}
-    ctx-size = ${toString model.contextSize}
+    [${legacyModel.id}]
+    model = ${legacyModel.path}
+    device = ${legacyModel.device}
+    ctx-size = ${toString legacyModel.contextSize}
     fit = true
-    fit-target = ${toString model.fitTarget}
-    fit-ctx = ${toString model.contextSize}
+    fit-target = ${toString legacyModel.fitTarget}
+    fit-ctx = ${toString legacyModel.contextSize}
     flash-attn = on
-    cache-type-k = ${model.cacheTypeK}
-    cache-type-v = ${model.cacheTypeV}
-    batch-size = ${toString model.batchSize}
-    ubatch-size = ${toString model.microBatchSize}
+    cache-type-k = ${legacyModel.cacheTypeK}
+    cache-type-v = ${legacyModel.cacheTypeV}
+    batch-size = ${toString legacyModel.batchSize}
+    ubatch-size = ${toString legacyModel.microBatchSize}
     load-on-startup = true
   '';
   legacyDropin = ''
@@ -190,7 +215,7 @@ let
     [Service]
     Environment=LD_LIBRARY_PATH=${prefix}/lib:${prefix}/lib64
     ExecStart=
-    ExecStart=${prefix}/bin/llama-server --models-preset /etc/llama/server/models.ini --models-max ${toString artifacts.server.modelsMax} --host ${artifacts.server.host} --port ${toString artifacts.server.port} --no-webui --temp ${builtins.toJSON model.temperature} --top-p ${builtins.toJSON model.topP} --top-k ${toString model.topK} --min-p ${builtins.toJSON model.minP} --presence-penalty ${builtins.toJSON model.presencePenalty} --repeat-penalty ${builtins.toJSON model.repetitionPenalty}${reasoningEffort} --chat-template-kwargs ${escapedChatTemplateKwargs}
+    ExecStart=${prefix}/bin/llama-server --models-preset /etc/llama/server/models.ini --models-max ${toString legacyServer.modelsMax} --host ${legacyServer.host} --port ${toString legacyServer.port} --no-webui --temp ${builtins.toJSON legacyModel.temperature} --top-p ${builtins.toJSON legacyModel.topP} --top-k ${toString legacyModel.topK} --min-p ${builtins.toJSON legacyModel.minP} --presence-penalty ${builtins.toJSON legacyModel.presencePenalty} --repeat-penalty ${builtins.toJSON legacyModel.repetitionPenalty}${reasoningEffort} --chat-template-kwargs ${escapedChatTemplateKwargs}
     SupplementaryGroups=render video
     Restart=on-failure
     RestartSec=3
@@ -201,7 +226,12 @@ in
   manifest = pkgs.writeText "arch-ai.json" (
     builtins.toJSON {
       inherit llama proxy;
-      inherit (artifacts) source server profiles;
+      inherit (artifacts)
+        source
+        server
+        profiles
+        legacy
+        ;
       switcher = {
         binary = lib.optionalString llama "${pkgs.llama-swap}/bin/llama-swap";
         listen = "127.0.0.1:${toString artifacts.server.port}";
