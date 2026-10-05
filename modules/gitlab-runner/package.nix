@@ -13,7 +13,10 @@ let
     }
   );
   runnerctlPackage =
-    if gitlab-runner != null then gitlab-runner.packages.${pkgs.system}.default else pkgs.emptyFile;
+    if gitlab-runner != null then
+      gitlab-runner.packages.${pkgs.stdenv.hostPlatform.system}.default
+    else
+      pkgs.emptyFile;
 in
 pkgs.writeShellApplication {
   name = "runnerctl";
