@@ -18,6 +18,16 @@
       flake = false;
     };
 
+    matt-pocock-skills = {
+      url = "github:mattpocock/skills";
+      flake = false;
+    };
+
+    vercel-skills = {
+      url = "github:vercel-labs/skills";
+      flake = false;
+    };
+
     personal-agent = {
       url = "github:gin31259461/personal-agent";
       inputs.nixpkgs.follows = "nixpkgs";
@@ -79,6 +89,10 @@
       ai = import ./modules/ai {
         inherit lib;
         config = archHost.ai;
+        skillSources = {
+          matt-pocock = inputs.matt-pocock-skills;
+          vercel = inputs.vercel-skills;
+        };
       };
       archAi = import ./platforms/arch/ai {
         inherit lib pkgs;

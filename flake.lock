@@ -60,6 +60,22 @@
         "type": "github"
       }
     },
+    "matt-pocock-skills": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1791294082,
+        "narHash": "sha256-c36sg+3AyW+iZ730QKXqwejpFOL+2neWlZhL5Jc7Rcs=",
+        "owner": "mattpocock",
+        "repo": "skills",
+        "rev": "6fd947921b935b7e1e69293a200400f0fdd5c15f",
+        "type": "github"
+      },
+      "original": {
+        "owner": "mattpocock",
+        "repo": "skills",
+        "type": "github"
+      }
+    },
     "nix-adapter": {
       "inputs": {
         "nixpkgs": [
@@ -190,10 +206,12 @@
         "gitlab-runner": "gitlab-runner",
         "home-manager": "home-manager",
         "hypr-config": "hypr-config",
+        "matt-pocock-skills": "matt-pocock-skills",
         "nix-adapter": "nix-adapter",
         "nixpkgs": "nixpkgs",
         "nvim-config": "nvim-config",
-        "personal-agent": "personal-agent"
+        "personal-agent": "personal-agent",
+        "vercel-skills": "vercel-skills"
       }
     },
     "uv2nix": {
@@ -218,6 +236,22 @@
       "original": {
         "owner": "pyproject-nix",
         "repo": "uv2nix",
+        "type": "github"
+      }
+    },
+    "vercel-skills": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1791225402,
+        "narHash": "sha256-QEfu1DzOFAlsV16zpMtQrCj7+eDNRYUk8eGIYSnXUSs=",
+        "owner": "vercel-labs",
+        "repo": "skills",
+        "rev": "14cf84aa922cccc7e5b11fee5af9a01b3750fddf",
+        "type": "github"
+      },
+      "original": {
+        "owner": "vercel-labs",
+        "repo": "skills",
         "type": "github"
       }
     }

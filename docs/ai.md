@@ -61,6 +61,81 @@ The legacy `qwen3.6-35b-a3b-ud-q5-k-m` option name remains for compatibility;
 its actual file is MXFP4_MOE. Thinking profile suffixes remain available for the
 selected agent. Inspect `/v1/models` for exact API IDs.
 
+## Agent skills
+
+Home Manager installs the explicitly selected skills into `~/.agents/skills`
+and `~/.gemini/config/skills` as complete directory links. Enablement follows
+`programs.ai.enable`, `programs.ai.skillsPresets.enable` for the shared agent
+directory, and `programs.ai.agy.enable` plus `programs.ai.agy.skills.enable` for
+the Antigravity directory. These switches are independent of llama.cpp asset
+preparation. The source and selection registry lives in
+[`modules/ai/skills.nix`](../modules/ai/skills.nix).
+
+The `matt-pocock-skills` flake input owns Matt's skill content, including bundled
+references, scripts and agent metadata. The `vercel-skills` input owns
+`find-skills`. Both revisions are fixed in `flake.lock`. The six custom skills
+remain in this repository, with their agent-specific content preserved.
+Deployment uses the sources already captured by the built Home Manager
+activation package; it does not run `npx`, download skills during activation,
+or maintain the Skills CLI's runtime lock file.
+
+Deploy the selected revisions with the normal workstation command:
+
+```bash
+just arch-workstation
+```
+
+Update only the skill sources, review the changed revisions and upstream
+changes, then validate the resulting generation:
+
+```bash
+nix flake update matt-pocock-skills vercel-skills
+just check-fast
+just check
+just build
+nix build --no-link --show-trace --print-build-logs \
+  '.#homeConfigurations."abnertu@arch".activationPackage'
+git diff --check
+```
+
+Either input can be updated on its own. After review and successful checks,
+run `just arch-workstation` to activate the new version and commit the reviewed
+lock change. `just arch-workstation update` controls native package convergence;
+it does not advance skill source revisions. To undo an update, restore the
+reviewed earlier lock entries, rebuild and redeploy. Source checks do not perform
+live activation.
+
+Adding a skill requires an explicit registry change. A selected upstream path
+that disappears or loses its `SKILL.md` fails evaluation, so source updates
+cannot silently drop selected skills. Local modifications to upstream skills
+are replaced by the upstream version during this migration; make intentional
+custom forks separately owned before editing installed content. Home Manager
+handles the old links it previously owned during activation and reports
+unmanaged file collisions rather than overwriting them. No custom directory
+cleanup or backup operation is added.
+
+This migration retires `batch-grill-me`, `design-an-interface`, `edit-article`,
+`qa`, `request-refactor-plan`, `resolving-merge-conflicts`,
+`ubiquitous-language` and `writing-great-skills`, which no longer exist under
+those names upstream. The confirmed rename `writing-great-skills` is replaced
+by `writing-for-agents`; other newly introduced skills are not automatically
+selected. See the [upstream changelog](https://github.com/mattpocock/skills/blob/main/CHANGELOG.md).
+
+The [Matt installation guide](https://github.com/mattpocock/skills#installation-30-second-setup)
+also supports installing through the
+[Skills CLI](https://github.com/vercel-labs/skills). That CLI is provided by
+`vercel-labs/skills`, not by Matt's repository. Its optional interactive
+`find-skills` prompt is skipped with `--yes` or noninteractive input; this
+configuration selects that skill explicitly. Use Nix input updates for these
+Home Manager-owned skills; do not use `npx skills update` to overwrite their
+installed links. Run `setup-matt-pocock-skills` separately for each project when
+you want its project-specific workflow configuration.
+
+Antigravity's [official skill guide](https://antigravity.google/docs/skills)
+documents `~/.gemini/config/skills` for its IDE/global configuration. This
+preserves the existing projection; Gemini CLI and Antigravity CLI have separate
+agent-specific directories and are not additional targets of this migration.
+
 ## Codex local profile
 
 When AI, Codex and llama.cpp are enabled, Home Manager writes

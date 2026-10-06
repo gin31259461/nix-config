@@ -18,6 +18,8 @@ Nix generates fixed content such as Home Manager files, systemd units, drop-ins,
 
 This separation borrows the declarative file-rendering idea from [nix-maid](https://viperml.codeberg.page/nix-maid/api.html) without adding it as a dependency or a second Home Manager layer. The existing feature modules own generated artifacts, and adapters retain Arch-specific reconciliation.
 
+Upstream agent skills are immutable sources pinned by separate flake inputs. The AI module owns the explicit selection and Home Manager projects complete skill directories from those sources; only custom skills remain authored in this checkout. Updating a source pin changes the next built home generation, without a runtime installer or a second owner for the installed files. See [skills deployment and updates](docs/ai.md#agent-skills).
+
 Home Manager commonly realizes static home files through links to the store. Arch-native files are copied or merged into `/etc` with native ownership and mode, while prepared llama.cpp binaries and GGUF models stay outside the store. Hyprland and Neovim source trees also stay outside managed runtime paths: by default they are pinned as external flake inputs, or can be projected from local worktrees using user `development` options (`development.neovimPath`, `development.hyprlandPath`) via out-of-store symlinks.
 
 ## Deployment lifecycle

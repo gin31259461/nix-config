@@ -58,6 +58,10 @@ inputs.home-manager.lib.homeManagerConfiguration {
     (import ../modules/ai {
       lib = inputs.nixpkgs.lib;
       config = ai;
+      skillSources = {
+        matt-pocock = inputs.matt-pocock-skills;
+        vercel = inputs.vercel-skills;
+      };
     }).homeModule
   ]
   ++ [ (userNormalized.homeConfig or { }) ]

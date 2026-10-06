@@ -53,7 +53,7 @@ External Hyprland and Neovim source trees remain outside Home Manager-managed ru
 | [Hotspot](docs/hotspot.md) | Adopt an existing NetworkManager AP |
 | [Desktop session](docs/desktop-session.md) | UWSM, startup ownership and Noctalia storage |
 | [Noctalia configuration](docs/noctalia-config.md) | Capture and deploy reviewed UI preferences |
-| [AI service](docs/ai.md) | Prepare external assets and converge loopback services |
+| [AI service](docs/ai.md) | Prepare external assets, converge loopback services and update agent skills |
 | [GitLab Runners](docs/runners.md) | Separate reconcile, registration and verification lifecycle |
 | [Personal Agent](docs/personal-agent.md) | External runtime configuration and native service |
 

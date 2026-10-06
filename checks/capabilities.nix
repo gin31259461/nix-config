@@ -20,6 +20,10 @@ let
         inherit lib;
         raw = lib.recursiveUpdate aiDefaults raw;
       };
+      skillSources = {
+        matt-pocock = inputs.matt-pocock-skills;
+        vercel = inputs.vercel-skills;
+      };
     };
   virtualization =
     raw:
@@ -122,6 +126,10 @@ let
   legacyBaseline = import ../modules/ai {
     inherit lib;
     config = legacyBaselineConfig;
+    skillSources = {
+      matt-pocock = inputs.matt-pocock-skills;
+      vercel = inputs.vercel-skills;
+    };
   };
   legacyBaselineArch = import ../platforms/arch/ai {
     inherit lib pkgs;
@@ -169,6 +177,42 @@ let
     username = host.deployment.username;
     user = host.users.${host.deployment.username};
   };
+  skillRegistry = import ../modules/ai/skills.nix {
+    inherit lib;
+    skillSources = {
+      matt-pocock = inputs.matt-pocock-skills;
+      vercel = inputs.vercel-skills;
+    };
+  };
+  unknownSkillSelection = builtins.tryEval (skillRegistry.resolve "not-registered");
+  missingSkillRegistry = import ../modules/ai/skills.nix {
+    inherit lib;
+    skillSources = {
+      matt-pocock = inputs.nixpkgs.outPath;
+      vercel = inputs.nixpkgs.outPath;
+    };
+  };
+  missingSkillSource = builtins.tryEval (builtins.deepSeq missingSkillRegistry.selected true);
+  agentSkillsOnly = ai {
+    enable = true;
+    agy.enable = false;
+  };
+  geminiSkillsOnly = ai {
+    enable = true;
+    skillsPresets.enable = false;
+  };
+  skillsDisabledWithoutSources = import ../modules/ai {
+    inherit lib;
+    config = import ../modules/ai/interface.nix {
+      inherit lib;
+      raw = lib.recursiveUpdate aiDefaults {
+        enable = true;
+        skillsPresets.enable = false;
+        agy.skills.enable = false;
+        codex.localProfile.enable = false;
+      };
+    };
+  };
   native = import ../platforms/arch/packages.nix {
     inherit lib;
     inherit (host) hardware;
@@ -190,6 +234,21 @@ assert
   home.config.home.file.".codex/llama-cpp.config.toml".text
   == codexProfile.homeModule.home.file.".codex/llama-cpp.config.toml".text;
 assert !(home.config.home.file ? ".codex/config.toml");
+assert home.config.home.file.".agents/skills/code-review".source == skillRegistry.roots.code-review;
+assert home.config.home.file.".agents/skills/find-skills".source == skillRegistry.roots.find-skills;
+assert
+  home.config.home.file.".agents/skills/create-agentsmd".source
+  == skillRegistry.agentCustomRoots.create-agentsmd;
+assert
+  home.config.home.file.".gemini/config/skills/create-agentsmd".source
+  == skillRegistry.geminiCustomRoots.create-agentsmd;
+assert !unknownSkillSelection.success;
+assert !missingSkillSource.success;
+assert agentSkillsOnly.homeModule.home.file ? ".agents/skills/code-review";
+assert !(agentSkillsOnly.homeModule.home.file ? ".gemini/config/skills/code-review");
+assert geminiSkillsOnly.homeModule.home.file ? ".gemini/config/skills/code-review";
+assert !(geminiSkillsOnly.homeModule.home.file ? ".agents/skills/code-review");
+assert skillsDisabledWithoutSources.homeModule.home.file == { };
 assert !(codexProfileOff.homeModule.home.file ? ".codex/llama-cpp.config.toml");
 assert !(codexOff.homeModule.home.file ? ".codex/llama-cpp.config.toml");
 assert !(llamaOff.homeModule.home.file ? ".codex/llama-cpp.config.toml");

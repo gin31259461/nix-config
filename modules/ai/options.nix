@@ -120,7 +120,7 @@ in
       description = "Manage a Codex profile for the selected local llama.cpp model.";
     };
   };
-  skillsPresets.enable = enable "the repository skill presets";
+  skillsPresets.enable = enable "the registered Codex agent skill presets";
   agy = {
     enable = enable "Antigravity (agy)";
     pkg.enable = enable "the Antigravity CLI package (antigravity-cli)";

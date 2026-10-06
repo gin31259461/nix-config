@@ -1,4 +1,8 @@
-{ lib, config }:
+{
+  lib,
+  config,
+  skillSources ? { },
+}:
 let
   llama = config.enable && config.llama.enable;
   inventory = import ./artifacts.nix;
@@ -100,26 +104,27 @@ in
   homeModule = {
     home.file = lib.optionalAttrs config.enable (
       let
-        agentSkillRoot = ../../files/home/.agents/skills;
-        geminiSkillRoot = ../../files/home/.gemini/config/skills;
+        skills =
+          if config.skillsPresets.enable || (config.agy.enable && config.agy.skills.enable) then
+            import ./skills.nix {
+              inherit lib skillSources;
+            }
+          else
+            null;
         agentSkills =
           if config.skillsPresets.enable then
-            lib.mapAttrs' (
-              name: _:
-              lib.nameValuePair ".agents/skills/${name}" {
-                source = agentSkillRoot + "/${name}";
-              }
-            ) (builtins.readDir agentSkillRoot)
+            assert skills.validateCustom skills.agentCustomRoots;
+            lib.mapAttrs' (name: source: lib.nameValuePair ".agents/skills/${name}" { inherit source; }) (
+              skills.agentCustomRoots // skills.selected
+            )
           else
             { };
         geminiSkills =
-          if (config.agy.enable && config.agy.skills.enable) && builtins.pathExists geminiSkillRoot then
+          if skills != null && config.agy.enable && config.agy.skills.enable then
+            assert skills.validateCustom skills.geminiCustomRoots;
             lib.mapAttrs' (
-              name: _:
-              lib.nameValuePair ".gemini/config/skills/${name}" {
-                source = geminiSkillRoot + "/${name}";
-              }
-            ) (builtins.readDir geminiSkillRoot)
+              name: source: lib.nameValuePair ".gemini/config/skills/${name}" { inherit source; }
+            ) (skills.geminiCustomRoots // skills.selected)
           else
             { };
       in
