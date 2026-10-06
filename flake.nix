@@ -127,7 +127,6 @@
         aiArtifacts = ai.artifacts;
         inherit personalAgentPackage;
         personalAgentConfig = archHost.personalAgent;
-        searxngConfig = archHost.searxng;
       };
       llama-prepare = import ./modules/ai/package.nix {
         inherit lib pkgs adapterPython;

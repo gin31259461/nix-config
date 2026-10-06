@@ -20,7 +20,6 @@ let
     "users"
     "gitlabRunners"
     "personalAgent"
-    "searxng"
     "hardware"
     "ai"
     "virtualization"
@@ -150,7 +149,6 @@ builtins.deepSeq users (
     };
     gitlabRunners = host.gitlabRunners or { };
     personalAgent = host.personalAgent or false;
-    searxng = host.searxng or false;
     powerpanel = import ../modules/powerpanel/interface.nix {
       inherit lib;
       raw = host.powerpanel or { };

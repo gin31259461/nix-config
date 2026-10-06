@@ -15,14 +15,6 @@ let
         gitlabRunners = { };
         personalAgent = {
           enable = false;
-          searxng = {
-            enable = false;
-            url = "http://127.0.0.1:8888";
-          };
-        };
-        searxng = {
-          enable = false;
-          port = 8888;
         };
         users =
           lib.mapAttrs (_: user: builtins.removeAttrs user [ "homeConfig" ])

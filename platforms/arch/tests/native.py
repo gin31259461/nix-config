@@ -38,7 +38,6 @@ if command == "python":
         ["/fixture/adapter", "/fixture/manifest"],
         ["/fixture/ai-adapter", "/fixture/ai-manifest"],
         ["/fixture/personal-agent-adapter", "/fixture/personal-agent-manifest"],
-        ["/fixture/searxng-adapter", "/fixture/searxng-manifest"],
     )
     assert args[2] in ("preflight", "converge")
     assert len(args) == 3 or args[3:] == ["--verbose"]

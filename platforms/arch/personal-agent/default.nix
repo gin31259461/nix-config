@@ -2,26 +2,21 @@
   pkgs,
   package,
   config,
-  searxngEnabled ? false,
 }:
 let
   enabled = config.enable;
-  searxngSupport = config.searxng.enable;
-  searxngUrl = config.searxng.url;
-  localSearxng = searxngSupport && searxngEnabled;
   unit = ''
     [Unit]
     Description=Personal Agent
-    After=network-online.target llama-swap.service${if localSearxng then " searxng.service" else ""}
+    After=network-online.target llama-swap.service
     Wants=network-online.target
-    Requires=llama-swap.service${if localSearxng then " searxng.service" else ""}
+    Requires=llama-swap.service
 
     [Service]
     Type=simple
     User=personal-agent
     Group=personal-agent
     EnvironmentFile=/etc/personal-agent/agent.env
-    ${if searxngSupport then "Environment=PERSONAL_AGENT_WEB_SEARCH_URL=${searxngUrl}" else ""}
     ExecStart=${package}/bin/personal-agent run --config /etc/personal-agent/config.toml
     Restart=on-failure
     RestartSec=5

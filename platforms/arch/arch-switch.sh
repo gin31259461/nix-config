@@ -188,14 +188,14 @@ if ((purge)); then
   fi
   [[ ! -e $root_state ]] || root rm -rf -- "$root_state"
   personal_units_changed=0
-  for service in personal-agent.service searxng.service; do
-    unit="$fs_root/etc/systemd/system/$service"
-    [[ -e $unit ]] || continue
+  service="personal-agent.service"
+  unit="$fs_root/etc/systemd/system/$service"
+  if [[ -e $unit ]]; then
     native systemctl is-enabled --quiet "$service" &&
       root systemctl disable --now "$service" || true
     root rm -f -- "$unit"
     personal_units_changed=1
-  done
+  fi
   ((personal_units_changed == 0)) || root systemctl daemon-reload
   progress_suspend
   printf 'Arch deployment state purged; package and user data were preserved.\n'
@@ -257,11 +257,6 @@ personal_agent_settings() {
   mapfile -d '' -t args < <(adapter_args "$personal_agent_manifest" "$1")
   native sudo "$personal_agent_python" "$personal_agent_adapter" "${args[@]}"
 }
-searxng_settings() {
-  local args=()
-  mapfile -d '' -t args < <(adapter_args "$searxng_manifest" "$1")
-  native sudo "$searxng_python" "$searxng_adapter" "${args[@]}"
-}
 # Read-only ownership preflight precedes package/configuration writes. A second
 # pass after updates checks newly installed native tools and configuration.
 progress_start "[$current_step/$total_steps] Preflight core and optional modules"
@@ -278,11 +273,6 @@ else
   else
     exit "$ai_status"
   fi
-fi
-if searxng_settings preflight; then
-  :
-else
-  exit $?
 fi
 personal_agent_skipped=0
 if ((ai_skipped)); then
@@ -449,11 +439,6 @@ if ((!ai_skipped)); then
     fi
     exit "$ai_status"
   fi
-fi
-if searxng_settings converge; then
-  :
-else
-  exit $?
 fi
 if ((!personal_agent_skipped)); then
   if personal_agent_settings converge; then

@@ -12,14 +12,6 @@
   personalAgentPackage ? null,
   personalAgentConfig ? {
     enable = false;
-    searxng = {
-      enable = false;
-      url = "http://127.0.0.1:8888";
-    };
-  },
-  searxngConfig ? {
-    enable = false;
-    port = 8888;
   },
   moduleGroups ? [ ],
   moduleSystemUnits ? [ ],
@@ -38,10 +30,6 @@ let
         artifacts = aiArtifacts;
         tailscale = capabilities.tailscale;
       };
-  searxng = import ./searxng {
-    inherit pkgs;
-    config = searxngConfig;
-  };
   personalAgent =
     if personalAgentPackage == null then
       null
@@ -50,7 +38,6 @@ let
         inherit pkgs;
         package = personalAgentPackage;
         config = personalAgentConfig;
-        searxngEnabled = searxngConfig.enable;
       };
 in
 pkgs.writeShellApplication {
@@ -104,9 +91,6 @@ pkgs.writeShellApplication {
       else
         personalAgent.manifest
     }
-    readonly searxng_python=${adapterPython}/bin/python3
-    readonly searxng_adapter=${./searxng/adapter.py}
-    readonly searxng_manifest=${searxng.manifest}
     readonly fs_root=""
     readonly native_bin=/usr/bin
     readonly managed_identity=644:0:0

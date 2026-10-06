@@ -19,13 +19,4 @@ sudo systemctl status personal-agent.service
 sudo journalctl -u personal-agent.service -f
 ```
 
-For private loopback web search, enable both the independent SearXNG service and the Agent integration:
-
-```nix
-services.searxng.enable = true;
-services.personalAgent.searxng.enable = true;
-```
-
-SearXNG binds loopback; its generated runtime secret stays under its native state directory. The Agent integration supplies the local search URL and orders the services when both are enabled. Their current defaults belong to the owning modules.
-
-Disabling either declaration withdraws management without deleting accounts, configuration or database state. Explicit workstation purge removes managed units and stops managed services while preserving that data and the accounts. See [deployment](deployment.md) for purge scope and failure recovery.
+Disabling the declaration withdraws management without deleting accounts, configuration or database state. Explicit workstation purge removes managed units and stops managed services while preserving that data and the accounts. See [deployment](deployment.md) for purge scope and failure recovery.

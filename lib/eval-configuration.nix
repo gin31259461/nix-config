@@ -42,14 +42,6 @@ let
     );
     personalAgent = {
       enable = cfg.services.personalAgent.enable;
-      searxng = {
-        enable = cfg.services.personalAgent.enable && cfg.services.personalAgent.searxng.enable;
-        inherit (cfg.services.personalAgent.searxng) url;
-      };
-    };
-    searxng = {
-      enable = cfg.services.searxng.enable;
-      inherit (cfg.services.searxng) port;
     };
     powerpanel = cfg.services.powerpanel;
     users = lib.mapAttrs (
