@@ -20,7 +20,11 @@ def execute(
     except subprocess.TimeoutExpired as error:
         raise Conflict(f"command timed out: {argv[0]}") from error
     except subprocess.CalledProcessError as error:
-        raise Conflict(f"command failed ({error.returncode}): {argv[0]}") from None
+        detail = (error.stderr or error.stdout or "").strip()
+        message = f"command failed ({error.returncode}): {argv[0]}"
+        if detail:
+            message = f"{message}: {detail}"
+        raise Conflict(message) from None
 
 
 class _AdapterRunner(Native):
